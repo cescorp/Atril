@@ -85,6 +85,10 @@ SETTINGS = [
     ("historial_dias", "Historial de cambios", "Borrar el historial de un archivo tras (días sin editarlo)", 7, 1, 3650),
     ("historial_mb", "Historial de cambios", "Espacio máximo de todo el historial (MB)", 1000, 50, 100000),
     ("historial_pausa_seg", "Historial de cambios", "Al escribir, un paso nuevo tras una pausa de (segundos)", 2, 1, 30),
+    # lista de opciones: valor por defecto de texto y en «mínimo» las opciones (valor, nombre)
+    ("web_buscador", "Web", "Buscador de la pestaña web (Google, Bing, Yahoo y Wikipedia se ven dentro de Atril; los demás, con «Abrir en el navegador»)",
+     "google", [("google", "Google"), ("bing", "Bing"), ("yahoo", "Yahoo"), ("wikipedia", "Wikipedia (español)"),
+                ("duckduckgo", "DuckDuckGo"), ("ecosia", "Ecosia"), ("brave", "Brave Search")], None),
 ]
 _settings = None
 
@@ -113,6 +117,9 @@ def set_ajustes(data):
         v = data[k]
         if isinstance(d, bool):
             current[k] = bool(v)
+        elif isinstance(d, str):  # lista de opciones: solo una de las previstas
+            if v in [c for c, _ in lo]:
+                current[k] = v
         else:
             try:
                 v = int(v)
@@ -1586,6 +1593,31 @@ def write_with_backup(p, data, busy):
     return {"bak": str(bak) if bak else None, "mtime": str(p.stat().st_mtime_ns), "deshacer": undo_id}
 
 
+# ---------- pestaña web: ¿la página se deja mostrar dentro de Atril? ----------
+
+def web_check(url):
+    """Descarga solo las cabeceras (GET, sigue redirecciones) y mira X-Frame-Options y CSP frame-ancestors.
+    Límite: una página que lo permite puede enlazar a otras que no; esas fallan dentro del marco."""
+    import urllib.request
+    if not re.match(r"https?://", url, re.I):
+        return {"permitido": False, "motivo": "La dirección debe empezar por http:// o https://", "url": url}
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (Atril)", "Accept": "text/html,*/*"})
+    try:
+        with urllib.request.urlopen(req, timeout=8) as r:
+            final, h = r.geturl(), r.headers
+    except urllib.error.HTTPError as e:  # 404, 403…: el marco mostrará la página de error de la web
+        final, h = url, e.headers
+    except (OSError, ValueError) as e:
+        return {"permitido": False, "motivo": f"No se pudo conectar: {getattr(e, 'reason', e)}", "url": url}
+    xfo = (h.get("X-Frame-Options") or "").strip().lower()
+    fa = re.search(r"frame-ancestors([^;]*)", h.get("Content-Security-Policy") or "", re.I)
+    sources = fa.group(1).split() if fa else []
+    blocked = xfo in ("deny", "sameorigin") or (fa and "*" not in sources)
+    host = urlparse(final).hostname or final
+    return {"permitido": not blocked, "url": final,
+            "motivo": f"{host} no permite mostrarse dentro de otra página (es una protección de la web)" if blocked else ""}
+
+
 # ---------- historial de cambios (↶ ↷): cada paso queda en disco y sobrevive a guardar y cerrar ----------
 # historial/versiones/<hash de la ruta>/: meta.json (árbol de pasos) + <id>.dat (el paso) + <id>.base (copia del archivo).
 # Texto e imagen: cada paso guarda el estado completo. Word: los cambios del paso (se reconstruye desde la última copia).
@@ -2399,6 +2431,8 @@ class Handler(BaseHTTPRequestHandler):
                 r = runs.get(q.get("id", ""))
                 return self.send_json(200, r.output(int(q.get("desde", 0)))) if r else self.send_json(404, {"error": "no existe"})
             ruta = q.get("ruta", "")
+            if url.path == "/api/web/permite":  # no es una ruta de archivo: va antes de la comprobación de permisos
+                return self.send_json(200, web_check(q.get("url", "")))
             if url.path == "/api/pruebas":
                 if not is_project(ruta):
                     return self.send_json(403, {"error": "no es un proyecto añadido"})

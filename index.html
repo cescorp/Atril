@@ -70,7 +70,7 @@ body.max-doc,body.max-ia,body.max-con{grid-template-columns:1fr!important}
 body.max-doc #ribbon,body.max-doc aside,body.max-doc #ia,body.max-doc #panel,
 body.max-ia #ribbon,body.max-ia aside,body.max-ia main,
 body.max-con #ribbon,body.max-con aside,body.max-con #ia,
-body.max-con #tabs,body.max-con #bar,body.max-con #view,body.max-con #status{display:none!important}
+body.max-con #panes,body.max-con #status{display:none!important}
 body.max-con main{grid-template-rows:1fr}
 body.max-con #panel{height:auto!important}
 /* panel de IA */
@@ -209,7 +209,15 @@ dialog#dlg.info{max-height:85vh;overflow:auto}
 .lock{color:var(--lock)}
 .missing{opacity:.5;text-decoration:line-through}
 /* pestañas */
-main{display:grid;grid-template-rows:auto auto 1fr auto auto;min-width:0;min-height:0}
+main{display:grid;grid-template-rows:1fr auto auto;min-width:0;min-height:0}
+/* vista dividida: cada .pane tiene sus #tabs, #bar y #view; $() busca primero en la activa (.on) */
+#panes{display:grid;grid-template-columns:minmax(0,1fr);min-width:0;min-height:0}
+body.split #panes{grid-template-columns:minmax(0,var(--splitL,1fr)) 5px minmax(0,1fr)}
+.pane{position:relative;display:grid;grid-template-rows:auto auto 1fr;min-width:0;min-height:0}
+#splitGrip{cursor:ew-resize;background:var(--line);transition:background .15s}#splitGrip:hover,#splitGrip.drag{background:var(--accent)}
+body.split .pane.on #tabs{box-shadow:inset 0 2px 0 var(--accent)}
+body.split .pane:not(.on) #view{opacity:.92}
+.pane #tabs.dropin{background:color-mix(in srgb,var(--accent) 12%,var(--side))}
 /* panel de consola */
 #panel{display:grid;grid-template-rows:4px auto 1fr auto auto;height:260px;border-top:1px solid var(--line);background:var(--side);min-height:0}
 #panel[hidden]{display:none}
@@ -333,6 +341,33 @@ dialog#dlg.cmp[open]{display:flex}
 .cm-blamei{position:absolute;right:16px;z-index:5;max-width:min(560px,70%);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
   padding:1px 8px;border-radius:4px;border-left:3px solid var(--ac);background:color-mix(in srgb,var(--paper) 92%,var(--ac));color:var(--ac);
   box-shadow:0 1px 4px rgba(0,0,0,.12);font:italic 11.5px/1.5 Inter,system-ui,sans-serif;cursor:default}
+/* pestaña web */
+#bar .waddr{flex:1;min-width:120px;margin:0 6px;padding:4px 10px;border:1px solid var(--line);border-radius:14px;background:var(--side);color:var(--ink);font:13px/1.4 inherit}
+#bar .waddr:focus{outline:2px solid color-mix(in srgb,var(--accent) 45%,transparent);background:var(--paper)}
+#bar .waddr.winside::placeholder{color:var(--muted);font-style:italic;opacity:1} /* dirección desconocida tras navegar dentro */
+.wframe{display:block;width:100%;height:100%;border:0;background:#fff}
+.wblock{margin:48px auto;max-width:560px}.wblock .primary{margin-top:6px}
+.wstart{max-width:640px;margin:64px auto;padding:0 16px;color:var(--muted)}
+.wstart h4{margin:24px 0 8px;font-size:13px;color:var(--ink)}
+.wfavs{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px}
+.wfavs button{text-align:left;padding:8px 10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* comparar dos archivos: mismos colores que el comparador de git (rojo = solo en A, verde = solo en B) */
+dialog#dlg.fcmp{max-width:none;width:calc(100vw - 32px);height:calc(100vh - 32px);padding:0;display:none;flex-direction:column}
+dialog#dlg.fcmp[open]{display:flex}
+.fcmp header,.fcmp footer{display:flex;gap:8px;align-items:center;padding:10px 14px}
+.fcmp header{border-bottom:1px solid var(--line)}.fcmp header b{margin-right:auto}
+.fcmp footer{border-top:1px solid var(--line)}
+.fheads{display:grid;grid-template-columns:1fr 1fr;gap:30px;padding:6px 14px;font-size:13px;font-weight:600;color:var(--muted)}
+.fheads span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fmerge{flex:1;min-height:0}
+.fmerge .CodeMirror-merge,.fmerge .CodeMirror-merge-pane,.fmerge .CodeMirror-merge-gap,.fmerge .CodeMirror-merge .CodeMirror{height:100%;border:0}
+.fmerge .CodeMirror-merge-left .CodeMirror-merge-l-chunk{background:rgba(220,40,40,.1)}
+.fmerge .CodeMirror-merge-editor .CodeMirror-merge-l-chunk{background:rgba(40,160,80,.12)}
+.fmerge .CodeMirror-merge-l-deleted{background:rgba(220,40,40,.32);border-radius:2px}
+.fmerge .CodeMirror-merge-l-inserted{background:rgba(40,160,80,.35);border-radius:2px}
+.fmerge [class*=CodeMirror-merge-][class*=-chunk-start]{border-top:1px solid rgba(128,128,128,.35)}
+.fmerge [class*=CodeMirror-merge-][class*=-chunk-end]{border-bottom:1px solid rgba(128,128,128,.35)}
+.fmerge .CodeMirror-merge-copy{color:var(--accent);font-size:15px}
 .cleg{margin-left:auto}.cleg i{display:inline-block;width:12px;height:12px;border-radius:2px;vertical-align:-2px;margin:0 2px 0 8px}
 .cleg i.del{background:#f4c7c7}.cleg i.add{background:#c9ecd2}
 /* de izquierda (más vieja) a derecha (más nueva): lo que solo está a la izquierda = quitado (rojo), lo nuevo = añadido (verde) */
@@ -404,7 +439,8 @@ dialog#dlg.cmp[open]{display:flex}
 .iwrap{position:relative;display:inline-block;line-height:0}.iwrap canvas{max-width:100%;max-height:calc(100vh - 190px);touch-action:none;box-shadow:0 1px 4px rgba(0,0,0,.2)}
 .icrop{position:absolute;display:none;border:1px dashed #fff;outline:1px dashed #000;box-shadow:0 0 0 9999px rgba(0,0,0,.45);pointer-events:none}
 .iwrap:has(.icrop) canvas{cursor:crosshair}
-.ppages{display:flex;flex-direction:column;align-items:center;gap:18px;padding:16px;background:var(--bg)}
+/* safe center: si la página es más ancha que el lado (vista dividida), se alinea a la izquierda en vez de cortarse por los dos bordes */
+.ppages{display:flex;flex-direction:column;align-items:safe center;gap:18px;padding:16px;background:var(--bg)}
 .phead{display:flex;gap:4px;align-items:center;font-size:12px;color:var(--muted);margin-bottom:4px}.phead button{padding:1px 7px}
 .pbody{position:relative;isolation:isolate;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.2);cursor:crosshair;touch-action:none;overflow:hidden}
 .pbody canvas{width:100%;height:100%;display:block}
@@ -426,7 +462,7 @@ dialog#dlg.cmp[open]{display:flex}
 .pthumb div{width:110px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);outline:2px solid transparent;outline-offset:2px}
 .pthumb div canvas{width:100%;height:100%;display:block}
 .pthumb:hover div{outline-color:var(--line)}.pthumb.cur div{outline-color:var(--accent)}.pthumb.cur{color:var(--accent);font-weight:600}
-/* buscar y reemplazar (como VS Code) */
+/* buscar y reemplazar (como VS Code); el cuadro vive en la .pane activa */
 main{position:relative}
 #find{position:absolute;right:22px;z-index:20;display:grid;grid-template-columns:auto 1fr;gap:4px 4px;padding:5px 6px 5px 2px;background:var(--side);border:1px solid var(--line);border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.18);font-size:13px}
 #find[hidden]{display:none}
@@ -448,7 +484,7 @@ main{position:relative}
 ::highlight(fcur){background-color:rgba(255,120,0,.75)}
 .cm-fmatch{background:rgba(255,200,0,.4);border-radius:2px}
 .cm-fbar{background:rgba(230,150,0,.9);min-height:3px}
-.ptx{white-space:pre;font-family:Helvetica,Arial,sans-serif;line-height:1;transform:translateY(-80%)}.docxbox .docx-wrapper{background:var(--bg)!important;padding:24px 16px!important}
+.ptx{white-space:pre;font-family:Helvetica,Arial,sans-serif;line-height:1;transform:translateY(-80%)}.docxbox .docx-wrapper{background:var(--bg)!important;padding:24px 16px!important;align-items:safe center!important}
 .docxbox .docx-wrapper>section.docx{box-shadow:0 1px 4px rgba(0,0,0,.18);margin-bottom:24px!important}
 .node.seldir:not(.on){box-shadow:inset 2px 0 0 var(--accent)}
 .newrow input{flex:1;min-width:0;font:inherit;font-size:13px;padding:2px 6px;border:1px solid var(--accent);border-radius:4px;background:var(--paper);color:var(--ink)}
@@ -536,6 +572,8 @@ dialog#dlg.sets[open]{display:flex}
 .srow label small{display:block;color:var(--faint);font-size:12px}
 .srow input[type=number]{width:100%;font:inherit;padding:4px 8px;border:1px solid var(--line);border-radius:5px;background:var(--bg);color:var(--ink);text-align:right;font-variant-numeric:tabular-nums}
 .srow input[type=checkbox]{justify-self:start;width:16px;height:16px;accent-color:var(--accent)}
+.srow select{width:100%;font:inherit;padding:4px 6px;border:1px solid var(--line);border-radius:5px;background:var(--bg);color:var(--ink)}
+.srow input:focus-visible,.srow select:focus-visible{outline:2px solid color-mix(in srgb,var(--accent) 45%,transparent)}
 .shint{font-size:12px;color:var(--faint);font-variant-numeric:tabular-nums}
 .sreset{visibility:hidden;font-size:12px;padding:1px 8px;justify-self:start}
 .srow.mod .sreset{visibility:visible}
@@ -646,9 +684,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
   <div class="rs" data-var="--sideW" data-def="260" title="Arrastra para cambiar el ancho · doble clic: ancho original"></div>
 </aside>
 <main>
-  <div id="tabs"></div>
-  <div id="bar"></div>
-  <div id="view"></div>
+  <div id="panes"><div class="pane on"><div id="tabs"></div><div id="bar"></div><div id="view"></div></div></div>
   <section id="panel" hidden>
     <div id="grip" title="Arrastra para cambiar el tamaño"></div>
     <div class="ph"><div id="runtabs"></div><span id="phTools"></span></div>
@@ -683,7 +719,9 @@ button:disabled{opacity:.45;cursor:not-allowed}
   </div>
 </div>
 <script>
-const $ = s => document.querySelector(s);
+// Vista dividida: los dos lados repiten ids (#tabs, #bar, #view, #rpg…); $() busca primero en el lado activo.
+let paneEl = document.querySelector('.pane');
+const $ = s => paneEl.querySelector(s) || document.querySelector(s);
 const H = { 'X-Atril': '1' };
 const api = (url, body) => fetch(url, body === undefined ? { headers: H } :
   { method: 'POST', headers: { ...H, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
@@ -709,6 +747,9 @@ const I = {
   folderPlus: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 10v6M9 13h6"/>',
   filePlus: '<path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5M12 11v6M9 14h6"/>',
   collapse: '<path d="m7 20 5-5 5 5M7 4l5 5 5-5"/>',
+  split: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16"/>',
+  globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/>',
+  unsplit: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16" stroke-dasharray="2 3"/>',
   left: '<path d="M19 12H5M11 18l-6-6 6-6"/>',
   right: '<path d="M5 12h14M13 6l6 6-6 6"/>',
   book: '<path d="M2 5h6a4 4 0 0 1 4 4v11a3 3 0 0 0-3-3H2zM22 5h-6a4 4 0 0 0-4 4v11a3 3 0 0 1 3-3h7z"/>',
@@ -854,18 +895,240 @@ function nodeMenu(anchor, path, isDir, git, extra = []) {
   const copy = [['⧉  Copiar nombre', () => copyText(name, 'Nombre copiado'), { title: name }],
     ['⧉  Copiar ruta', () => copyText(path, 'Ruta copiada'), { title: path }],
     ['⧉  Copiar ruta relativa', () => copyText(rel, 'Ruta relativa copiada'), { title: rel }],
-    ['📁  Mostrar en carpeta', () => api('/api/mostrar', { ruta: path }), { title: 'Abrir el Explorador de Windows con el archivo marcado' }]];
+    ['📁  Mostrar en carpeta', () => api('/api/mostrar', { ruta: path }).catch(e => ask('Mostrar en carpeta', e.message, ['Entendido'])), { title: 'Abrir el explorador de archivos con el archivo marcado' }]];
   if (isDir) return openMenu(anchor, [{ head: name }, ['ⓘ  Información…', () => infoDialog(path)], '-',
     ['＋  Nuevo archivo aquí', () => newInline('archivo', path)], ['＋  Nueva carpeta aquí', () => newInline('carpeta', path)], '-', ...copy]);
   openMenu(anchor, [{ head: g ? `${name} · ${GIT_TXT[g]}` : name }, ...extra,
     ['ⓘ  Información…', () => infoDialog(path)],
     ['⇆  Comparar versiones (git)…', () => compareDialog(path), g === 'sin_git' ? { disabled: true, title: 'Sin git: este archivo no está en un repositorio' } : { title: 'Ver y comparar sus commits en 2 o 3 columnas' }],
+    ['⇆  Comparar con otro archivo…', () => comparePick(anchor, path), { title: 'Elegir otro archivo y ver sus diferencias en colores' }],
+    ...(otherPath() && otherPath() !== path ? [['⇆  Comparar con el otro lado', () => compareFiles(path, otherPath()), { title: otherPath() }]] : []),
     '-',
     ['📄  Abrir', () => openTab(path, true)],
     ['✎  Editar', () => editPath(path)],
     ['📎  Adjuntar al chat', () => { setIA(true); dropPath(path); }, { title: 'Lo mismo que arrastrarlo al panel de IA' }],
     ['🖨  Imprimir…', () => printDialog(path), canPrint(path) ? { key: 'Ctrl+P' } : { disabled: true, title: 'Audio, vídeo y fuentes no se imprimen' }],
     '-', ...copy]);
+}
+// ---------- pestaña web ----------
+// Un <iframe> con sandbox sin allow-top-navigation: la web no puede sacar a Atril de su página.
+// Antes de cargar, /api/web/permite mira X-Frame-Options y frame-ancestors; si la web no se deja mostrar,
+// se ofrece abrirla en el navegador. La dirección no sigue a los enlaces dentro de la web (el iframe es de otro
+// origen y no se puede leer); ← → usan el historial de la ventana, contando solo las cargas de este iframe.
+// buscador de ⚙ Ajustes (web_buscador); igu=1: con ese parámetro Google se deja mostrar en un iframe
+const SEARCHERS = { google: 'https://www.google.com/search?igu=1&q=', bing: 'https://www.bing.com/search?q=',
+  yahoo: 'https://search.yahoo.com/search?p=', wikipedia: 'https://es.wikipedia.org/w/index.php?search=',
+  duckduckgo: 'https://duckduckgo.com/?q=', ecosia: 'https://www.ecosia.org/search?q=', brave: 'https://search.brave.com/search?q=' };
+const WEB_SEARCH = q => (SEARCHERS[AJ.web_buscador] || SEARCHERS.google) + encodeURIComponent(q);
+const webFavs = () => { try { return JSON.parse(LS('atril.favoritos') || '[]'); } catch { return []; } };
+function webUrl(t) { // lo escrito en la barra: dirección, dominio suelto o búsqueda
+  t = t.trim();
+  if (!t) return '';
+  if (/^https?:\/\//i.test(t)) return t;
+  if (/^(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/i.test(t)) return 'http://' + t;
+  if (/^[\w-]+(\.[\w-]+)+(:\d+)?(\/\S*)?$/.test(t) && !/\s/.test(t)) return 'https://' + t;
+  return WEB_SEARCH(t);
+}
+function webOpen(t) { // nueva pestaña web (o la de inicio si no hay dirección)
+  const u = webUrl(t || '');
+  openTab('web:' + u, true);
+}
+async function webView(V, B, path) {
+  const s = curSeq();
+  let url = path.slice(4);
+  V.className = 'flush';
+  // nav: posición en las cargas de este iframe. urls[pos]: la dirección de esa carga si la puso Atril (barra o
+  // favoritos); null si se llegó con un enlace de dentro, que no se puede leer. going: ±1 si la pidió ← →;
+  // expect: 'nuevo' (Atril cambió src, la dirección es pending) o 'recarga' (misma posición).
+  const nav = { pos: 0, max: 0, going: 0, urls: [], expect: null, pending: '' };
+  const HINT = 'Escribe una dirección o lo que quieras buscar';
+  const go = Object.assign(document.createElement('input'), { className: 'waddr', value: url, placeholder: HINT, spellcheck: false });
+  const lastKnown = () => { for (let i = nav.pos; i >= 0; i--) if (nav.urls[i]) return nav.urls[i]; return url; };
+  function showState() { // dirección conocida: como un navegador · desconocida: se dice, y ⟳ vuelve al inicio
+    const here = nav.urls[nav.pos], inside = !!frame && frame.dataset.loaded && !here;
+    go.classList.toggle('winside', inside);
+    if (here) setUrl(here);
+    if (inside) { go.value = ''; go.placeholder = `↪ Navegaste dentro de la web · empezó en ${lastKnown()}`; }
+    else go.placeholder = HINT;
+    reload.textContent = inside ? '⌂' : '⟳';
+    reload.title = inside ? `Volver al inicio: ${lastKnown()}` : 'Recargar';
+    const note = inside ? ` (dirección inicial: ${lastKnown()})` : '';
+    ext.title = 'Abrir en el navegador' + note; paintStar(); star.title += note;
+  }
+  const back = iconBtn('left', 'Atrás', () => {
+    if (frame?.hidden) { frame.hidden = false; V.querySelector('.wblock')?.remove(); return; } // del aviso de bloqueo a la página de antes
+    if (nav.pos > 0) { nav.going = -1; history.back(); }
+  }, true);
+  const fwd = iconBtn('right', 'Adelante', () => { if (nav.pos < nav.max) { nav.going = 1; history.forward(); } }, true);
+  const reload = button('⟳', () => { // dentro de la web no se puede recargar «la de ahora»: se vuelve a la última conocida
+    if (!frame) return render();
+    const here = nav.urls[nav.pos];
+    if (here) { nav.expect = 'recarga'; frame.src = here; } else navigate(lastKnown());
+  });
+  reload.className = 'small'; reload.title = 'Recargar';
+  const isFav = () => webFavs().some(f => f.url === url);
+  const star = button('☆', () => {
+    if (!url) return;
+    const favs = webFavs(), i = favs.findIndex(f => f.url === url);
+    i >= 0 ? favs.splice(i, 1) : favs.push({ url, nombre: webHost(url) });
+    LS('atril.favoritos', JSON.stringify(favs)); paintStar();
+  });
+  star.className = 'small';
+  const paintStar = () => { star.textContent = isFav() ? '★' : '☆'; star.title = isFav() ? 'Quitar de favoritos' : 'Añadir a favoritos'; };
+  const favMenu = button('▾', e => {
+    const favs = webFavs();
+    openMenu(e.currentTarget, favs.length ? [{ head: 'Favoritos' }, ...favs.map(f => [f.nombre, () => navigate(f.url), { title: f.url }])]
+      : [{ head: 'Sin favoritos: ☆ añade la página actual' }]);
+  });
+  favMenu.className = 'small'; favMenu.title = 'Favoritos';
+  const ext = button('↗', () => url && window.open(lastKnown(), '_blank', 'noopener')); ext.className = 'small'; ext.title = 'Abrir en el navegador';
+  B.append(back, fwd, reload, go, star, favMenu, ext, maxBtn('doc'));
+  paintStar();
+  let frame = null;
+  const setUrl = u => { // la pestaña pasa a llamarse como la nueva dirección (sin volver a dibujar)
+    url = u; go.value = u; paintStar();
+    const p = 'web:' + u, i = tabs.indexOf(cur);
+    if (i >= 0 && p !== cur && !tabs.includes(p)) { if (previewTab === cur) previewTab = p; tabs[i] = cur = p; persist(); renderTabs(); }
+  };
+  async function navigate(u) {
+    u = webUrl(u);
+    if (!u) return;
+    const r = await api('/api/web/permite?url=' + encodeURIComponent(u)).catch(e => ({ permitido: false, motivo: e.message, url: u }));
+    if (!live(s)) return;
+    setUrl(r.url || u);
+    if (!r.permitido) { if (frame) frame.hidden = true; return blocked(r); } // oculto, no quitado: ← vuelve a la anterior
+    V.querySelector('.wblock, .wstart')?.remove();
+    if (frame) frame.hidden = false;
+    if (!frame) { // un solo iframe por pestaña: así su historial sirve para ← →
+      frame = Object.assign(document.createElement('iframe'), { className: 'wframe', referrerPolicy: 'no-referrer' });
+      frame.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads');
+      frame.onload = () => {
+        const known = nav.expect === 'nuevo' ? nav.pending : null;
+        if (nav.expect === 'recarga') { /* misma posición */ }
+        else if (nav.going) { nav.pos += nav.going; nav.going = 0; }
+        else if (frame.dataset.loaded) { nav.pos++; nav.max = nav.pos; nav.urls.length = nav.pos; nav.urls[nav.pos] = known; }
+        else nav.urls[0] = known; // primera carga
+        nav.expect = null; frame.dataset.loaded = 1;
+        back.disabled = nav.pos <= 0; fwd.disabled = nav.pos >= nav.max;
+        showState();
+      };
+      Object.assign(nav, { expect: 'nuevo', pending: r.url || u });
+      frame.src = r.url || u; // antes de insertarlo: si no, carga about:blank y esa carga contaría como página
+      return V.append(frame);
+    }
+    Object.assign(nav, { expect: 'nuevo', pending: r.url || u });
+    frame.src = r.url || u;
+  }
+  function blocked(r) {
+    V.querySelector('.wblock, .wstart')?.remove();
+    const box = document.createElement('div'); box.className = 'card wblock';
+    box.innerHTML = '<b>🔒 Esta página no se puede mostrar aquí</b><p></p><p class="ok">Las webs pueden prohibir que se las muestre dentro de otra página (GitHub, YouTube, bancos…). Ábrela en el navegador.</p>';
+    box.querySelector('p').textContent = r.motivo;
+    const b = button('↗ Abrir en el navegador', () => window.open(r.url, '_blank', 'noopener')); b.className = 'primary';
+    box.append(b); V.append(box);
+    back.disabled = !frame; // hay una página anterior a la que volver
+  }
+  function start() { // pestaña nueva: la barra de dirección y los favoritos
+    const box = document.createElement('div'); box.className = 'wstart';
+    box.innerHTML = '<p>Escribe una dirección o lo que quieras buscar en la barra de arriba.</p>';
+    const favs = webFavs();
+    if (favs.length) {
+      const L = document.createElement('div'); L.className = 'wfavs';
+      L.append(...favs.map(f => Object.assign(button(f.nombre, () => navigate(f.url)), { title: f.url })));
+      box.append(Object.assign(document.createElement('h4'), { textContent: 'Favoritos' }), L);
+    }
+    V.append(box);
+    setTimeout(() => go.focus());
+  }
+  go.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); navigate(go.value); } if (e.key === 'Escape') go.value = go.classList.contains('winside') ? '' : url; };
+  go.onfocus = () => go.select();
+  url ? navigate(url) : start();
+}
+// ---------- comparar dos archivos cualesquiera ----------
+// MergeView de CodeMirror (el mismo que el comparador de git): izquierda = A (solo lectura), derecha = B.
+// Si B es texto, la derecha se edita y las flechas ➜ copian un cambio de A a B; Guardar escribe B.
+// Word, Excel y PowerPoint se comparan por su texto; PDF por el texto de sus páginas (hasta 500).
+const otherPath = () => panes[1] ? panes[active === 0 ? 1 : 0].cur : null;
+async function comparePick(anchor, path) {
+  const folder = path.replace(/[\\/][^\\/]*$/, ''), seen = new Set([path]), items = [];
+  const add = p => { if (!seen.has(p) && !isVirtual(p)) { seen.add(p); items.push([p.split(/[\\/]/).pop(), () => compareFiles(path, p), { title: p }]); } };
+  panes.forEach(p => (p === panes[active] ? tabs : p.tabs).forEach(add)); // primero las pestañas abiertas
+  for (const i of await api('/api/dir?ruta=' + encodeURIComponent(folder)).catch(() => [])) if (!i.dir) add(i.ruta);
+  if (!items.length) return ask('Comparar', 'No hay otros archivos en esa carpeta ni pestañas abiertas con los que comparar.', ['Entendido']);
+  openMenu(anchor, [{ head: `Comparar «${path.split(/[\\/]/).pop()}» con…` }, ...items], { search: 'Buscar archivo…' });
+}
+async function cmpText(path) {
+  const name = path.split(/[\\/]/).pop(), ext = kind(path).ext, ed = edits.get(path);
+  if (ed) return { text: ed.text, f: ed.f };
+  if (ext === 'pdf') {
+    const doc = await (await loadPdfJs()).getDocument(raw(path)).promise;
+    return { text: await pdfText(doc, 1, Math.min(doc.numPages, 500)) };
+  }
+  if (/^(docx|xlsx|xlsm|pptx)$/.test(ext)) return { text: norm((await api('/api/extraer?ruta=' + encodeURIComponent(path))).texto) };
+  const f = await api('/api/abrir?ruta=' + encodeURIComponent(path));
+  if (f.texto === null) throw new Error(`«${name}» no es un archivo de texto: no se puede comparar`);
+  return { text: norm(f.texto), f: f.truncado ? null : f }; // f: se puede editar y guardar
+}
+async function compareFiles(a, b) {
+  const d = $('#dlg'), nameA = a.split(/[\\/]/).pop(), nameB = b.split(/[\\/]/).pop();
+  let A, B;
+  try { [A, B] = await Promise.all([cmpText(a), cmpText(b), loadMerge()]); }
+  catch (e) { return ask('Comparar', e.message, ['Entendido']); }
+  const editable = !!B.f;
+  d.className = 'fcmp'; d.oninput = d.onchange = null;
+  d.innerHTML = `<header><b></b><button class="small" data-a="swap" title="Poner cada archivo en el otro lado">⇄ Invertir</button>
+      <button class="ic" data-a="x" title="Cerrar (Esc)">✕</button></header>
+    <div class="fheads"><span title="${esc(a)}">${esc(nameA)}</span><span title="${esc(b)}">${esc(nameB)}${editable ? '' : ' · solo lectura'}</span></div>
+    <div class="fmerge"></div>
+    <footer><button data-a="prev" title="Cambio anterior (Alt+↑)">↑</button><button data-a="next" title="Cambio siguiente (Alt+↓)">↓</button>
+      <span class="ok" id="finfo"></span><label class="ok"><input type="checkbox" id="ffold"> Ocultar líneas iguales</label>
+      <span class="ok cleg"><i class="del"></i> solo en ${esc(nameA)} <i class="add"></i> solo en ${esc(nameB)}</span>
+      ${editable ? '<button class="primary small" data-a="save" disabled title="Guardar los cambios del lado derecho">Guardar</button>' : ''}</footer>`;
+  d.querySelector('header b').textContent = `Comparar · ${nameA} ⇆ ${nameB}`;
+  let mv = null;
+  const build = () => {
+    const info = CodeMirror.findModeByFileName(nameB), box = d.querySelector('.fmerge');
+    const text = mv ? mv.editor().getValue() : B.text; // al plegar/desplegar se conserva lo editado
+    box.innerHTML = '';
+    mv = CodeMirror.MergeView(box, { value: text, origLeft: A.text, lineNumbers: true, readOnly: !editable, revertButtons: editable,
+      highlightDifferences: true, connect: 'align', collapseIdentical: $('#ffold').checked ? 3 : false, lineWrapping: true,
+      mode: info?.mime || info?.mimes?.[0], theme: matchMedia('(prefers-color-scheme: dark)').matches ? 'material-darker' : 'default' });
+    if (info) CodeMirror.autoLoadMode(mv.editor(), info.mode);
+    const count = () => {
+      const n = mv.leftChunks()?.length || 0;
+      $('#finfo').textContent = n ? `${n} cambio${n === 1 ? '' : 's'}` : 'Son iguales';
+      const s = d.querySelector('[data-a=save]'); if (s) s.disabled = mv.editor().getValue() === B.text;
+    };
+    mv.editor().on('changes', () => setTimeout(count, 50)); // MergeView recalcula los cambios después del evento
+    [mv.leftOriginal(), mv.editor()].forEach(c => c.refresh());
+    count();
+  };
+  d.onclick = async e => {
+    const act = e.target.closest('[data-a]')?.dataset.a;
+    if (act === 'x') d.close();
+    if (act === 'swap') { d.close(); compareFiles(b, a); }
+    if (act === 'prev' || act === 'next') CodeMirror.commands[act === 'next' ? 'goNextDiff' : 'goPrevDiff'](mv.editor());
+    if (act === 'save') {
+      const texto = mv.editor().getValue();
+      try {
+        const r = await api('/api/guardar', { ruta: b, texto, codificacion: B.f.codificacion, eol: B.f.eol, mtime: B.f.mtime });
+        Object.assign(B, { text: texto }); B.f.mtime = r.mtime;
+        const ed = edits.get(b); if (ed) { ed.text = ed.orig = texto; ed.f.mtime = r.mtime; }
+        flash(`✓ Guardado ${nameB}` + (r.bak ? ' · respaldo: ' + r.bak.split(/[\\/]/).pop() : ''));
+        e.target.disabled = true;
+        if (panes.some(p => (p === panes[active] ? cur : p.cur) === b) && cur === b) render();
+      } catch (err) { ask('No se guardó', err.message, ['Entendido']); }
+    }
+  };
+  d.onkeydown = e => { // Alt+↑ / Alt+↓ antes que CodeMirror (que los usaría para mover líneas)
+    if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+    e.preventDefault(); e.stopPropagation(); d.querySelector(`[data-a=${e.key === 'ArrowDown' ? 'next' : 'prev'}]`).click();
+  };
+  $('#ffold').checked = LS('atril.fcmpfold') === '1';
+  $('#ffold').onchange = e => { LS('atril.fcmpfold', e.target.checked ? '1' : ''); build(); };
+  d.onclose = () => { d.onkeydown = d.onclick = null; };
+  d.showModal();
+  build();
 }
 async function editPath(path) { // abre la pestaña y entra en edición según el tipo
   await openTab(path, true);
@@ -1450,7 +1713,7 @@ function markActive() {
 
 // ---------- nuevo archivo / nueva carpeta (en la carpeta elegida, o la del archivo abierto, o el primer proyecto) ----------
 let selDir = null;
-const targetDir = () => selDir || (cur && !isUntitled(cur) ? cur.replace(/[\\/][^\\/]*$/, '') : null) || side.proyectos[0]?.ruta || null;
+const targetDir = () => selDir || (cur && !isVirtual(cur) ? cur.replace(/[\\/][^\\/]*$/, '') : null) || side.proyectos[0]?.ruta || null;
 async function newInline(type, dir = targetDir()) {
   if (!dir) return ask('Nuevo', 'Añade primero un proyecto: lo nuevo se crea dentro de él.', ['Entendido']);
   if (document.body.classList.contains('noside')) toggleSide();
@@ -1487,7 +1750,7 @@ async function newInline(type, dir = targetDir()) {
 }
 // El archivo de la pestaña actual siempre a la vista: despliega sus carpetas y se desplaza hasta él
 async function reveal(path) {
-  if (!path || isUntitled(path) || AJ.revelar_en_arbol === false || document.body.classList.contains('vsearch')) return;
+  if (!path || isVirtual(path) || AJ.revelar_en_arbol === false || document.body.classList.contains('vsearch')) return;
   const low = path.toLowerCase();
   const p = side.proyectos.find(x => under(low, x.ruta));
   if (p) {
@@ -1963,17 +2226,19 @@ async function settingsDialog() {
       <label class="sonly"><input type="checkbox"> Solo cambiados</label><span class="scount"></span></header>
     <div class="sbody"><nav>${groups.map(g => `<a data-g="${esc(g)}">${esc(g)}<span></span></a>`).join('')}</nav>
     <div class="slist">${groups.map(g => `<section data-g="${esc(g)}"><h4>${esc(g)}</h4>${s.lista.filter(a => a.grupo === g).map(a => {
-      const v = s.valores[a.clave], bool = typeof a.defecto === 'boolean';
+      const v = s.valores[a.clave], bool = typeof a.defecto === 'boolean', opts = typeof a.defecto === 'string' && a.min; // opts: [[valor, nombre]]
+      const def = bool ? (a.defecto ? 'sí' : 'no') : opts ? opts.find(o => o[0] === a.defecto)?.[1] : a.defecto;
       return `<div class="srow" data-c="${a.clave}" data-t="${esc(plainTxt(a.etiqueta + ' ' + g))}">
         <label for="s_${a.clave}">${label(a.etiqueta)}</label>
         ${bool ? `<input type="checkbox" id="s_${a.clave}" data-k="${a.clave}" ${v ? 'checked' : ''}>`
-               : `<input type="number" id="s_${a.clave}" data-k="${a.clave}" value="${v}" min="${a.min}" max="${a.max}">`}
-        <span class="shint">${bool ? '' : `${a.min}–${a.max}`}</span>
-        <button class="sreset" title="Volver al valor por defecto">↺ ${bool ? (a.defecto ? 'sí' : 'no') : a.defecto}</button></div>`;
+          : opts ? `<select id="s_${a.clave}" data-k="${a.clave}">${opts.map(([o, n]) => `<option value="${esc(o)}" ${o === v ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>`
+          : `<input type="number" id="s_${a.clave}" data-k="${a.clave}" value="${v}" min="${a.min}" max="${a.max}">`}
+        <span class="shint">${bool || opts ? '' : `${a.min}–${a.max}`}</span>
+        <button class="sreset" title="Volver al valor por defecto">↺ ${esc(String(def))}</button></div>`;
     }).join('')}</section>`).join('')}<p class="snone"></p></div></div>
     <footer><span class="ok">Se guardan en config.json</span><div class="exp-actions"></div></footer>`;
   const inp = k => d.querySelector(`[data-k=${k}]`), find = d.querySelector('.sfind'), only = d.querySelector('.sonly input');
-  const val = i => i.type === 'checkbox' ? i.checked : +i.value;
+  const val = i => i.type === 'checkbox' ? i.checked : i.tagName === 'SELECT' ? i.value : +i.value;
   const values = () => Object.fromEntries([...d.querySelectorAll('[data-k]')].map(i => [i.dataset.k, val(i)]));
   const refresh = () => {
     const q = plainTxt(find.value.trim());
@@ -2028,7 +2293,135 @@ const isDirty = e => e.text !== e.orig;
 // clic reemplaza. Se fija (deja de reemplazarse) con doble clic o en cuanto se modifica.
 let previewTab = null;
 try { ({ tabs, cur, previewTab = null } = JSON.parse(localStorage.getItem('atril.tabs')) || { tabs: [], cur: null }); } catch {}
-const persist = () => { try { localStorage.setItem('atril.tabs', JSON.stringify({ tabs, cur, previewTab })); } catch {} };
+
+// ---------- vista dividida ----------
+// panes[i]: estado de cada lado. tabs/cur/previewTab (y editorCM, curFile, pdfCtl, findP) son siempre los del
+// lado activo: activatePane() los guarda en su pane y carga los del otro sin volver a dibujar ninguno.
+const panes = [{ el: paneEl }];
+let active = 0, savedSplit = null; // savedSplit: se lee antes de que el arranque vuelva a guardar las pestañas
+try { savedSplit = JSON.parse(localStorage.getItem('atril.split') || 'null'); } catch {}
+const syncPane = () => {
+  Object.assign(panes[active], { tabs, cur, previewTab });
+  try { Object.assign(panes[active], { editorCM, curFile, pdfCtl, findP }); } catch {} // aún sin declarar mientras carga el script
+};
+const otherShows = path => panes.some((p, i) => i !== active && p.cur === path);
+const persist = () => {
+  syncPane();
+  const st = p => ({ tabs: p.tabs, cur: p.cur, previewTab: p.previewTab });
+  try {
+    localStorage.setItem('atril.tabs', JSON.stringify(st(panes[0])));
+    localStorage.setItem('atril.split', panes[1] ? JSON.stringify({ ...st(panes[1]), active }) : '');
+  } catch {}
+};
+function activatePane(i) {
+  if (i === active || !panes[i]) return;
+  syncPane();
+  panes[active].el.classList.remove('on');
+  active = i; paneEl = panes[i].el; paneEl.classList.add('on');
+  ({ tabs, cur, previewTab } = panes[i]);
+  editorCM = panes[i].editorCM || null; curFile = panes[i].curFile || null; pdfCtl = panes[i].pdfCtl || null;
+  sel = null;
+  const F = document.getElementById('find'); // el cuadro de buscar sigue al lado activo
+  if (F && F.parentElement !== paneEl) { F.hidden = true; paneEl.append(F); }
+  findP = panes[i].findP || null;
+  // un Word/imagen/PDF que se editaba aquí y cuyo estado global pasó a otro archivo: se vuelve a dibujar
+  const stale = (paneEl.querySelector('.wediting') && wedit?.path !== cur) || (paneEl.querySelector('.iedit') && iedit?.path !== cur)
+    || (paneEl.querySelector('.ppage') && pedit?.path !== cur);
+  persist(); markActive(); iaOnFile(); histBar();
+  if (stale || panes[i].stale) { panes[i].stale = false; render(); }
+}
+function newPaneEl() {
+  const el = document.createElement('div');
+  el.className = 'pane';
+  el.innerHTML = '<div id="tabs"></div><div id="bar"></div><div id="view"></div>';
+  paneWire(el);
+  return el;
+}
+// Un clic en cualquier parte de un lado lo activa antes de que el clic llegue a su destino.
+// Soltar una pestaña del otro lado sobre la barra de pestañas la mueve aquí.
+function paneWire(el) {
+  el.addEventListener('pointerdown', () => activatePane(panes.findIndex(p => p.el === el)), true);
+  const T = el.querySelector('#tabs');
+  const from = e => e.dataTransfer.types.includes('text/atril-pane') && +e.dataTransfer.getData('text/atril-pane');
+  T.addEventListener('dragover', e => {
+    if (!e.dataTransfer.types.includes('text/atril-pane')) return;
+    e.preventDefault(); T.classList.add('dropin');
+  });
+  T.addEventListener('dragleave', () => T.classList.remove('dropin'));
+  T.addEventListener('drop', e => {
+    T.classList.remove('dropin');
+    const src = from(e), path = e.dataTransfer.getData('text/atril-path'), dst = panes.findIndex(p => p.el === el);
+    if (src === false || src === dst || !path) return;
+    e.preventDefault();
+    moveTab(path, src, dst);
+  });
+}
+paneWire(paneEl);
+async function moveTab(path, src, dst) {
+  activatePane(src);
+  if (!await askUnsaved(path)) return; // Word/imagen/PDF en edición: guardar o descartar antes de cambiar de lado
+  endEdit([wedit, iedit, pedit].find(st => st?.path === path));
+  const i = tabs.indexOf(path);
+  tabs.splice(i, 1);
+  if (previewTab === path) previewTab = null;
+  if (cur === path) { // se iba la que se veía: el origen muestra otra, y termina de dibujarse antes de cambiar de lado
+    cur = tabs[Math.min(i, tabs.length - 1)] ?? null;
+    await render();
+  } else { persist(); renderTabs(); } // lo que se veía en el origen no se toca (una web no se recarga)
+  activatePane(dst);
+  openTab(path, true);
+}
+function setSplit(on) {
+  if (on === !!panes[1]) return;
+  if (on) {
+    const grip = Object.assign(document.createElement('div'), { id: 'splitGrip', title: 'Arrastra para cambiar el ancho · doble clic: mitad y mitad' });
+    const el = newPaneEl();
+    $('#panes').append(grip, el);
+    gripWire(grip);
+    document.body.classList.add('split');
+    // lo que se ve se queda donde está (sin recargar: una web conserva por dónde ibas); el lado nuevo se lleva
+    // la pestaña vista justo antes, o cualquier otra; con una sola pestaña empieza vacío
+    const move = [...hist].reverse().find(p => p !== cur && tabs.includes(p)) || tabs.find(p => p !== cur) || null;
+    panes.push({ el, tabs: [], cur: null, previewTab: null });
+    if (move) { moveTab(move, active, 1); return; }
+    renderTabsOf(0); activatePane(1); render();
+  } else {
+    activatePane(0);
+    for (const p of panes[1].tabs) if (!tabs.includes(p)) tabs.push(p);
+    panes[1].el.remove(); document.getElementById('splitGrip')?.remove();
+    panes.pop();
+    document.body.classList.remove('split');
+    persist(); render();
+  }
+}
+// Redibuja la barra de pestañas de un lado que no es el activo (sus botones dependen de cuántos lados hay).
+function renderTabsOf(i) {
+  if (i === active) return renderTabs();
+  syncPane();
+  const keep = { tabs, cur, previewTab, paneEl, active };
+  ({ tabs, cur, previewTab } = panes[i]); paneEl = panes[i].el; active = i;
+  renderTabs();
+  ({ tabs, cur, previewTab, paneEl, active } = keep);
+}
+function gripWire(grip) {
+  const P = $('#panes');
+  grip.onpointerdown = e => {
+    grip.setPointerCapture(e.pointerId); grip.classList.add('drag');
+    grip.onpointermove = m => {
+      const r = P.getBoundingClientRect(), f = Math.min(.85, Math.max(.15, (m.clientX - r.left) / r.width));
+      P.style.setProperty('--splitL', (f / (1 - f)).toFixed(3) + 'fr');
+    };
+    grip.onpointerup = () => {
+      grip.onpointermove = null; grip.classList.remove('drag');
+      LS('atril.splitL', P.style.getPropertyValue('--splitL'));
+    };
+  };
+  grip.ondblclick = () => { P.style.removeProperty('--splitL'); LS('atril.splitL', ''); };
+  const w = LS('atril.splitL'); if (w) P.style.setProperty('--splitL', w);
+}
+addEventListener('keydown', e => { // Ctrl+\: dividir o juntar
+  if (e.ctrlKey && !e.altKey && e.key === '\\') { e.preventDefault(); setSplit(!panes[1]); }
+});
 
 // Historial ← → de archivos visitados
 const hist = [];
@@ -2103,22 +2496,26 @@ function renderTabs() {
       e.preventDefault();
       const close = [['✕  Cerrar pestaña', () => closeTab(p), { title: 'También con clic central en la pestaña' }],
         ['✕  Cerrar las demás', async () => { for (const q of tabs.filter(q => q !== p)) await closeTab(q); }, { disabled: tabs.length < 2 }], '-'];
-      if (isUntitled(p)) return openMenu({ x: e.clientX, y: e.clientY }, [{ head: name }, ...close.slice(0, 2)]);
+      if (isVirtual(p)) return openMenu({ x: e.clientX, y: e.clientY }, [{ head: name }, ...close.slice(0, 2)]);
       nodeMenu({ x: e.clientX, y: e.clientY }, p, false, null, close);
     };
     // arrastrar: sobre otra pestaña = reordenar (la raya marca dónde cae) · al chat = adjuntar
     el.draggable = true;
-    el.ondragstart = e => { dragTab = p; e.dataTransfer.effectAllowed = 'copyMove'; e.dataTransfer.setData(isUntitled(p) ? 'text/plain' : 'text/atril-path', isUntitled(p) ? '' : p); };
+    el.ondragstart = e => {
+      dragTab = p; e.dataTransfer.effectAllowed = 'copyMove'; e.dataTransfer.setData(isVirtual(p) ? 'text/plain' : 'text/atril-path', isVirtual(p) ? '' : p);
+      if (panes[1] && !isUntitled(p)) e.dataTransfer.setData('text/atril-pane', String(active));
+      if (isWeb(p) && panes[1]) e.dataTransfer.setData('text/atril-path', p); // una web también cambia de lado // soltar en el otro lado la mueve allí
+    };
     el.ondragend = () => { dragTab = null; T.querySelectorAll('.dl,.dr').forEach(t => t.classList.remove('dl', 'dr')); };
     el.ondragover = e => {
-      if (!dragTab || dragTab === p) return;
+      if (!dragTab || dragTab === p || !T.closest('.pane').classList.contains('on')) return; // en el otro lado: lo recoge su barra
       e.preventDefault(); e.dataTransfer.dropEffect = 'move';
       const r = el.getBoundingClientRect(), after = e.clientX > r.left + r.width / 2;
       el.classList.toggle('dr', after); el.classList.toggle('dl', !after);
     };
     el.ondragleave = () => el.classList.remove('dl', 'dr');
     el.ondrop = e => {
-      if (!dragTab || dragTab === p) return;
+      if (!dragTab || dragTab === p || !T.closest('.pane').classList.contains('on')) return;
       e.preventDefault(); e.stopPropagation();
       const after = el.classList.contains('dr');
       tabs.splice(tabs.indexOf(dragTab), 1); tabs.splice(tabs.indexOf(p) + after, 0, dragTab);
@@ -2126,12 +2523,15 @@ function renderTabs() {
     };
     T.append(el);
   }
-  T.append(iconBtn('plus', 'Añadir proyecto o archivos', openExplorer));
+  T.append(iconBtn('plus', 'Añadir proyecto o archivos', openExplorer), iconBtn('globe', 'Nueva pestaña web', () => webOpen('')));
   // conmutadores de paneles en los extremos, siempre visibles (como en VS Code / Obsidian)
+  // con la vista dividida: barra lateral a la izquierda del primer lado; dividir/juntar e IA a la derecha del último
   const side = document.body.classList.contains('noside'), ia = document.body.classList.contains('ia');
-  T.prepend(iconBtn('panelLeft', (side ? 'Mostrar' : 'Ocultar') + ' barra lateral (Ctrl+B)', toggleSide));
-  T.append(Object.assign(document.createElement('span'), { style: 'flex:1' }),
-    iconBtn('panelRight', (ia ? 'Ocultar' : 'Mostrar') + ' panel de IA (Ctrl+Alt+B)', () => setIA(!ia)));
+  const first = active === 0, last = active === panes.length - 1;
+  if (first) T.prepend(iconBtn('panelLeft', (side ? 'Mostrar' : 'Ocultar') + ' barra lateral (Ctrl+B)', toggleSide));
+  T.append(Object.assign(document.createElement('span'), { style: 'flex:1' }));
+  if (last) T.append(iconBtn(panes[1] ? 'unsplit' : 'split', panes[1] ? 'Juntar en un solo lado (Ctrl+\\)' : 'Dividir: dos pestañas lado a lado (Ctrl+\\)',
+    () => setSplit(!panes[1])), iconBtn('panelRight', (ia ? 'Ocultar' : 'Mostrar') + ' panel de IA (Ctrl+Alt+B)', () => setIA(!ia)));
 }
 
 // Migas: "proyecto / carpeta / archivo" (o "carpeta / archivo" para sueltos)
@@ -2238,10 +2638,12 @@ function closeMenu() { $('#menu')?.remove(); menuOff?.abort(); menuOff = null; }
 
 const fmtSize = n => n < 1024 ? n + ' B' : n < 1048576 ? (n / 1024).toFixed(1) + ' KB' : (n / 1048576).toFixed(1) + ' MB';
 
-let renderSeq = 0; // cada render invalida a los anteriores que aún esperan al servidor (evita cabeceras duplicadas)
+let renderSeq = 0; // número único de cada render; cada lado guarda el último suyo (panes[i].seq)
+// un render sigue vivo mientras sea el último de su lado: el del otro lado no lo cancela
+const curSeq = () => panes[active].seq, live = s => panes.some(p => p.seq === s);
 async function render() {
   // se fue del Word, imagen o PDF que estaba editando: sin cambios, se sale; con cambios, se queda y pregunta
-  const away = [wedit, iedit, pedit].find(st => st && st.path !== cur);
+  const away = [wedit, iedit, pedit].find(st => st && st.path !== cur && !otherShows(st.path)); // el otro lado puede seguir editándolo
   if (away && !away.dirty) endEdit(away);
   else if (away) {
     const to = cur;
@@ -2249,7 +2651,7 @@ async function render() {
     if (await askUnsaved(away.path)) { endEdit(away); openTab(to); }
     return;
   }
-  const seq = ++renderSeq;
+  const seq = panes[active].seq = ++renderSeq;
   renderTabs(); markActive(); closeMenu();
   const V = $('#view'), B = $('#bar'), S = $('#stmain');
   V.className = ''; V.innerHTML = ''; V.onscroll = V.onwheel = null; B.innerHTML = ''; S.innerHTML = '<span id="msg"></span>';
@@ -2260,13 +2662,15 @@ async function render() {
     V.innerHTML = '<div class="empty">Abre un archivo desde la barra lateral.<br>Un clic: vista previa · doble clic: pestaña fija.</div>';
     return;
   }
+  if (isWeb(cur)) { iaOnFile(); return webView(V, B, cur); }
   const path = cur, ed = edits.get(path);
   let f = ed?.f;
   if (!f && isUntitled(path)) { closeTab(path); return; } // "nuevo N" sin contenido recuperado: ya no existe
   if (!f) {
     try { f = await api('/api/abrir?ruta=' + encodeURIComponent(path)); }
-    catch (e) { if (seq === renderSeq) V.innerHTML = `<div class="card"><b>No se puede abrir</b><p>${esc(e.message)}</p><p class="ok">${esc(path)}</p></div>`; return; }
-    if (seq !== renderSeq) return; // mientras cargaba empezó otro render (otra pestaña o el mismo archivo otra vez)
+    catch (e) { if (live(seq)) V.innerHTML = `<div class="card"><b>No se puede abrir</b><p>${esc(e.message)}</p><p class="ok">${esc(path)}</p></div>`; return; }
+    if (!live(seq)) return; // mientras cargaba empezó otro render (otra pestaña o el mismo archivo otra vez)
+    if (panes[active].seq !== seq) { panes.find(p => p.seq === seq).stale = true; return; } // se cambió de lado: se dibuja al volver
   }
   curFile = f; iaOnFile(); reveal(path);
   const k = kind(f.nombre), canSrc = f.texto !== null && (MD.has(k.ext) || HTML.has(k.ext) || k.ext in TABLE || k.ext === 'svg' || k.ext === 'ipynb');
@@ -2352,7 +2756,7 @@ async function render() {
   if (f.truncado) V.insertAdjacentHTML('beforeend', `<div class="warnbox">Archivo grande: se muestran los primeros 2 MB (solo lectura).</div>`);
   const dir = f.ruta.replace(/[\\/][^\\/]*$/, '');
   // en lectura se busca en el texto de la vista (el editor y el PDF ponen su propio buscador); ponytail: 300 ms para lo que tarda en dibujarse
-  if (!(k.ext === 'pdf' && !ed && !pedit && !edgePdf.has(path))) setTimeout(() => seq === renderSeq && !findP && findAttach(domFind(V)), 300);
+  if (!(k.ext === 'pdf' && !ed && !pedit && !edgePdf.has(path))) setTimeout(() => live(seq) && !findP && findAttach(domFind(V)), 300);
 
   if (ed) {
     if (preview && MD.has(k.ext)) return V.append(page(DOMPurify.sanitize(marked.parse(ed.text)), dir));
@@ -2624,7 +3028,7 @@ function findReplace(all) {
     <div class="frow frep"><div class="fbox"><input id="fr" placeholder="Reemplazar" aria-label="Reemplazar" autocomplete="off">
       <button data-o="p" title="Conservar mayúsculas">AB</button></div>
       <button data-f="one" title="Reemplazar (Enter · Ctrl+Mayús+1)">⇄</button><button data-f="all" title="Reemplazar todo (Ctrl+Alt+Enter)">⇄⇄</button></div>`;
-  $('main').append(F);
+  paneEl.append(F);
   const toggle = o => {
     const st = findState();
     if (o === 's') { st.sel = st.s ? null : findP?.selRange?.(); st.s = !!st.sel; if (!st.sel) return; }
@@ -2674,7 +3078,10 @@ addEventListener('beforeunload', e => { if (flushBackups()) e.preventDefault(); 
 // El archivo original no se toca hasta Ctrl+S. Tras un cierre, cuelgue o reinicio, se reabre tal cual.
 const backupTimers = new Map(); // ruta → { t, first }
 const isUntitled = p => p.startsWith('nuevo:');
-const tabName = p => isUntitled(p) ? 'nuevo ' + p.slice(6) : p.split(/[\\/]/).pop();
+const isWeb = p => p.startsWith('web:'); // pestaña web: «web:» + dirección («web:» sola = página de inicio)
+const isVirtual = p => isUntitled(p) || isWeb(p); // pestañas que no son un archivo del disco
+const webHost = u => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return u; } };
+const tabName = p => isUntitled(p) ? 'nuevo ' + p.slice(6) : isWeb(p) ? (p.length > 4 ? '🌐 ' + webHost(p.slice(4)) : '🌐 Nueva pestaña') : p.split(/[\\/]/).pop();
 function recKey(path) {
   if (isUntitled(path)) return 'nuevo-' + path.slice(6);
   let h = 5381; for (const ch of path.toLowerCase()) h = (h * 33 ^ ch.charCodeAt(0)) >>> 0;
@@ -2952,24 +3359,24 @@ function notebookView(V, text, dir) {
   V.append(page(DOMPurify.sanitize(html), dir));
 }
 async function docxView(V, f) {
-  const s = renderSeq; // si mientras convierte se abre otra cosa, no se añade encima
+  const s = curSeq(); // si mientras convierte se abre otra cosa, no se añade encima
   try {
     const node = wedit?.path === f.ruta && wedit.node; // editando: el Word tal como está en ese paso del historial
     const buf = await (await fetch(node ? `/api/hist/docx?ruta=${encodeURIComponent(f.ruta)}&id=${node}` : raw(f.ruta), { cache: 'no-store' })).arrayBuffer();
-    if (s !== renderSeq) return;
+    if (!live(s)) return;
     if (window.docx?.renderAsync) { // como en Word: colores, fuentes, tamaños y páginas
       const box = document.createElement('div'); box.className = 'docxbox';
       V.className = 'flush'; V.append(box);
       await docx.renderAsync(buf, box, null, { className: 'docx', inWrapper: true, breakPages: true,
         ignoreLastRenderedPageBreak: true, renderHeaders: true, renderFooters: true, experimental: true });
       docxDrop(box, f.ruta); // soltar una imagen sobre un párrafo la inserta ahí
-      if (wedit?.path === f.ruta && s === renderSeq) await wordEditable(box, f.ruta);
+      if (wedit?.path === f.ruta && live(s)) await wordEditable(box, f.ruta);
       return;
     }
     if (wedit?.path === f.ruta) { wedit = null; ask('Editar Word', 'Para editar hace falta el visor de Word, que se carga de internet. Sin conexión solo se puede leer.', ['Entendido']); }
     const { value } = await mammoth.convertToHtml({ arrayBuffer: buf }); // reserva sin internet: sin colores
-    if (s === renderSeq) V.append(page(DOMPurify.sanitize(value), ''));
-  } catch (e) { if (s === renderSeq) card(V, f); }
+    if (live(s)) V.append(page(DOMPurify.sanitize(value), ''));
+  } catch (e) { if (live(s)) card(V, f); }
 }
 // ---------- editar un Word a mano: texto y formato básico sobre la vista; se guarda como cambios por párrafo ----------
 // Cada <p> del visor se empareja con su w:p del archivo (mismo texto, en orden); los que no casan (encabezados,
@@ -3118,7 +3525,7 @@ const EDIT_IMG = set('png jpg jpeg webp');
 let iedit = null; // { path, mtime, cv, b, c, dirty, saved, last }
 function imageEdit(path) { pinTab(path); iedit = { path, fresh: true, b: 100, c: 100, dirty: false }; render(); }
 async function imageEditView(V, f) {
-  const s = renderSeq;
+  const s = curSeq();
   if (!iedit.cv) { // primera vez: la imagen del disco en un lienzo
     const img = new Image(); img.src = raw(f.ruta) + '?v=' + f.mtime;
     try { await img.decode(); } catch { iedit = null; return ask('Editar imagen', 'No se pudo abrir la imagen.', ['Entendido']); }
@@ -3133,7 +3540,7 @@ async function imageEditView(V, f) {
     render();
   }, iedit.fresh);
   iedit.fresh = false;
-  if (s !== renderSeq) return;
+  if (!live(s)) return;
   V.insertAdjacentHTML('beforeend', `<div class="iedit"><div class="itools">
     <button data-a="l" title="Girar a la izquierda">⟲</button><button data-a="r" title="Girar a la derecha">⟳</button>
     <button data-a="h" title="Voltear horizontal">↔</button><button data-a="v" title="Voltear vertical">↕</button>
@@ -3258,14 +3665,14 @@ const pdfCanvas = async (page, vp) => {
 let pdfCtl = null; // el PDF en lectura de la pestaña actual: teclas AvPág/RePág/Inicio/Fin y Ctrl + / −
 const PDF_ZOOMS = [50, 75, 90, 100, 110, 125, 150, 200];
 async function pdfReadView(V, f) {
-  const s = renderSeq, path = f.ruta;
+  const s = curSeq(), path = f.ruta;
   let doc;
   try { doc = await (await loadPdfJs()).getDocument(raw(f.ruta) + '?v=' + f.mtime).promise; }
   catch (e) { // sin internet o PDF raro: el visor de Edge
-    if (s === renderSeq) { V.className = 'flush'; V.append(frame(raw(f.ruta) + '#page=' + pdfAt(path))); flash('Visor de Edge: ' + (e.message || e)); }
+    if (live(s)) { V.className = 'flush'; V.append(frame(raw(f.ruta) + '#page=' + pdfAt(path))); flash('Visor de Edge: ' + (e.message || e)); }
     return;
   }
-  if (s !== renderSeq) return doc.destroy();
+  if (!live(s)) return doc.destroy();
   const N = doc.numPages;
   V.className = 'flush';
   // ◧ | ‹ pág › | − zoom + ↔ ▯ | ⟲ | 🔍
@@ -3390,6 +3797,13 @@ async function pdfReadView(V, f) {
   layout(); drawThumbs();
   pdfTrack(V, () => els, path, onPage);
   findAttach(provider);
+  // el ancho del lado cambia (dividir, mover el borde, barra lateral): las páginas se recalculan para ese ancho
+  let lastW = P.clientWidth;
+  const ro = new ResizeObserver(() => {
+    if (!P.isConnected) return ro.disconnect(); // la vista se volvió a dibujar
+    if (Math.abs(P.clientWidth - lastW) > 24) { lastW = P.clientWidth; layout(); }
+  });
+  ro.observe(P);
 }
 addEventListener('keydown', e => { // PDF en lectura: AvPág/RePág/Inicio/Fin por páginas, Ctrl + / − / 0 zoom
   if (!pdfCtl || e.target.closest?.('input, textarea, select, #ia, #panel') || modalOpen() || !$('#exp').hidden) return;
@@ -3418,7 +3832,7 @@ function pdfDirty() {
   const b = $('#isave'); if (b) Object.assign(b, { disabled: false, textContent: 'Guardar ●' });
 }
 async function pdfEditView(V, f) {
-  const s = renderSeq;
+  const s = curSeq();
   if (!pedit.doc) {
     try { pedit.doc = await (await loadPdfJs()).getDocument(raw(f.ruta) + '?v=' + f.mtime).promise; }
     catch (e) { pedit = null; return ask('Editar PDF', e.message || 'No se pudo abrir el PDF', ['Entendido']); }
@@ -3434,7 +3848,7 @@ async function pdfEditView(V, f) {
     render();
   }, pedit.fresh);
   pedit.fresh = false;
-  if (s !== renderSeq) return;
+  if (!live(s)) return;
   V.className = 'flush';
   V.insertAdjacentHTML('beforeend', `<div class="pedit"><div class="itools">
     <label title="Clic en la página para escribir"><input type="radio" name="ptool" value="texto"> T Texto</label>
@@ -3766,9 +4180,9 @@ addEventListener('keydown', e => { // Ctrl+Z / Ctrl+Y en Word, imagen y PDF (en 
   if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); e.stopPropagation(); histRedo(cur); }
 }, true);
 function fontView(V, f) {
-  const fam = 'f' + Math.random().toString(36).slice(2), s = renderSeq;
+  const fam = 'f' + Math.random().toString(36).slice(2), s = curSeq();
   new FontFace(fam, `url(${raw(f.ruta)})`).load().then(ff => {
-    if (s !== renderSeq) return;
+    if (!live(s)) return;
     document.fonts.add(ff);
     V.insertAdjacentHTML('beforeend', `<div class="page font" style="font-family:${fam}">ABCDEFGHIJKLMNÑOPQRSTUVWXYZ<br>abcdefghijklmnñopqrstuvwxyz<br>0123456789 ¿?¡! áéíóú<br><span style="font-size:18px">El veloz murciélago hindú comía feliz cardillo y kiwi.</span></div>`);
   }).catch(() => card(V, f));
@@ -3889,7 +4303,7 @@ function drawRunBar() {
     textContent: r.fin ? `${r.codigo === 0 ? '✓' : '✗'} código ${r.codigo} · ${fmtDur(r.dur)}` : `● En ejecución · ${fmtDur(r.dur)}` }));
   B.append(r.fin ? button('↻ Repetir', () => launch(r.again, r.label, r.cmd, r.cwd, r.ruta)) : button('■ Detener', () => api('/api/detener', { id: r.id })),
     button('Limpiar', () => closeRun(r)),
-    button('Abrir en consola de Windows', () => api('/api/consola', { id: r.id })),
+    button('Abrir en una terminal', () => api('/api/consola', { id: r.id }).catch(e => ask('Abrir en una terminal', e.message, ['Entendido']))),
     Object.assign(button('🤖 Explicar error', () => explainError(r)),
       { disabled: !r.fin || r.codigo === 0, title: 'Envía a la IA solo las últimas ~40 líneas y el comando' }));
 }
@@ -4426,6 +4840,7 @@ function askPages(nombre, total) {
 }
 const sensitiveBlocked = nombre => kind(nombre).lock && AJ.ia_permitir_sensibles === false;
 async function dropPath(path) {
+  if (isWeb(path)) return ask('Adjuntar', 'Una pestaña web no se puede adjuntar: copia el texto de la página y pégalo en el mensaje.', ['Entendido']);
   const nombre = path.split(/[\\/]/).pop();
   if (sensitiveBlocked(nombre)) return ask('Adjuntar', '🔒 El envío a la IA de archivos sensibles está desactivado en ⚙ Ajustes.', ['Entendido']);
   let pages = null;
@@ -4742,7 +5157,20 @@ if (abrir) { abrir.split('|').forEach(p => tabs.includes(p) || tabs.push(p)); cu
 if (cur) { hist.push(cur); hi = 0; }
 try { if (localStorage.getItem('atril.ia')) document.body.classList.add('ia'); } catch {}
 // render después: las migas necesitan los proyectos; antes, ajustes y lo que haya que recuperar
-loadSide().finally(async () => { await loadSettings(); await recoverAll(); render(); });
+loadSide().finally(async () => {
+  await loadSettings(); await recoverAll(); await render();
+  const sp = savedSplit; // vista dividida de la última vez
+  if (sp?.tabs) {
+    const grip = Object.assign(document.createElement('div'), { id: 'splitGrip', title: 'Arrastra para cambiar el ancho · doble clic: mitad y mitad' });
+    const el = newPaneEl();
+    $('#panes').append(grip, el); gripWire(grip);
+    document.body.classList.add('split');
+    panes.push({ el, tabs: sp.tabs, cur: sp.cur, previewTab: sp.previewTab || null });
+    activatePane(1); await render();
+    renderTabsOf(0); // con dos lados, el botón de dividir pasa al segundo
+    activatePane(sp.active === 1 ? 1 : 0);
+  }
+});
 if (!linked && !$('#convQ').value) $('#convQ').value = LS('atril.borrador') || ''; // lo que se escribía en el chat
 $('#convQ').addEventListener('input', () => LS(draftKey(), $('#convQ').value));
 $('#convLink').insertAdjacentHTML('afterbegin', svg('link'));

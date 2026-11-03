@@ -3,6 +3,8 @@
 Visor y editor local de proyectos y archivos, con pestañas, buscador y un chat de IA que gasta pocos tokens.
 Todo corre en tu ordenador: un servidor pequeño en Python (solo biblioteca estándar, sin instalar nada) y una ventana web.
 
+![Atril con el plan de un curso abierto: árbol del proyecto a la izquierda y el documento a la derecha](docs/capturas/01-explorador.png)
+
 ## Qué hace
 
 - **Explorador** de proyectos y archivos sueltos, con estado de git y pestañas como en VS Code.
@@ -17,6 +19,38 @@ Todo corre en tu ordenador: un servidor pequeño en Python (solo biblioteca est�
 - **Consola** para ejecutar scripts y las pruebas del proyecto.
 - **Chat de IA** con Claude Code, Codex o Gemini CLI usando tu propia suscripción. Atril adjunta solo lo necesario (el archivo abierto, las páginas pedidas de un PDF, una selección) y nada se envía sin que pulses Enviar.
 - Copias de seguridad: `.bak` la primera vez que se guarda, recuperación de lo no guardado y «Deshacer» de los cambios de la IA.
+- **Vista dividida**, **comparador** de archivos y **pestaña web**.
+
+## Capturas
+
+Las capturas usan un proyecto de ejemplo inventado, «Taller de escritura».
+
+**Vista dividida.** Dos pestañas lado a lado: aquí, un PDF y un Word. Cada lado tiene sus pestañas, y una pestaña se arrastra de un lado al otro.
+![Vista dividida con un PDF a la izquierda y un Word a la derecha](docs/capturas/02-vista-dividida.png)
+
+**Comparar dos archivos.** En rojo, lo que solo está en el primero; en verde, lo que solo está en el segundo, con las palabras exactas marcadas. Con la flecha ➜ se copia un cambio y se guarda.
+![Comparador con dos versiones de un guion](docs/capturas/03-comparar.png)
+
+**Editar un Word** sin salir de Atril: texto, negrita, cursiva, subrayado y color.
+![Word en edición con la barra B, I, U y color](docs/capturas/04-editar-word.png)
+
+**Historial de cambios.** Cada paso queda en disco, con su vista previa. Se puede deshacer o rehacer hasta cualquier punto, incluso después de guardar y cerrar.
+![Modal del historial con la lista de pasos y la vista previa de un cambio](docs/capturas/05-historial.png)
+
+**Editar imágenes:** girar, voltear, recortar, cambiar el tamaño, brillo y contraste.
+![Editor de imágenes recortando una portada](docs/capturas/06-editar-imagen.png)
+
+**Editar PDF:** añadir texto, resaltar, y girar, mover o borrar páginas.
+![PDF con una frase resaltada y una nota en rojo](docs/capturas/07-editar-pdf.png)
+
+**Pestaña web** junto a tus documentos, con favoritos y el buscador que elijas en Ajustes.
+![Wikipedia a la izquierda y un guion a la derecha](docs/capturas/08-web.png)
+
+**Chat de IA** que adjunta solo lo necesario. Antes de enviar ves qué archivos van y cuántos tokens gastarán.
+![Panel de IA con los archivos que se enviarán y el mensaje escrito](docs/capturas/09-ia.png)
+
+**Consola** para ejecutar scripts y las pruebas del proyecto.
+![Script de Python ejecutado en la consola de Atril](docs/capturas/10-consola.png)
 
 ## Requisitos
 

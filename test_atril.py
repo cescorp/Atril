@@ -348,6 +348,36 @@ with tempfile.TemporaryDirectory() as tmp:
     old.write_text(json.dumps(m), encoding="utf-8")
     atril.hist_cleanup()
     assert not atril.hist_dir(txt).exists() and atril.hist_dir(hw).exists()
+    # pestaña web: X-Frame-Options y frame-ancestors deciden si la página se deja mostrar en un iframe
+    import email.message
+    import urllib.request
+
+    class Resp:
+        def __init__(self, headers):
+            self.headers = email.message.Message()
+            for k, v in headers.items():
+                self.headers[k] = v
+        def geturl(self):
+            return "https://ejemplo.org/final"
+        def __enter__(self):
+            return self
+        def __exit__(self, *a):
+            return False
+
+    real_open = urllib.request.urlopen
+    for headers, ok in (({}, True), ({"X-Frame-Options": "DENY"}, False), ({"X-Frame-Options": "SAMEORIGIN"}, False),
+                        ({"Content-Security-Policy": "default-src 'self'; frame-ancestors 'none'"}, False),
+                        ({"Content-Security-Policy": "frame-ancestors *"}, True), ({"Content-Security-Policy": "script-src 'self'"}, True)):
+        urllib.request.urlopen = lambda req, timeout=0, h=headers: Resp(h)
+        r = atril.web_check("https://ejemplo.org")
+        assert r["permitido"] is ok and r["url"] == "https://ejemplo.org/final", (headers, r)
+    urllib.request.urlopen = real_open
+    assert not atril.web_check("file:///C:/x")["permitido"]
+    assert atril.ajuste("web_buscador") == "google"  # ajuste de lista: solo valores previstos
+    atril.set_ajustes({"web_buscador": "bing"})
+    atril.set_ajustes({"web_buscador": "inventado"})
+    assert atril.ajuste("web_buscador") == "bing"
+    atril.set_ajustes({"web_buscador": "google"})
     # .xlsx y .pptx: su texto para la IA
     xl = io.BytesIO()
     with zipfile.ZipFile(xl, "w") as z:
