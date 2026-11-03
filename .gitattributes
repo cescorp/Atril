@@ -1,0 +1,4 @@
+# Los lanzadores de macOS y Linux se rompen con saltos de línea de Windows
+*.sh text eol=lf
+*.command text eol=lf
+*.pyw text eol=lf
