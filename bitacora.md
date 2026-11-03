@@ -8,6 +8,9 @@ Entradas nuevas arriba. Formato: `## AAAA-MM-DD · título` + 2–4 líneas (qu�
 - **Cómo trabaja el usuario:** escribe en español. **Antes de construir algo nuevo, dibujarlo en texto y esperar su «ok».** No instalar nada sin acuerdo. Ahorrar tokens. Prefiere lo simple: rechazó un panel de IA con modos (ver 2026-11-02).
 - **Para verificar sin tocar su Atril:** levantar `atril.Handler` en el puerto 8799 con `CONFIG`, `CONV_DIR`, `RECOVERY_DIR` e `INDEX_DB` en una carpeta temporal y hacer captura con Edge sin ventana (`--headless=new --screenshot`). Así se probó cada paso. Ojo: en Windows dos servidores pueden escuchar el mismo puerto sin error; si hay otra sesión probando, usa otro puerto.
 
+## 2026-11-03 · El documento se pintaba encima del panel de IA
+Captura del usuario: un Word ancho se veía a través del panel de IA (parecía transparente). Un elemento con posición absoluta dentro de `#view` (que no está posicionado) no lo recorta su scroll y puede salir sobre `#ia`. Arreglo: `main{overflow:clip}` (nada se pinta fuera del área central) y `#ia{z-index:3}`. No se reprodujo con su documento, pero sí el mecanismo: con el CSS anterior un elemento así tapa la IA; con el nuevo, no. El «Failed to fetch» de esa captura fue el servidor reiniciándose.
+
 ## 2026-11-03 · Ctrl+G: panel de IA
 Abre y cierra el panel de IA (sigue también Ctrl+Alt+B). Escuchado en captura para que funcione con el cursor en el editor y no lo coja el «buscar siguiente» del navegador; no actúa con un modal abierto ni a pantalla completa. Para buscar dentro de una web se quedó la opción C (Ctrl+F del navegador); la A (lista de coincidencias sin resaltar) se descartó.
 

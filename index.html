@@ -76,7 +76,7 @@ body.max-con #panes,body.max-con #status{display:none!important}
 body.max-con main{grid-template-rows:1fr}
 body.max-con #panel{height:auto!important}
 /* panel de IA */
-#ia{position:relative;display:none;flex-direction:column;border-left:1px solid var(--line);background:var(--side);min-height:0;min-width:0}
+#ia{position:relative;z-index:3;display:none;flex-direction:column;border-left:1px solid var(--line);background:var(--side);min-height:0;min-width:0}
 body.ia #ia{display:flex}
 #ia.dropping{outline:2px dashed var(--accent);outline-offset:-6px}
 #ia.dropping::after{content:"⤓ Suelta aquí para adjuntar";position:absolute;left:16px;right:16px;top:45%;text-align:center;padding:14px;border-radius:8px;background:var(--paper);color:var(--accent);font-weight:600;box-shadow:0 4px 16px rgba(0,0,0,.15);pointer-events:none}
@@ -467,7 +467,8 @@ dialog#dlg.fcmp[open]{display:flex}
 .pthumb div canvas{width:100%;height:100%;display:block}
 .pthumb:hover div{outline-color:var(--line)}.pthumb.cur div{outline-color:var(--accent)}.pthumb.cur{color:var(--accent);font-weight:600}
 /* buscar y reemplazar (como VS Code); el cuadro vive en la .pane activa */
-main{position:relative}
+/* clip: nada del documento (p. ej. un elemento con posición absoluta del visor de Word) se pinta fuera del área central */
+main{position:relative;overflow:clip}
 #find{position:absolute;right:22px;z-index:20;display:grid;grid-template-columns:auto 1fr;gap:4px 4px;padding:5px 6px 5px 2px;background:var(--side);border:1px solid var(--line);border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.18);font-size:13px}
 #find[hidden]{display:none}
 #find .ftog{grid-row:1/3;width:18px;padding:0;border:0;background:none;color:var(--muted);align-self:stretch;transition:transform .12s}
