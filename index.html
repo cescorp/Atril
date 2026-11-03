@@ -54,19 +54,21 @@
 :root{--bg:#fff;--side:#f6f6f6;--paper:#fff;--ink:#222;--muted:#5c5c5c;--faint:#ababab;--line:#e3e3e3;--accent:#7c5cdb;--hover:rgba(0,0,0,.05);--active:rgba(0,0,0,.085);--chip:#f0f0f0;--warn:#a35a00;--warnbg:#fbecd6;--lock:#8a2f2f;--lockbg:#f6dede}
 @media (prefers-color-scheme:dark){:root{--bg:#1e1e1e;--side:#262626;--paper:#1e1e1e;--ink:#dadada;--muted:#a3a3a3;--faint:#666;--line:#363636;--accent:#a68af9;--hover:rgba(255,255,255,.06);--active:rgba(255,255,255,.1);--chip:#2a2a2a;--warn:#f0b46a;--warnbg:#3a2c18;--lock:#f0a0a0;--lockbg:#3a2020}}
 *{box-sizing:border-box}
-html,body{height:100%}
-body{margin:0;display:grid;grid-template-columns:44px var(--sideW,260px) 1fr;background:var(--bg);color:var(--ink);font:14px Inter,system-ui,sans-serif;overflow:hidden}
-body.noside{grid-template-columns:44px 1fr} /* sin la barra, el contenido pasa a la 2.ª columna */
+/* overflow:clip y no hidden: hidden deja que scrollIntoView() desplace la página entera aunque no haya barra */
+html,body{height:100%;overflow:clip}
+/* minmax(0,1fr): la columna central nunca se estira por su contenido (muchas pestañas, rutas largas) */
+body{margin:0;display:grid;grid-template-columns:44px var(--sideW,260px) minmax(0,1fr);background:var(--bg);color:var(--ink);font:14px Inter,system-ui,sans-serif}
+body.noside{grid-template-columns:44px minmax(0,1fr)} /* sin la barra, el contenido pasa a la 2.ª columna */
 body.noside aside{display:none}
-body.ia{grid-template-columns:44px var(--sideW,260px) 1fr var(--iaW,340px)}
-body.ia.noside{grid-template-columns:44px 1fr var(--iaW,340px)}
+body.ia{grid-template-columns:44px var(--sideW,260px) minmax(0,1fr) var(--iaW,340px)}
+body.ia.noside{grid-template-columns:44px minmax(0,1fr) var(--iaW,340px)}
 /* bordes arrastrables (doble clic: ancho original) */
 .rs{position:absolute;top:0;bottom:0;width:6px;cursor:col-resize;z-index:5}
 .rs:hover,.rs.drag{background:var(--accent);opacity:.45}
 aside .rs{right:-3px}#ia .rs{left:-3px}
 body.dragging{user-select:none}body.dragging iframe{pointer-events:none}
 /* ⤢ pantalla completa: se oculta lo demás sin tocar su estado, así ⤡ vuelve exactamente a como estaba */
-body.max-doc,body.max-ia,body.max-con{grid-template-columns:1fr!important}
+body.max-doc,body.max-ia,body.max-con{grid-template-columns:minmax(0,1fr)!important}
 body.max-doc #ribbon,body.max-doc aside,body.max-doc #ia,body.max-doc #panel,
 body.max-ia #ribbon,body.max-ia aside,body.max-ia main,
 body.max-con #ribbon,body.max-con aside,body.max-con #ia,
@@ -344,6 +346,8 @@ dialog#dlg.cmp[open]{display:flex}
 /* pestaña web */
 #bar .waddr{flex:1;min-width:120px;margin:0 6px;padding:4px 10px;border:1px solid var(--line);border-radius:14px;background:var(--side);color:var(--ink);font:13px/1.4 inherit}
 #bar .waddr:focus{outline:2px solid color-mix(in srgb,var(--accent) 45%,transparent);background:var(--paper)}
+.pane>.webbox{grid-row:3;grid-column:1;display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--paper);z-index:1}
+.pane>.webbox[hidden]{display:none}.webbox .wframe{flex:1;height:auto}
 #bar .waddr.winside::placeholder{color:var(--muted);font-style:italic;opacity:1} /* dirección desconocida tras navegar dentro */
 .wframe{display:block;width:100%;height:100%;border:0;background:#fff}
 .wblock{margin:48px auto;max-width:560px}.wblock .primary{margin-top:6px}
@@ -662,7 +666,7 @@ dialog::backdrop{background:rgba(0,0,0,.35)}
 .exp-actions{display:flex;gap:8px;margin-left:auto}
 button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
 button:disabled{opacity:.45;cursor:not-allowed}
-@media (max-width:760px){body{grid-template-columns:44px 200px 1fr}.page{padding:16px 16px 48px}}
+@media (max-width:760px){body{grid-template-columns:44px 200px minmax(0,1fr)}.page{padding:16px 16px 48px}}
 </style>
 </head>
 <body>
@@ -933,10 +937,16 @@ function webOpen(t) { // nueva pestaña web (o la de inicio si no hay dirección
   const u = webUrl(t || '');
   openTab('web:' + u, true);
 }
+// Cada pestaña web vive en su .webbox, hija directa de su .pane y encima de #view (misma celda de la rejilla).
+// Al cambiar de pestaña la caja se oculta, no se borra: el iframe conserva la página, el scroll y lo escrito.
+// Sacar un iframe del DOM o moverlo lo recarga; por eso la caja nunca se mueve (al cambiar de lado sí se recarga).
 async function webView(V, B, path) {
-  const s = curSeq();
-  let url = path.slice(4);
   V.className = 'flush';
+  const kept = [...paneEl.children].find(b => b.classList.contains('webbox') && b.dataset.path === path);
+  if (kept) { kept.hidden = false; B.append(...kept._bar, maxBtn('doc')); return; }
+  const box = Object.assign(document.createElement('div'), { className: 'webbox' });
+  box.dataset.path = path; paneEl.append(box);
+  let url = path.slice(4);
   // nav: posición en las cargas de este iframe. urls[pos]: la dirección de esa carga si la puso Atril (barra o
   // favoritos); null si se llegó con un enlace de dentro, que no se puede leer. going: ±1 si la pidió ← →;
   // expect: 'nuevo' (Atril cambió src, la dirección es pending) o 'recarga' (misma posición).
@@ -956,7 +966,7 @@ async function webView(V, B, path) {
     ext.title = 'Abrir en el navegador' + note; paintStar(); star.title += note;
   }
   const back = iconBtn('left', 'Atrás', () => {
-    if (frame?.hidden) { frame.hidden = false; V.querySelector('.wblock')?.remove(); return; } // del aviso de bloqueo a la página de antes
+    if (frame?.hidden) { frame.hidden = false; box.querySelector('.wblock')?.remove(); return; } // del aviso de bloqueo a la página de antes
     if (nav.pos > 0) { nav.going = -1; history.back(); }
   }, true);
   const fwd = iconBtn('right', 'Adelante', () => { if (nav.pos < nav.max) { nav.going = 1; history.forward(); } }, true);
@@ -982,22 +992,29 @@ async function webView(V, B, path) {
   });
   favMenu.className = 'small'; favMenu.title = 'Favoritos';
   const ext = button('↗', () => url && window.open(lastKnown(), '_blank', 'noopener')); ext.className = 'small'; ext.title = 'Abrir en el navegador';
-  B.append(back, fwd, reload, go, star, favMenu, ext, maxBtn('doc'));
+  box._bar = [back, fwd, reload, go, star, favMenu, ext]; // la barra se vuelve a poner al volver a esta pestaña
+  B.append(...box._bar, maxBtn('doc'));
   paintStar();
   let frame = null;
-  const setUrl = u => { // la pestaña pasa a llamarse como la nueva dirección (sin volver a dibujar)
+  const setUrl = u => { // la pestaña pasa a llamarse como la nueva dirección (sin volver a dibujar); vale aunque esté oculta
     url = u; go.value = u; paintStar();
-    const p = 'web:' + u, i = tabs.indexOf(cur);
-    if (i >= 0 && p !== cur && !tabs.includes(p)) { if (previewTab === cur) previewTab = p; tabs[i] = cur = p; persist(); renderTabs(); }
+    const old = box.dataset.path, p = 'web:' + u, k = panes.findIndex(x => x.el.contains(box));
+    if (k < 0 || p === old) return;
+    const pn = panes[k], list = k === active ? tabs : pn.tabs, i = list.indexOf(old);
+    if (i < 0 || list.includes(p)) return;
+    list[i] = p; box.dataset.path = p;
+    if (k === active) { if (cur === old) cur = p; if (previewTab === old) previewTab = p; }
+    else { if (pn.cur === old) pn.cur = p; if (pn.previewTab === old) pn.previewTab = p; }
+    persist(); renderTabsOf(k);
   };
   async function navigate(u) {
     u = webUrl(u);
     if (!u) return;
     const r = await api('/api/web/permite?url=' + encodeURIComponent(u)).catch(e => ({ permitido: false, motivo: e.message, url: u }));
-    if (!live(s)) return;
+    if (!box.isConnected) return; // se cerró la pestaña mientras se comprobaba
     setUrl(r.url || u);
     if (!r.permitido) { if (frame) frame.hidden = true; return blocked(r); } // oculto, no quitado: ← vuelve a la anterior
-    V.querySelector('.wblock, .wstart')?.remove();
+    box.querySelector('.wblock, .wstart')?.remove();
     if (frame) frame.hidden = false;
     if (!frame) { // un solo iframe por pestaña: así su historial sirve para ← →
       frame = Object.assign(document.createElement('iframe'), { className: 'wframe', referrerPolicy: 'no-referrer' });
@@ -1014,30 +1031,30 @@ async function webView(V, B, path) {
       };
       Object.assign(nav, { expect: 'nuevo', pending: r.url || u });
       frame.src = r.url || u; // antes de insertarlo: si no, carga about:blank y esa carga contaría como página
-      return V.append(frame);
+      return box.append(frame);
     }
     Object.assign(nav, { expect: 'nuevo', pending: r.url || u });
     frame.src = r.url || u;
   }
   function blocked(r) {
-    V.querySelector('.wblock, .wstart')?.remove();
-    const box = document.createElement('div'); box.className = 'card wblock';
-    box.innerHTML = '<b>🔒 Esta página no se puede mostrar aquí</b><p></p><p class="ok">Las webs pueden prohibir que se las muestre dentro de otra página (GitHub, YouTube, bancos…). Ábrela en el navegador.</p>';
-    box.querySelector('p').textContent = r.motivo;
+    box.querySelector('.wblock, .wstart')?.remove();
+    const card = document.createElement('div'); card.className = 'card wblock';
+    card.innerHTML = '<b>🔒 Esta página no se puede mostrar aquí</b><p></p><p class="ok">Las webs pueden prohibir que se las muestre dentro de otra página (GitHub, YouTube, bancos…). Ábrela en el navegador.</p>';
+    card.querySelector('p').textContent = r.motivo;
     const b = button('↗ Abrir en el navegador', () => window.open(r.url, '_blank', 'noopener')); b.className = 'primary';
-    box.append(b); V.append(box);
+    card.append(b); box.append(card);
     back.disabled = !frame; // hay una página anterior a la que volver
   }
   function start() { // pestaña nueva: la barra de dirección y los favoritos
-    const box = document.createElement('div'); box.className = 'wstart';
-    box.innerHTML = '<p>Escribe una dirección o lo que quieras buscar en la barra de arriba.</p>';
+    const card = document.createElement('div'); card.className = 'wstart';
+    card.innerHTML = '<p>Escribe una dirección o lo que quieras buscar en la barra de arriba.</p>';
     const favs = webFavs();
     if (favs.length) {
       const L = document.createElement('div'); L.className = 'wfavs';
       L.append(...favs.map(f => Object.assign(button(f.nombre, () => navigate(f.url)), { title: f.url })));
-      box.append(Object.assign(document.createElement('h4'), { textContent: 'Favoritos' }), L);
+      card.append(Object.assign(document.createElement('h4'), { textContent: 'Favoritos' }), L);
     }
-    V.append(box);
+    box.append(card);
     setTimeout(() => go.focus());
   }
   go.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); navigate(go.value); } if (e.key === 'Escape') go.value = go.classList.contains('winside') ? '' : url; };
@@ -2357,10 +2374,13 @@ function paneWire(el) {
   });
 }
 paneWire(paneEl);
+// la caja (y su iframe) de una pestaña web que se cierra o cambia de lado
+function dropWebBox(path, el) { [...el.children].find(b => b.classList.contains('webbox') && b.dataset.path === path)?.remove(); }
 async function moveTab(path, src, dst) {
   activatePane(src);
   if (!await askUnsaved(path)) return; // Word/imagen/PDF en edición: guardar o descartar antes de cambiar de lado
   endEdit([wedit, iedit, pedit].find(st => st?.path === path));
+  dropWebBox(path, paneEl); // un iframe no se puede mover sin recargarse: en el otro lado se crea de nuevo
   const i = tabs.indexOf(path);
   tabs.splice(i, 1);
   if (previewTab === path) previewTab = null;
@@ -2431,7 +2451,7 @@ function openTab(path, pin = false, fromHist = false) {
   const usePreview = AJ.pestanas_vista_previa !== false;
   if (!tabs.includes(path)) {
     const i = usePreview ? tabs.indexOf(previewTab) : -1;
-    if (i >= 0) { edits.delete(previewTab); tabs[i] = path; } else tabs.push(path);
+    if (i >= 0) { edits.delete(previewTab); dropWebBox(previewTab, paneEl); tabs[i] = path; } else tabs.push(path); // la vista previa se sustituye
     previewTab = pin || !usePreview ? null : path;
   } else if (pin && previewTab === path) previewTab = null;
   if (!fromHist && hist[hi] !== path) { hist.splice(hi + 1); hist.push(path); hi = hist.length - 1; }
@@ -2460,6 +2480,7 @@ async function askUnsaved(path) {
 const endEdit = st => { if (st === wedit) wedit = null; if (st === iedit) iedit = null; if (st === pedit) pedit = null; };
 async function closeTab(path) {
   if (!await askUnsaved(path)) return;
+  dropWebBox(path, paneEl);
   const e = edits.get(path);
   if (pedit?.path === path) pedit = null;
   if (wedit?.path === path) wedit = null;
@@ -2531,7 +2552,7 @@ function renderTabs() {
   if (first) T.prepend(iconBtn('panelLeft', (side ? 'Mostrar' : 'Ocultar') + ' barra lateral (Ctrl+B)', toggleSide));
   T.append(Object.assign(document.createElement('span'), { style: 'flex:1' }));
   if (last) T.append(iconBtn(panes[1] ? 'unsplit' : 'split', panes[1] ? 'Juntar en un solo lado (Ctrl+\\)' : 'Dividir: dos pestañas lado a lado (Ctrl+\\)',
-    () => setSplit(!panes[1])), iconBtn('panelRight', (ia ? 'Ocultar' : 'Mostrar') + ' panel de IA (Ctrl+Alt+B)', () => setIA(!ia)));
+    () => setSplit(!panes[1])), iconBtn('panelRight', (ia ? 'Ocultar' : 'Mostrar') + ' panel de IA (Ctrl+G)', () => setIA(!ia)));
 }
 
 // Migas: "proyecto / carpeta / archivo" (o "carpeta / archivo" para sueltos)
@@ -2655,6 +2676,7 @@ async function render() {
   renderTabs(); markActive(); closeMenu();
   const V = $('#view'), B = $('#bar'), S = $('#stmain');
   V.className = ''; V.innerHTML = ''; V.onscroll = V.onwheel = null; B.innerHTML = ''; S.innerHTML = '<span id="msg"></span>';
+  for (const b of paneEl.children) if (b.classList.contains('webbox')) b.hidden = true; // las webs de este lado siguen vivas, ocultas
   editorCM = null; sel = null; curFile = null; pdfCtl = null; findAttach(null);
   if (!cur) {
     iaOnFile();
@@ -2964,7 +2986,7 @@ function findAttach(p) {
   if (p && findSt.get(cur)?.open) { findDraw(); findRun(true); } else $('#find').hidden = true;
 }
 function findOpen(repl) {
-  if (!cur) return false;
+  if (!cur || isWeb(cur)) return false; // web de otro origen: no se puede leer; Ctrl+F sigue al buscador del navegador
   const st = findState();
   if (repl && !findP?.replace && curFile?.texto != null && !curFile.truncado && !edits.has(cur) && kind(curFile.nombre).ext !== 'pdf') { // en lectura: Ctrl+H pasa a edición
     Object.assign(st, { open: true, repl: true }); startEdit(cur, curFile); return true;
@@ -3801,7 +3823,7 @@ async function pdfReadView(V, f) {
   let lastW = P.clientWidth;
   const ro = new ResizeObserver(() => {
     if (!P.isConnected) return ro.disconnect(); // la vista se volvió a dibujar
-    if (Math.abs(P.clientWidth - lastW) > 24) { lastW = P.clientWidth; layout(); }
+    if (Math.abs(P.clientWidth - lastW) > 24) { lastW = P.clientWidth; requestAnimationFrame(layout); } // al siguiente cuadro: sin bucle de ResizeObserver
   });
   ro.observe(P);
 }
@@ -5117,6 +5139,12 @@ addEventListener('keydown', e => { // Ctrl+B: barra lateral · Ctrl+Alt+B: panel
   e.preventDefault();
   e.altKey ? setIA(!document.body.classList.contains('ia')) : toggleSide();
 });
+// Ctrl+G: panel de IA. En captura: antes que el editor y que el «buscar siguiente» del navegador (ir a la línea sigue en Alt+G)
+addEventListener('keydown', e => {
+  if (!e.ctrlKey || e.altKey || e.shiftKey || e.key.toLowerCase() !== 'g' || maxZone || modalOpen()) return;
+  e.preventDefault(); e.stopPropagation();
+  setIA(!document.body.classList.contains('ia'));
+}, true);
 try { if (localStorage.getItem('atril.noside')) document.body.classList.add('noside'); } catch {}
 if (LS('atril.bak')) document.body.classList.add('showbak');
 $('#ribbon').append(

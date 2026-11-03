@@ -8,6 +8,16 @@ Entradas nuevas arriba. Formato: `## AAAA-MM-DD · título` + 2–4 líneas (qu�
 - **Cómo trabaja el usuario:** escribe en español. **Antes de construir algo nuevo, dibujarlo en texto y esperar su «ok».** No instalar nada sin acuerdo. Ahorrar tokens. Prefiere lo simple: rechazó un panel de IA con modos (ver 2026-11-02).
 - **Para verificar sin tocar su Atril:** levantar `atril.Handler` en el puerto 8799 con `CONFIG`, `CONV_DIR`, `RECOVERY_DIR` e `INDEX_DB` en una carpeta temporal y hacer captura con Edge sin ventana (`--headless=new --screenshot`). Así se probó cada paso. Ojo: en Windows dos servidores pueden escuchar el mismo puerto sin error; si hay otra sesión probando, usa otro puerto.
 
+## 2026-11-03 · Ctrl+G: panel de IA
+Abre y cierra el panel de IA (sigue también Ctrl+Alt+B). Escuchado en captura para que funcione con el cursor en el editor y no lo coja el «buscar siguiente» del navegador; no actúa con un modal abierto ni a pantalla completa. Para buscar dentro de una web se quedó la opción C (Ctrl+F del navegador); la A (lista de coincidencias sin resaltar) se descartó.
+
+## 2026-11-03 · Pestaña web: no se recarga al cambiar de pestaña; Ctrl+F del navegador
+Cada pestaña web vive en una `.webbox` hija de su `.pane`, encima de `#view` en la misma celda de la rejilla. Al cambiar de pestaña se oculta (no se borra) y la barra (`box._bar`) se vuelve a poner al volver: misma página, scroll y lo escrito, sin recargar. Se quita al cerrar la pestaña, al sustituir la de vista previa y al moverla de lado (ahí sí se recarga: un iframe que se mueve en el DOM se recarga). `setUrl` cambia la ruta de la pestaña aunque esté oculta o en el otro lado.
+Ctrl+F en una pestaña web: `findOpen` devuelve false y la tecla llega al buscador del navegador, que sí entra en webs de otro origen; el de Atril no puede leerlas.
+
+## 2026-11-03 · La ventana entera se desplazaba hacia un lado
+Con muchas pestañas (o una ruta larga en la barra de estado) la columna central `1fr` crecía más que la ventana, y como `body` tenía `overflow:hidden` (oculta la barra pero deja desplazar por código), el primer `scrollIntoView()` (saltar de página en el PDF, marcar el archivo en el árbol) corría todo Atril: la columna de iconos y parte del árbol quedaban fuera. Arreglo: columnas `minmax(0,1fr)` y `html,body{overflow:clip}` (no se puede desplazar ni por código). Reproducido con el CSS anterior (columna de iconos a −3142 px) y comprobado con el nuevo (0).
+
 ## 2026-11-03 · Capturas para el README
 10 capturas en `docs/capturas/` (1440×900) con un proyecto inventado, «Taller de escritura» (sin datos del usuario). Se sacan con Edge sin ventana manejado por CDP desde Node (WebSocket nativo de Node 24, nada instalado). El proyecto se crea en `_demo/` (en .gitignore) con una ruta neutra, porque la consola muestra la ruta completa. Al repetirlas, crear la demo, levantar un servidor aparte (otro puerto, historial aparte) y lanzar el guion de escenas.
 Encontrado de paso: en la vista dividida, PDF y Word quedaban cortados por los dos bordes (centrados y más anchos que el lado) → `align-items: safe center` y el visor de PDF recalcula el ancho con ResizeObserver. «Abrir en consola de Windows» → «Abrir en una terminal».
