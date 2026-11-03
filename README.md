@@ -31,6 +31,9 @@ Las capturas usan un proyecto de ejemplo inventado, «Taller de escritura».
 **Comparar dos archivos.** En rojo, lo que solo está en el primero; en verde, lo que solo está en el segundo, con las palabras exactas marcadas. Con la flecha ➜ se copia un cambio y se guarda.
 ![Comparador con dos versiones de un guion](docs/capturas/03-comparar.png)
 
+**Comparar versiones con git.** Los commits de un archivo en 2 o 3 columnas, con fecha, autor y mensaje. Tiene lista de cambios, mapa, una raya del color de cada autor y los archivos que tocó cada commit. Con ↩ se recupera una versión.
+![Comparador de git con tres commits de un guion en tres columnas](docs/capturas/03b-comparar-git.png)
+
 **Editar un Word** sin salir de Atril: texto, negrita, cursiva, subrayado y color.
 ![Word en edición con la barra B, I, U y color](docs/capturas/04-editar-word.png)
 
