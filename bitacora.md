@@ -8,6 +8,9 @@ Entradas nuevas arriba. Formato: `## AAAA-MM-DD · título` + 2–4 líneas (qu�
 - **Cómo trabaja el usuario:** escribe en español. **Antes de construir algo nuevo, dibujarlo en texto y esperar su «ok».** No instalar nada sin acuerdo. Ahorrar tokens. Prefiere lo simple: rechazó un panel de IA con modos (ver 2026-11-02).
 - **Para verificar sin tocar su Atril:** levantar `atril.Handler` en el puerto 8799 con `CONFIG`, `CONV_DIR`, `RECOVERY_DIR` e `INDEX_DB` en una carpeta temporal y hacer captura con Edge sin ventana (`--headless=new --screenshot`). Así se probó cada paso. Ojo: en Windows dos servidores pueden escuchar el mismo puerto sin error; si hay otra sesión probando, usa otro puerto.
 
+## 2026-11-03 · Código comentado
+Barrido completo con la regla de reglas.md (técnico, para quien mantenga): 83 docstrings en atril.pyw (138 de 145 funciones comentadas; las 7 restantes son de una línea y evidentes) y 100 comentarios en index.html sobre las funciones de 5+ líneas que no tenían (las que quedan son de una línea o evidentes). Solo comentarios: se comprobó que el código sin ellos es idéntico al de antes, y las pruebas pasan en Windows y Linux.
+
 ## 2026-11-03 · El documento se pintaba encima del panel de IA
 Captura del usuario: un Word ancho se veía a través del panel de IA (parecía transparente). Un elemento con posición absoluta dentro de `#view` (que no está posicionado) no lo recorta su scroll y puede salir sobre `#ia`. Arreglo: `main{overflow:clip}` (nada se pinta fuera del área central) y `#ia{z-index:3}`. No se reprodujo con su documento, pero sí el mecanismo: con el CSS anterior un elemento así tapa la IA; con el nuevo, no. El «Failed to fetch» de esa captura fue el servidor reiniciándose.
 

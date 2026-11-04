@@ -44,6 +44,7 @@ HIDDEN = {".git", "__pycache__", ".ipynb_checkpoints", ".idea", ".vs"}
 # ---------- configuración y permisos ----------
 
 def load_config():
+    """config.json (proyectos, sueltos, ajustes, IA, ventana…); si falta o está roto, una configuración vacía."""
     try:
         return json.loads(CONFIG.read_text(encoding="utf-8"))
     except (FileNotFoundError, ValueError):
@@ -51,6 +52,7 @@ def load_config():
 
 
 def save_config(cfg):
+    """Escribe config.json y anula la caché de ajustes para que la próxima lectura vea lo nuevo."""
     global _settings
     _settings = None  # los ajustes se vuelven a leer
     CONFIG.write_text(json.dumps(cfg, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -94,6 +96,7 @@ _settings = None
 
 
 def ajustes():
+    """Valores de ⚙ Ajustes (los guardados y, para el resto, los de SETTINGS); se leen una vez y quedan en caché."""
     global _settings
     if _settings is None:
         saved = load_config().get("ajustes", {})
@@ -133,6 +136,7 @@ def set_ajustes(data):
 
 
 def add_paths(kind, paths):
+    """Añade carpetas («proyectos») o archivos («sueltos») a config.json, sin repetir, y despierta al indexador."""
     cfg = load_config()
     for p in paths:
         p = str(Path(p).resolve())
@@ -185,6 +189,7 @@ backed_up = set()  # archivos que ya tienen su .bak en esta sesión
 
 
 def in_git(p):
+    """¿Está dentro de un repositorio git? (Entonces no hace falta .bak: el historial ya lo guarda git.)"""
     return any((d / ".git").exists() for d in p.parents)
 
 
@@ -231,6 +236,7 @@ def is_project(path):
 
 
 def template_info(project):
+    """Para el aviso «Sin reglas / Sin bitácora»: qué archivos de plantillas/ tiene ya el proyecto y su texto."""
     p = Path(project)
     return {"proyecto": p.name, "tecnologia": " · ".join(project_tags(p)),
             "archivos": [{"nombre": n, "existe": (p / n).exists()} for n in TEMPLATES],
@@ -265,6 +271,8 @@ def split_log(text):
 
 
 def plan_archive(project):
+    """Plan de «Archivar bitácora»: las N entradas más nuevas se quedan; el resto, agrupado por año.
+    Devuelve (texto completo, cabecera, entradas que quedan, {año: entradas}) sin escribir nada."""
     text = (Path(project) / "bitacora.md").read_text(encoding="utf-8")
     head, entries = split_log(text)
     n = ajuste("bitacora_conservar")
@@ -279,6 +287,8 @@ def plan_archive(project):
 
 
 def archive_log(project):
+    """Mueve las entradas viejas de bitacora.md a bitacora/AAAA.md (las nuevas arriba en cada año).
+    Primero escribe los archivos anuales y al final recorta bitacora.md: si algo falla a medias, nada se pierde."""
     _, head, keep, by_year = plan_archive(project)
     folder = Path(project) / "bitacora"
     folder.mkdir(exist_ok=True)
@@ -292,6 +302,7 @@ def archive_log(project):
 
 
 def status(project):
+    """Avisos de un proyecto para el árbol: «Sin reglas», «Sin bitácora», «Bitácora grande» o «En orden»."""
     p = Path(project)
     if not p.is_dir():
         return ["No encontrado"]
@@ -309,6 +320,7 @@ def status(project):
 
 
 def estado():
+    """Lo que dibuja la barra lateral: proyectos con sus avisos y archivos sueltos (con su estado de git)."""
     cfg = load_config()
     return {
         "proyectos": [{"ruta": r, "nombre": Path(r).name or r, "avisos": status(r)} for r in cfg["proyectos"]],
@@ -318,6 +330,7 @@ def estado():
 
 
 def list_dir(path):
+    """Contenido de una carpeta para el árbol: sin las carpetas ocultas (HIDDEN), carpetas primero y por nombre."""
     items = []
     for e in Path(path).iterdir():
         if e.name in HIDDEN:
@@ -339,6 +352,7 @@ HEAVY = {"node_modules", "vendor", ".venv", "venv", "dist", "build"}
 
 
 def drives():
+    """Unidades para el explorador de «Añadir»: C:\\, D:\\… en Windows; «/» en macOS y Linux."""
     if not WINDOWS:  # macOS y Linux: una sola raíz (los discos cuelgan de /Volumes o /media)
         return ["/"]
     out = []
@@ -352,6 +366,7 @@ def drives():
 
 
 def project_tags(path):
+    """Tecnologías que se reconocen por sus archivos (MARKERS): Laravel, Node, Python, git… Laravel ya implica PHP."""
     try:
         names = set(os.listdir(path))
     except OSError:
@@ -364,11 +379,14 @@ def project_tags(path):
 
 
 def explore(ruta):
+    """Datos del explorador «Añadir proyecto o archivos»: unidades, lugares (Inicio, Escritorio…), proyectos
+    añadidos y el contenido de `ruta`, con cada elemento marcado como «añadido», «dentro» (de un proyecto) o libre."""
     cfg = load_config()
     projects = [Path(r).resolve() for r in cfg["proyectos"]]
     loose = {Path(s).resolve() for s in cfg["sueltos"]}
 
     def state(p, is_dir):
+        """«añadido» si ya es un proyecto o suelto; «dentro» si cuelga de un proyecto; None si no."""
         if (is_dir and p in projects) or (not is_dir and p in loose):
             return "añadido"
         if any(p.is_relative_to(r) for r in projects):
@@ -417,6 +435,7 @@ def explore(ruta):
 # ---------- consola: ejecutar scripts y pruebas ----------
 
 def oem_encoding():
+    """Codificación de la consola de Windows (cp850, cp437…): la que usan los .bat y PowerShell al escribir."""
     try:
         import ctypes
         return f"cp{ctypes.windll.kernel32.GetOEMCP()}"
@@ -425,6 +444,7 @@ def oem_encoding():
 
 
 def find_venv_python(p, gui=False):
+    """Python del entorno virtual del proyecto (.venv o venv, subiendo carpetas), para ejecutar sus .py con sus paquetes."""
     sub, exe = ("Scripts", "pythonw.exe" if gui else "python.exe") if WINDOWS else ("bin", "python")
     for d in p.parents:
         for name in (".venv", "venv"):
@@ -434,6 +454,7 @@ def find_venv_python(p, gui=False):
 
 
 def git_bash():
+    """bash.exe que trae Git para Windows (para los .sh); el «bash» del PATH puede ser el de WSL, que no ve las rutas igual."""
     git = shutil.which("git")  # 'bash' en el PATH puede ser el de WSL; se usa el que trae Git
     if git:
         for cand in (Path(git).parents[1] / "bin" / "bash.exe", Path(git).parents[1] / "usr" / "bin" / "bash.exe"):
@@ -472,6 +493,7 @@ def command_for(path):
 
 
 def run_info(path):
+    """Para el botón ▶: la orden que se ejecutaría y en qué carpeta, o el motivo por el que no se puede."""
     args, enc = command_for(path)
     if args is None:
         return {"error": enc} if enc else None
@@ -480,6 +502,7 @@ def run_info(path):
 
 
 def detect_tests(project):
+    """Comando de pruebas que se propone según el proyecto: Laravel, npm (si package.json tiene «test») o pytest."""
     p = Path(project)
     if (p / "artisan").exists():
         return "php artisan test"
@@ -502,6 +525,8 @@ class Run:
     """Un proceso en ejecución; su salida se guarda en trozos que la interfaz va pidiendo."""
 
     def __init__(self, args, cwd, encoding, label):
+        """Lanza el proceso con su salida y su error por tuberías; dos hilos los leen sin bloquear y un tercero
+        espera al final para guardar el código de salida y la duración."""
         self.args, self.cwd, self.label, self.encoding = args, cwd, label, encoding  # args: lista, o texto para cmd /c
         self.chunks, self.code, self.start, self.end = [], None, time.time(), None
         self.lock = threading.Lock()
@@ -515,6 +540,7 @@ class Run:
             t.start()
 
         def wait():
+            """Cuando terminan los dos lectores (ya no queda salida por leer), se guarda el código de salida."""
             for t in readers:
                 t.join()
             self.code = self.proc.wait()
@@ -522,6 +548,7 @@ class Run:
         threading.Thread(target=wait, daemon=True).start()
 
     def read(self, stream, kind, encoding):
+        """Lee la salida a trozos de 4 KB y la decodifica de forma incremental (un carácter puede quedar partido entre dos trozos)."""
         dec = codecs.getincrementaldecoder(encoding)(errors="replace")
         while chunk := stream.read1(4096):
             text = dec.decode(chunk).replace("\r\n", "\n")
@@ -530,11 +557,13 @@ class Run:
                     self.chunks.append([kind, text])
 
     def output(self, since):
+        """Los trozos desde `since` (la ventana pide solo lo nuevo), si terminó, el código de salida y la duración."""
         with self.lock:
             return {"trozos": self.chunks[since:], "total": len(self.chunks), "fin": self.end is not None,
                     "codigo": self.code, "dur": round((self.end or time.time()) - self.start, 1)}
 
     def send(self, text):
+        """Una línea de la caja de entrada de la consola al proceso (input() de Python, set /p de un .bat…)."""
         try:
             self.proc.stdin.write((text + "\r\n").encode(self.encoding, errors="replace"))
             self.proc.stdin.flush()
@@ -542,6 +571,7 @@ class Run:
             pass
 
     def kill(self):
+        """Detener: el proceso y sus hijos (taskkill /T en Windows; en macOS y Linux, su grupo de procesos)."""
         if self.end is None and WINDOWS:  # /T: también los procesos hijos (un .bat que lanza otros programas)
             subprocess.run(["taskkill", "/T", "/F", "/PID", str(self.proc.pid)], capture_output=True,
                            creationflags=NO_WINDOW)
@@ -553,6 +583,7 @@ class Run:
 
 
 def start_run(args, cwd, encoding, label):
+    """Arranca un proceso y lo registra en `runs` con un id para que la consola pida su salida."""
     r = Run(args, cwd, encoding, label)
     with runs_lock:
         rid = str(len(runs) + 1)
@@ -607,6 +638,7 @@ ia_cache = {}
 
 
 def is_sensitive(path):
+    """Archivo con claves o contraseñas (.env, .pem, id_rsa, credentials.json…): 🔒 en el árbol y aviso antes de enviarlo a la IA."""
     name = Path(path).name.lower()
     return name.startswith(".env") or name in SENSITIVE_NAMES or Path(name).suffix in SENSITIVE
 
@@ -618,6 +650,7 @@ def blocked_for_ai(path):
 
 def ia_prefs():
     # el límite vive en Ajustes (un solo valor para «Conectar IA» y ⚙ Ajustes)
+    """Preferencias de IA para la ventana: la predeterminada, el límite de tokens y la carga fija medida de cada CLI."""
     ia = load_config().get("ia", {})
     # carga fija medida con «Probar»: solo vale la medida con el modo mínimo actual (CARGA_V);
     # las antiguas (≈ 27.000–41.000 tokens del modo completo) se ignoran hasta volver a medir
@@ -816,6 +849,7 @@ def image_size(b):
 
 
 def human_size(n):
+    """Tamaño legible para la IA: «85 KB», «1.6 MB»."""
     return f"{n / 1_000_000:.1f} MB" if n >= 1_000_000 else f"{max(1, round(n / 1000))} KB"
 
 
@@ -851,6 +885,7 @@ TEXT_EXT = {".md", ".markdown", ".txt", ".docx", ".pdf", ".csv", ".tsv", ".json"
 
 
 def plain_words(text):
+    """Palabras sin tildes ni mayúsculas, solo letras y números: «Preguntas y Datos» → ['preguntas', 'y', 'datos']."""
     text = unicodedata.normalize("NFD", text.lower())
     return re.findall(r"[a-z0-9]+", "".join(c for c in text if unicodedata.category(c) != "Mn"))
 
@@ -869,6 +904,8 @@ def longest_run(a, b):
 
 
 def project_files(base, depth=3, cap=3000):
+    """Archivos de texto del proyecto que la IA puede recibir si se nombran en el mensaje.
+    ponytail: hasta 3 niveles y 3000 archivos, sin node_modules, vendor… (HEAVY); más hondo no se encuentra."""
     out = []
     for root, dirs, files in os.walk(base):
         rel = Path(root).relative_to(base)
@@ -903,6 +940,7 @@ def find_mentioned(mensaje, ruta):
 
 
 def conv_path(cid):
+    """Ruta del JSON de una conversación; el id solo puede ser hexadecimal (nada de ../ desde la ventana)."""
     if not re.fullmatch(r"[0-9a-f]+", cid or ""):
         raise ValueError("conversación no válida")
     return CONV_DIR / f"{cid}.json"
@@ -913,6 +951,7 @@ def conv_load(cid):
 
 
 def conv_save(conv):
+    """Guarda la conversación entera (mensajes, adjuntos con su texto, sesión de Claude) en historial/conversaciones."""
     CONV_DIR.mkdir(parents=True, exist_ok=True)
     conv_path(conv["id"]).write_text(json.dumps(conv, ensure_ascii=False), encoding="utf-8")
 
@@ -925,6 +964,7 @@ def conv_public(conv):
 
 
 def conv_list():
+    """Conversaciones para el selector del chat, la más reciente primero (sin mensajes: solo título, fecha, IA y vínculo)."""
     out = []
     for f in sorted(CONV_DIR.glob("*.json"), key=lambda f: f.stat().st_mtime, reverse=True) if CONV_DIR.exists() else []:
         try:
@@ -967,6 +1007,8 @@ def abierto_hint(abierto):
 
 
 def conv_prompt(intro, reglas, adjuntos, historial, mensaje, abierto=""):
+    """Texto que recibe la IA: instrucciones, reglas del proyecto, adjuntos, conversación previa, archivo abierto
+    y el mensaje. Con la sesión de Claude ya abierta solo van los adjuntos nuevos y el mensaje."""
     parts = [intro] if intro else []
     if reglas.strip():
         parts.append("REGLAS DEL PROYECTO (respétalas):\n" + reglas.strip())
@@ -1019,18 +1061,21 @@ def conv_send(data):
 
 
 def open_login(ai):
+    """Abre una terminal con el login de la CLI (claude, codex, gemini) para que el usuario inicie sesión allí."""
     open_terminal(AIS[ai]["login"], Path.home(), f'Atril · {AIS[ai]["nombre"]}')
 
 
 # ---------- reglas del proyecto y archivos nuevos ----------
 
 def project_of(path):
+    """El proyecto añadido que contiene `path`; si hay proyectos anidados, el más profundo. None si es un suelto."""
     p = Path(path).resolve()
     inside = [Path(r).resolve() for r in load_config()["proyectos"] if p.is_relative_to(Path(r).resolve())]
     return max(inside, key=lambda r: len(r.parts)) if inside else None
 
 
 def file_info(p):
+    """Lo que la ventana necesita para abrir un archivo: texto (si lo es), codificación, saltos de línea, mtime y si se ejecuta."""
     st = p.stat()
     texto, cod, trunc = read_text(p)
     return {"nombre": p.name, "ruta": str(p), "tam": st.st_size, "fecha": st.st_mtime, "mtime": str(st.st_mtime_ns),
@@ -1039,6 +1084,7 @@ def file_info(p):
 
 
 def rules_for(path):
+    """reglas.md del proyecto de `path` para el panel de IA (None si el archivo no está en un proyecto o no hay reglas)."""
     proj = project_of(path)
     if not proj:
         return {"proyecto": None, "reglas": None}
@@ -1049,6 +1095,7 @@ def rules_for(path):
 # ---------- crear .docx y .pdf desde el HTML del Markdown (la IA escribe Markdown; Atril convierte, sin IA) ----------
 
 def _x(t):
+    """Escapa texto para meterlo en XML/HTML (Word y la página que se imprime a PDF)."""
     return t.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
 
 
@@ -1063,6 +1110,7 @@ class _Docx(HTMLParser):
         self.table, self.cell = None, None
 
     def start_p(self, style="", indent=0, prefix=""):
+        """Empieza un párrafo de Word con su estilo (Heading1, Quote…) y la sangría de lista o de cita."""
         self.end_p()
         self.runs = []
         ppr = f'<w:pStyle w:val="{style}"/>' if style else ""
@@ -1075,12 +1123,14 @@ class _Docx(HTMLParser):
             self.add(prefix)
 
     def end_p(self):
+        """Cierra el párrafo abierto y lo añade al cuerpo o a la celda de tabla en curso."""
         if self.runs is None:
             return
         (self.cell if self.cell is not None else self.body).append(f"<w:p>{self.ppr}{''.join(self.runs)}</w:p>")
         self.runs = None
 
     def add(self, text):
+        """Texto suelto → un run de Word con el formato activo (negrita, cursiva, código, enlace); fuera de <pre> se juntan los espacios."""
         if not self.pre:
             text = re.sub(r"\s+", " ", text)
         if self.runs is None:
@@ -1097,6 +1147,7 @@ class _Docx(HTMLParser):
                 self.runs.append(f'<w:r>{"<w:rPr>" + rpr + "</w:rPr>" if rpr else ""}<w:t xml:space="preserve">{_x(part)}</w:t></w:r>')
 
     def handle_starttag(self, tag, attrs):
+        """Etiquetas HTML de marked → estado del conversor: títulos, listas, tablas, citas, código, enlaces, saltos e imágenes."""
         a = dict(attrs)
         if tag in ("td", "th"):
             self.b += tag == "th"  # encabezados de tabla en negrita
@@ -1146,6 +1197,7 @@ class _Docx(HTMLParser):
             self.table.append([])
 
     def handle_endtag(self, tag):
+        """Cierra lo abierto en handle_starttag; al cerrar una tabla la escribe con bordes y ancho completo."""
         if re.fullmatch(r"h[1-6]", tag) or tag in ("p", "li", "pre"):
             self.end_p()
             self.pre = False if tag == "pre" else self.pre
@@ -1203,6 +1255,8 @@ DOCX_STYLES = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 
 
 def html_to_docx(html):
+    """Markdown ya convertido a HTML → .docx mínimo válido (document.xml, estilos, numeración de listas y
+    relaciones), solo con zipfile. Word lo abre sin avisos; formatos más ricos se piden a la IA sobre el Word."""
     d = _Docx()
     d.feed(html)
     d.close()
@@ -1348,12 +1402,15 @@ COLORS = {"rojo": "FF0000", "azul": "0070C0", "verde": "00B050", "negro": "00000
 
 
 def _set_rpr(run, op):
+    """Aplica el formato pedido (color, negrita, cursiva, subrayado, tamaño, resaltado, fuente) al <w:rPr> de un run,
+    creándolo si falta. Cada propiedad se inserta en el orden que exige el esquema de Word (RPR_ORDER)."""
     rpr = run.find(W + "rPr")
     if rpr is None:
         rpr = ET.Element(W + "rPr")
         run.insert(0, rpr)
 
     def put(tag, attrs):
+        """Quita la propiedad si estaba y, si attrs no es None, la vuelve a poner con esos valores y en su sitio."""
         old = rpr.find(W + tag)
         if old is not None:
             rpr.remove(old)
@@ -1629,15 +1686,18 @@ _hist_last = 0  # último id dado (los ids son el reloj en ns, siempre creciente
 
 
 def hist_dir(path):
+    """Carpeta del historial de un archivo: hash de su ruta (en Windows sin distinguir mayúsculas), no su nombre."""
     return HIST_DIR / hashlib.sha1(os.path.normcase(str(Path(path).resolve())).encode()).hexdigest()[:16]
 
 
 def hist_kind(path):
+    """Cómo se guarda cada paso: texto (gzip), imagen (PNG), docx (cambios) o pdf (JSON de páginas y notas)."""
     ext = Path(path).suffix.lower()
     return "docx" if ext == ".docx" else "pdf" if ext == ".pdf" else "imagen" if ext in EDIT_IMG else "texto"
 
 
 def hist_meta(path):
+    """meta.json del historial (árbol de pasos y el actual); vacío si el archivo aún no tiene historial."""
     try:
         return json.loads((hist_dir(path) / "meta.json").read_text(encoding="utf-8"))
     except (FileNotFoundError, ValueError):
@@ -1645,6 +1705,7 @@ def hist_meta(path):
 
 
 def _hist_write_meta(path, meta):
+    """Guarda meta.json de golpe (archivo temporal + os.replace) y anota la última actividad, que usa la limpieza."""
     d = hist_dir(path)
     d.mkdir(parents=True, exist_ok=True)
     meta["ultimo"] = time.time()
@@ -1654,6 +1715,7 @@ def _hist_write_meta(path, meta):
 
 
 def _hist_node(meta, nid):
+    """El paso con ese id; ValueError si ya no está (p. ej. lo borró la limpieza)."""
     for n in meta["nodos"]:
         if n["id"] == nid:
             return n
@@ -1667,11 +1729,14 @@ def hist_disk_node(path, meta):
 
 
 def hist_public(path):
+    """Árbol de pasos para la ventana, el actual y cuál corresponde al archivo tal como está en disco."""
     meta = hist_meta(path)
     return {"nodos": meta["nodos"], "actual": meta["actual"], "disco": hist_disk_node(path, meta) if Path(path).is_file() else None}
 
 
 def _hist_add(meta, path, padre, desc, data, extra, base=None):
+    """Crea un paso: <id>.dat con su contenido (texto comprimido) y, si es copia de partida, <id>.base.
+    Los ids son el reloj en ns, siempre crecientes, así que ordenarlos como texto es ordenarlos en el tiempo."""
     global _hist_last
     d = hist_dir(path)
     d.mkdir(parents=True, exist_ok=True)
@@ -1709,6 +1774,7 @@ def hist_step(path, padre, desc, data, extra=None):
 
 
 def hist_go(path, nid):
+    """Anota en meta.json en qué paso está el editor tras ↶ ↷ o «hasta aquí» (el estado lo carga la ventana)."""
     with _hist_lock:
         meta = hist_meta(path)
         _hist_node(meta, nid)
@@ -1825,6 +1891,7 @@ UNDO_KEEP = 100  # copias que se conservan (las más antiguas se borran)
 
 
 def undo_save(p):
+    """Copia exacta del archivo antes de un cambio de la IA o de un guardado binario; se conservan las últimas UNDO_KEEP."""
     UNDO_DIR.mkdir(parents=True, exist_ok=True)
     uid = f"{time.time_ns():x}"
     shutil.copy2(p, UNDO_DIR / f"{uid}{p.suffix}")
@@ -1834,6 +1901,8 @@ def undo_save(p):
 
 
 def docx_undo(path, uid):
+    """«↩ Deshacer»: vuelve a poner la copia guardada por undo_save (Word, imagen o PDF), de golpe.
+    El id solo puede ser hexadecimal: no se puede pedir otro archivo desde la ventana."""
     if not re.fullmatch(r"[0-9a-f]+", uid or ""):
         raise ValueError("Copia para deshacer no válida")
     p, src = Path(path), UNDO_DIR / f"{uid}{Path(path).suffix}"
@@ -1851,6 +1920,7 @@ def docx_undo(path, uid):
 
 
 def create_folder(folder, name):
+    """Carpeta nueva dentro de un proyecto añadido; nombre válido en Windows y nunca reutiliza una que ya exista."""
     if not name or any(c in name for c in '\\/:*?"<>|') or name.strip(" .") == "":
         raise ValueError("Nombre de carpeta no válido")
     p = Path(folder).resolve() / name
@@ -1867,12 +1937,15 @@ RECOVERY_DIR = ROOT / "historial" / "recuperacion"
 
 
 def recovery_path(key):
+    """JSON de recuperación de una pestaña; la clave se limita a [a-z0-9-] para que no pueda salir de la carpeta."""
     if not re.fullmatch(r"[a-z0-9-]{1,64}", key or ""):
         raise ValueError("clave de recuperación no válida")
     return RECOVERY_DIR / f"{key}.json"
 
 
 def recovery_save(data):
+    """Copia de lo no guardado (como Notepad++) para reabrirlo tras un cierre o un apagón.
+    Se escribe a un .tmp, se fuerza al disco y se renombra: nunca queda un JSON a medias."""
     RECOVERY_DIR.mkdir(parents=True, exist_ok=True)
     p = recovery_path(data.get("clave"))
     entry = {k: data.get(k) for k in ("clave", "ruta", "titulo", "texto", "mtime", "codificacion", "eol")}
@@ -1886,6 +1959,7 @@ def recovery_save(data):
 
 
 def recovery_list():
+    """Copias de recuperación pendientes, para ofrecer reabrirlas al arrancar."""
     out = []
     for f in sorted(RECOVERY_DIR.glob("*.json")) if RECOVERY_DIR.exists() else []:
         try:
@@ -1959,6 +2033,7 @@ def idx_file(c, p, root):
 
 
 def idx_targets():
+    """Todos los archivos a indexar: los de cada proyecto (sin .git) y los sueltos, cada uno con su proyecto."""
     cfg = load_config()
     for r in map(Path, cfg["proyectos"]):
         for d, dirs, files in os.walk(r):
@@ -1971,6 +2046,8 @@ def idx_targets():
 
 
 def idx_pass():
+    """Una pasada del indexador: añade o actualiza lo que cambió (por mtime y tamaño) y borra lo que ya no existe.
+    Hace commit cada 100 archivos para que, si Atril se cierra, lo hecho no se repita."""
     targets = list(idx_targets())
     idx_state.update(fase="indexando", total=len(targets), hechos=0, inicio=time.time(), fin=None)
     c = idx_conn()
@@ -1991,6 +2068,7 @@ def idx_pass():
 
 
 def indexer():
+    """Hilo del índice: una pasada al arrancar y luego cada N minutos, o antes si se añade un proyecto (idx_wake)."""
     while True:
         try:
             idx_pass()
@@ -2013,6 +2091,7 @@ def idx_update(path):
 
 
 def idx_status():
+    """Resumen del índice para su modal: archivos por estado y por tipo, páginas de PDF y los últimos errores."""
     c = idx_conn()
     try:
         por_estado = dict(c.execute("select estado, count(*) from files group by estado").fetchall())
@@ -2028,6 +2107,7 @@ def idx_status():
 
 
 def idx_pdf_next():
+    """El siguiente PDF pendiente (el más pequeño primero): su texto lo extrae la ventana con pdf.js."""
     c = idx_conn()
     try:
         row = c.execute("select path, mtime from files where estado='pdf_pendiente' order by size limit 1").fetchone()
@@ -2038,6 +2118,8 @@ def idx_pdf_next():
 
 
 def idx_pdf_save(ruta, mtime, paginas, error=None):
+    """Guarda el texto por páginas que la ventana extrajo de un PDF.
+    Si el PDF cambió mientras se leía (otro mtime), no se guarda: se repetirá en la próxima pasada."""
     c = idx_conn()
     try:
         row = c.execute("select mtime from files where path=?", (ruta,)).fetchone()
@@ -2096,6 +2178,7 @@ git_cache = {}
 
 
 def git_root(d):
+    """La carpeta del repositorio git que contiene `d` (la que tiene .git), o None."""
     for x in [d, *d.parents]:
         if (x / ".git").exists():
             return x
@@ -2103,6 +2186,7 @@ def git_root(d):
 
 
 def git_run(repo, *args):
+    """Ejecuta una orden de git en el repositorio y devuelve su salida, o «» si falla."""
     r = subprocess.run(["git", "-C", str(repo), *args], capture_output=True, timeout=20,
                        creationflags=NO_WINDOW)
     return r.stdout.decode("utf-8", "replace").strip() if r.returncode == 0 else ""
@@ -2198,6 +2282,8 @@ def git_blame(path, commit="", rel="", text=None):
 
 
 def git_status_map(repo):
+    """Estado de git de todo el repositorio de una vez (git status --porcelain -z, con ignorados), en caché
+    unos segundos: el árbol pregunta por muchos archivos seguidos. Devuelve archivos y carpetas enteras."""
     t, files, dirs = git_cache.get(repo, (0, None, None))
     if files is not None and time.time() - t < ajuste("git_cache_seg"):
         return files, dirs
@@ -2223,6 +2309,7 @@ GIT_TEXT = {"limpio": "Git: sin cambios", "modificado": "Git: modificado", "nuev
 
 
 def git_state(p):
+    """Estado de git de un archivo para el punto del árbol: limpio, modificado, nuevo, conflicto, ignorado o sin_git."""
     p = Path(p)
     repo = git_root(p.parent)
     if not repo:
@@ -2249,6 +2336,7 @@ def git_state(p):
 # ---------- información de un archivo (modal ⓘ) ----------
 
 def _pdf_str(raw, key):
+    """Un campo del diccionario de información de un PDF (/Title, /Author…), en texto (paréntesis) o hexadecimal, en UTF-16 o Latin-1."""
     m = re.search(rb"/" + key + rb"\s*\(((?:\\.|[^\\)])*)\)", raw) or re.search(rb"/" + key + rb"\s*<([0-9A-Fa-f]+)>", raw)
     if not m:
         return ""
@@ -2265,6 +2353,7 @@ def _pdf_str(raw, key):
 
 
 def _image_size(raw):
+    """Ancho y alto de una imagen para el modal de información (PNG, GIF, JPEG) leyendo solo su cabecera."""
     if raw[:8] == b"\x89PNG\r\n\x1a\n":
         return int.from_bytes(raw[16:20], "big"), int.from_bytes(raw[20:24], "big")
     if raw[:6] in (b"GIF87a", b"GIF89a"):
@@ -2283,6 +2372,9 @@ def _image_size(raw):
 
 
 def file_meta(path):
+    """Datos del modal ⓘ Información: tamaño, fechas, atributos, codificación y saltos de línea si es texto,
+    y las propiedades del documento (autor, título, revisión) en Word, Excel, PowerPoint, PDF e imágenes.
+    st_file_attributes y st_birthtime solo existen en Windows y macOS: en Linux salen «normal» y la fecha de cambio."""
     p = Path(path)
     st, ext = p.stat(), p.suffix.lower()
     attrs = getattr(st, "st_file_attributes", 0)
@@ -2343,6 +2435,8 @@ bye_at = None
 
 
 def watchdog(server):
+    """Apaga el servidor cuando se cierra la ventana (aviso «adiós» y 5 s sin pings, por si era una recarga)
+    o si lleva 5 minutos sin pings (la ventana se cerró sin avisar)."""
     while True:
         time.sleep(2)
         now = time.time()
@@ -2356,9 +2450,11 @@ def watchdog(server):
 
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *a):
+        """Sin registro de cada petición en la consola: con pythonw no hay consola y solo sería ruido."""
         pass
 
     def send_json(self, code, data):
+        """Respuesta JSON con su código HTTP (los errores llevan {"error": mensaje} para que la ventana lo muestre)."""
         body = json.dumps(data, ensure_ascii=False).encode()
         self.send_response(code)
         self.send_header("Content-Type", "application/json; charset=utf-8")
@@ -2375,6 +2471,9 @@ class Handler(BaseHTTPRequestHandler):
         return True
 
     def do_GET(self):
+        """Peticiones GET: la página (index.html), /raw/ (archivos de los proyectos, para visores e iframes) y /api/…
+        Todo exige Host local; la API además la cabecera X-Atril (una web externa no puede enviarla sin CORS).
+        Solo se sirven rutas dentro de proyectos o sueltos añadidos (allowed)."""
         url = urlparse(self.path)
         q = {k: v[0] for k, v in parse_qs(url.query, keep_blank_values=True).items()}
         try:
@@ -2501,6 +2600,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(500, {"error": str(e)})
 
     def do_POST(self):
+        """Peticiones POST (todas en post()): un error inesperado vuelve a la ventana como JSON en vez de cortar la conexión."""
         try:
             self.post()
         except (ConnectionError, TimeoutError):
@@ -2509,6 +2609,9 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(500, {"error": str(e)})
 
     def post(self):
+        """Todas las acciones que cambian algo: guardar, crear, ejecutar, IA, historial, Word, imágenes, PDF, ajustes…
+        ping/adiós llegan con sendBeacon, que no puede llevar cabeceras; el resto exige la cabecera X-Atril.
+        Cada acción vuelve a comprobar que la ruta está dentro de lo añadido a Atril."""
         global last_ping, bye_at
         url = urlparse(self.path).path
         if url in ("/api/ping", "/api/adios"):  # sendBeacon no puede enviar cabeceras
@@ -2811,6 +2914,8 @@ def open_window(url):
 
 
 def main():
+    """Arranque: los archivos pasados como argumento (arrastrados sobre el icono) se añaden como sueltos; si Atril
+    ya está abierto en ese puerto, solo se abre otra ventana; si no, servidor, indexador, limpieza y ventana."""
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     files = [str(Path(a).resolve()) for a in args if Path(a).is_file()]
     if files:

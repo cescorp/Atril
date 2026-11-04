@@ -775,6 +775,7 @@ const I = {
   x: '<path d="M6 6l12 12M18 6 6 18"/>',
 };
 const svg = name => `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${I[name]}</svg>`;
+// Botón de icono (SVG de I) con su texto de ayuda también como aria-label, para lectores de pantalla.
 function iconBtn(name, title, fn, disabled = false) {
   const b = button('', fn);
   b.className = 'ic'; b.title = title; b.disabled = disabled; b.setAttribute('aria-label', title);
@@ -802,6 +803,7 @@ const LANG = { phtml: 'php', php3: 'php', php4: 'php', php5: 'php', pyw: 'python
   proto: 'protobuf', asm: 'x86asm', s: 'x86asm', ino: 'arduino', psql: 'sql', pgsql: 'sql', mk: 'makefile',
   cmake: 'cmake', gql: 'graphql', tf: 'ini', hcl: 'ini', patch: 'diff', log: 'plaintext', txt: 'plaintext', text: 'plaintext' };
 
+// Tipo de un archivo por su nombre: extensión, lenguaje para colorear el código y si es sensible (🔒).
 function kind(name) {
   const lower = name.toLowerCase(), ext = lower.includes('.') ? lower.split('.').pop() : '';
   const lang = lower.endsWith('.blade.php') ? 'xml' : lower === 'makefile' ? 'makefile' : lower === 'dockerfile' ? 'dockerfile'
@@ -812,6 +814,8 @@ function kind(name) {
 // ---------- barra lateral ----------
 const tree = new Map(); // ruta → ¿abierta?
 let side = { proyectos: [], sueltos: [] };
+// Árbol de la barra lateral: proyectos (con sus avisos: sin reglas, sin bitácora…) y archivos sueltos.
+// Las carpetas que estaban abiertas (mapa `tree`) se vuelven a desplegar antes de marcar el archivo actual.
 async function loadSide() {
   const st = side = await api('/api/estado');
   const P = $('#projects'); P.innerHTML = '';
@@ -851,6 +855,8 @@ function setName(el, name, file = true, before = '', after = '') {
 }
 const GIT_TXT = { limpio: 'Git: sin cambios', modificado: 'Git: modificado', nuevo: 'Git: nuevo (sin commit)',
   conflicto: 'Git: conflicto', ignorado: 'Git: ignorado (.gitignore)', sin_git: 'No está en git' };
+// Una fila del árbol: nombre (con la extensión siempre visible), 🔒 si es sensible, punto de git que
+// cambia a (i) al pasar el ratón y ⋮/✕ para proyectos y sueltos. Clic: abrir · doble clic: fijar · arrastrar: al chat.
 function nodeEl(name, path, isDir, removable, git) {
   const el = document.createElement('div');
   const k = kind(name);
@@ -1067,6 +1073,7 @@ async function webView(V, B, path) {
 // Si B es texto, la derecha se edita y las flechas ➜ copian un cambio de A a B; Guardar escribe B.
 // Word, Excel y PowerPoint se comparan por su texto; PDF por el texto de sus páginas (hasta 500).
 const otherPath = () => panes[1] ? panes[active === 0 ? 1 : 0].cur : null;
+// «⇆ Comparar con…»: menú con buscador; primero las pestañas abiertas de los dos lados, luego la carpeta del archivo.
 async function comparePick(anchor, path) {
   const folder = path.replace(/[\\/][^\\/]*$/, ''), seen = new Set([path]), items = [];
   const add = p => { if (!seen.has(p) && !isVirtual(p)) { seen.add(p); items.push([p.split(/[\\/]/).pop(), () => compareFiles(path, p), { title: p }]); } };
@@ -1075,6 +1082,8 @@ async function comparePick(anchor, path) {
   if (!items.length) return ask('Comparar', 'No hay otros archivos en esa carpeta ni pestañas abiertas con los que comparar.', ['Entendido']);
   openMenu(anchor, [{ head: `Comparar «${path.split(/[\\/]/).pop()}» con…` }, ...items], { search: 'Buscar archivo…' });
 }
+// Texto de un archivo para el comparador: lo que hay en el editor si se está editando; Word, Excel y PowerPoint
+// por su texto; PDF por el texto de sus páginas. `f` (para guardar) solo si es texto y no está truncado.
 async function cmpText(path) {
   const name = path.split(/[\\/]/).pop(), ext = kind(path).ext, ed = edits.get(path);
   if (ed) return { text: ed.text, f: ed.f };
@@ -1087,6 +1096,8 @@ async function cmpText(path) {
   if (f.texto === null) throw new Error(`«${name}» no es un archivo de texto: no se puede comparar`);
   return { text: norm(f.texto), f: f.truncado ? null : f }; // f: se puede editar y guardar
 }
+// Modal del comparador de dos archivos (MergeView): ↑↓ entre cambios, «Ocultar líneas iguales», ⇄ invertir
+// y, si B es texto, flechas ➜ para copiar cambios de A y Guardar.
 async function compareFiles(a, b) {
   const d = $('#dlg'), nameA = a.split(/[\\/]/).pop(), nameB = b.split(/[\\/]/).pop();
   let A, B;
@@ -1199,6 +1210,8 @@ async function printContent(type, path, f, text) { // lo que se imprime, una vez
   else box.append(codeLines(text, k.lang));
   return box;
 }
+// Imprimir: PDF con el diálogo del navegador; el resto se maqueta en una página aparte (texto, código con
+// colores, Markdown, Word con su aspecto o imagen) con papel, orientación, márgenes y cómo encajar.
 async function printDialog(path) {
   const name = path.split(/[\\/]/).pop(), k = kind(path);
   if (!canPrint(path)) return ask('Imprimir', `«${name}» no se puede imprimir desde Atril.`, ['Entendido']);
@@ -1667,6 +1680,7 @@ function sortOf(ruta) {
   const o = (p && sortMap()[p.ruta]) || 'alfa-asc';
   return { alfa: 'alfa-asc', fecha: 'fecha-desc' }[o] || o; // valores de la primera versión
 }
+// Ordena una carpeta del árbol según su proyecto (alfabético natural en español o por fecha); carpetas siempre antes.
 function sortItems(items, ruta) {
   const [by, dir] = sortOf(ruta).split('-'), k = dir === 'desc' ? -1 : 1;
   const cmp = by === 'fecha' ? (a, b) => (a.fecha || 0) - (b.fecha || 0) : (a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base', numeric: true });
@@ -1687,6 +1701,8 @@ function kidsOf(el) { // en un proyecto, entre el nodo y sus hijos están los av
 }
 function collapse(el) { kidsOf(el).innerHTML = ''; el.classList.remove('open'); }
 const dirSig = items => items.map(i => i.nombre + (i.dir ? '/' : '') + ':' + (i.git || '')).join('|'); // qué hay y en qué orden
+// Despliega una carpeta del árbol con su orden (por proyecto). `sig` guarda qué había, para que el repaso
+// periódico (treePoll) solo vuelva a dibujarla si algo cambió.
 async function expand(el) {
   const kids = kidsOf(el);
   el.classList.add('open');
@@ -1732,6 +1748,8 @@ function markActive() {
 // ---------- nuevo archivo / nueva carpeta (en la carpeta elegida, o la del archivo abierto, o el primer proyecto) ----------
 let selDir = null;
 const targetDir = () => selDir || (cur && !isVirtual(cur) ? cur.replace(/[\\/][^\\/]*$/, '') : null) || side.proyectos[0]?.ruta || null;
+// «Nuevo archivo / Nueva carpeta» escrito dentro del propio árbol, en la carpeta elegida: Enter crea,
+// Esc cancela. Si el nombre ya existe, avisa y deja corregirlo.
 async function newInline(type, dir = targetDir()) {
   if (!dir) return ask('Nuevo', 'Añade primero un proyecto: lo nuevo se crea dentro de él.', ['Entendido']);
   if (document.body.classList.contains('noside')) toggleSide();
@@ -1786,6 +1804,7 @@ const pdfPage = new Map(); // ruta → página a la que saltar al abrir (resulta
 $('#sideQ').oninput = () => { clearTimeout(sideTimer); sideTimer = setTimeout(sideSearch, 250); };
 // Aa · 📄 nombre · ≡ contenido (se recuerdan; nombre y contenido nunca se apagan los dos a la vez)
 const sopt = (() => { try { return { nombre: true, contenido: true, exacto: false, ...JSON.parse(localStorage.getItem('atril.buscar')) }; } catch { return { nombre: true, contenido: true, exacto: false }; } })();
+// Botones Aa (exacto), 📄 nombre y ≡ contenido del buscador lateral; nombre y contenido nunca quedan los dos apagados.
 function drawSearchToggles() {
   const T = $('#stog'); T.innerHTML = '';
   const tog = (key, label, title, other) => {
@@ -1821,6 +1840,7 @@ addEventListener('keydown', e => { // Ctrl+Shift+F: vista Buscar
 });
 // Resultados: proyecto › archivo › fragmentos. Un archivo sale una vez aunque coincida por nombre y por contenido.
 let sres = null, sfilt = '', sfold = new Set();
+// Búsqueda en el índice (nombres y contenido) con las opciones del buscador; descarta la respuesta si ya se escribió otra cosa.
 async function sideSearch() {
   const q = $('#sideQ').value.trim();
   if (!q) { sres = null; return drawResults(); }
@@ -1835,6 +1855,7 @@ async function sideSearch() {
   if (!sres.files.some(f => kind(f.nombre).ext === sfilt)) sfilt = '';
   drawResults();
 }
+// Resultados del buscador lateral agrupados por proyecto, con chips por tipo de archivo para filtrar y el total de coincidencias.
 function drawResults() {
   const R = $('#results'), C = $('#schips');
   R.innerHTML = C.innerHTML = $('#sinfo').textContent = '';
@@ -1869,6 +1890,8 @@ function rowEl(name, count, title) { // fila plegable de proyecto
   el.querySelector('.n').textContent = name;
   return el;
 }
+// Un archivo en los resultados: nombre, carpeta, número de coincidencias, «nombre» si coincide por el nombre y,
+// desplegados, los fragmentos; clic en un fragmento: abre el archivo con esa palabra en el buscador (y en su página, si es PDF).
 function fileResult(f) {
   const F = document.createElement('div'); F.className = 'sfile' + (sfold.has(f.ruta) ? ' fold' : '');
   const el = document.createElement('div'); el.className = 'node res sr'; el.tabIndex = -1; el.dataset.path = f.ruta; el.title = f.ruta;
@@ -1922,6 +1945,7 @@ const META_NAMES = { creator: 'Autor', lastModifiedBy: 'Modificado por', title: 
   CreationDate: 'Creado', ModDate: 'Modificado' };
 const IDX_NAMES = { ok: 'indexado', binario: 'solo el nombre (archivo binario)', pdf_pendiente: 'PDF pendiente de leer',
   pdf_sin_texto: 'PDF sin texto (¿escaneado?)', error: 'error al leerlo', pendiente: 'aún no indexado' };
+// Modal ⓘ Información del archivo (/api/info): datos del disco, del texto, de git y propiedades del documento.
 async function infoDialog(path) {
   let m;
   try { m = await api('/api/info?ruta=' + encodeURIComponent(path)); } catch (e) { return ask('Información', e.message, ['Entendido']); }
@@ -1956,11 +1980,13 @@ async function infoDialog(path) {
 let idxInfo = null;
 const pdfWork = { actual: '', pagina: 0, total: 0 };
 const sleep = ms => new Promise(ok => setTimeout(ok, ms));
+// Pregunta al servidor por el índice cada 2 s mientras trabaja y cada 15 s si está quieto, para la barra de estado.
 async function idxPoll() {
   try { idxInfo = await api('/api/indice'); } catch { idxInfo = null; }
   drawIdx();
   setTimeout(idxPoll, idxInfo?.fase === 'indexando' || pdfWork.actual ? 2000 : 15000);
 }
+// Texto de la barra de estado sobre el índice: «Indexando N / M», el PDF que se está leyendo o «✓ Índice al día».
 function drawIdx() {
   const E = $('#idx');
   if (!idxInfo) { E.textContent = ''; return; }
@@ -1979,6 +2005,7 @@ $('#idx').onclick = () => {
   d.onclose = () => { d.dataset.kind = ''; };
   fillIdx(); d.showModal();
 };
+// Contenido del modal del índice: estado, archivos por estado y por tipo, PDF pendientes y últimos errores.
 function fillIdx() {
   const i = idxInfo || {}, d = $('#dlg'), fd = t => t ? new Date(t * 1000).toLocaleString() : '—';
   const est = i.por_estado || {}, pend = est.pdf_pendiente || 0;
@@ -2027,6 +2054,8 @@ async function pdfWorker() {
 
 // ---------- avisos: plantillas, archivar bitácora, proyecto no encontrado ----------
 const OPTIONAL_IA = ['AGENTS.md', 'CLAUDE.md', 'GEMINI.md'];
+// Aviso «Sin reglas / Sin bitácora»: crea reglas.md y bitacora.md (y AGENTS/CLAUDE/GEMINI.md si se marcan)
+// desde plantillas/, con la descripción y la tecnología del proyecto ya rellenas.
 async function templateDialog(p) {
   const info = await api('/api/plantilla?ruta=' + encodeURIComponent(p.ruta));
   const d = $('#dlg');
@@ -2070,6 +2099,7 @@ async function templateDialog(p) {
   };
   d.showModal(); $('#tDesc').focus();
 }
+// Aviso «Bitácora grande»: explica qué entradas se mueven a bitacora/AAAA.md y lo hace si se acepta.
 async function archiveDialog(p) {
   const a = await api('/api/archivar?ruta=' + encodeURIComponent(p.ruta));
   const years = Object.entries(a.mover), total = years.reduce((s, [, n]) => s + n, 0);
@@ -2089,6 +2119,7 @@ async function removeMissing(p) {
 // Tres columnas: lugares | lista de la carpeta (filtro, teclado) | qué se añade como proyecto y qué como sueltos.
 let ex = null, exSel = null, exCur = 0;
 const exFiles = new Map(); // ruta → elemento marcado (se conserva aunque se cambie de carpeta)
+// Explorador «Añadir»: carga una carpeta (sin ruta: la última usada) y lo dibuja.
 async function explore(ruta) {
   try { ex = await api('/api/explorar' + (ruta === undefined ? '' : '?ruta=' + encodeURIComponent(ruta))); }
   catch (e) { return ask('No se puede abrir esa carpeta', e.message, ['Entendido']); }
@@ -2113,6 +2144,7 @@ function revealInTree(ruta) {
   closeExplorer(); loadSide();
 }
 
+// Migas, lista y panel lateral del explorador «Añadir».
 function drawExplorer() {
   const C = $('#crumbs'); C.innerHTML = '';
   C.append(button('Este equipo', () => explore('')));
@@ -2133,6 +2165,7 @@ function drawExplorer() {
   drawExList(); drawExSide();
 }
 
+// Lista del explorador: carpetas y archivos con tipo y estado (añadido, dentro de un proyecto); la fila activa se mueve con el teclado.
 function drawExList() {
   const L = $('#expList'), shown = exShown(), q = $('#expFind').value.trim();
   exCur = Math.min(exCur, Math.max(shown.length - 1, 0));
@@ -2159,6 +2192,7 @@ function exPick(i) {
   drawExList(); drawExSide();
 }
 
+// Panel derecho del explorador: añadir la carpeta como proyecto o los archivos marcados como sueltos.
 function drawExSide() {
   const S = $('#expSide'), t = exTarget();
   const proj = document.createElement('section');
@@ -2196,11 +2230,13 @@ function drawExSide() {
   S.replaceChildren(proj, loose);
 }
 
+// Añade la carpeta elegida como proyecto y la deja desplegada en el árbol.
 async function addProject() {
   const t = exTarget();
   await api('/api/agregar', { tipo: 'proyectos', rutas: [t.ruta], ultima: ex.ruta });
   tree.set(t.ruta, true); closeExplorer(); loadSide();
 }
+// Añade los archivos marcados como sueltos (los que ya lo eran no se repiten) y los abre en pestañas.
 async function addLoose() {
   const files = [...exFiles.values()], fresh = files.filter(f => !f.estado).map(f => f.ruta);
   if (fresh.length) await api('/api/agregar', { tipo: 'sueltos', rutas: fresh, ultima: ex.ruta });
@@ -2226,6 +2262,7 @@ addEventListener('keydown', e => {
 
 // ---------- ajustes (⚙ en la cinta; se guardan en config.json) ----------
 let AJ = {};
+// Lee ⚙ Ajustes en AJ y aplica los que son CSS (tamaño de letra de documentos y de código).
 async function loadSettings() {
   try { AJ = (await api('/api/ajustes')).valores; } catch { AJ = {}; }
   const r = document.documentElement.style;
@@ -2331,6 +2368,9 @@ const persist = () => {
     localStorage.setItem('atril.split', panes[1] ? JSON.stringify({ ...st(panes[1]), active }) : '');
   } catch {}
 };
+// Cambia el lado activo de la vista dividida: guarda tabs/cur/previewTab y el estado de su vista en su
+// pane y carga los del otro, sin volver a dibujar (cada lado conserva su DOM). Si el lado mostraba un
+// Word, imagen o PDF en edición cuyo estado ya es de otro archivo, ese lado se vuelve a dibujar.
 function activatePane(i) {
   if (i === active || !panes[i]) return;
   syncPane();
@@ -2348,6 +2388,7 @@ function activatePane(i) {
   persist(); markActive(); iaOnFile(); histBar();
   if (stale || panes[i].stale) { panes[i].stale = false; render(); }
 }
+// El DOM de un lado nuevo: sus #tabs, #bar y #view (los ids se repiten; $() busca primero en el activo).
 function newPaneEl() {
   const el = document.createElement('div');
   el.className = 'pane';
@@ -2377,6 +2418,8 @@ function paneWire(el) {
 paneWire(paneEl);
 // la caja (y su iframe) de una pestaña web que se cierra o cambia de lado
 function dropWebBox(path, el) { [...el.children].find(b => b.classList.contains('webbox') && b.dataset.path === path)?.remove(); }
+// Pasa una pestaña de un lado al otro. Si era la que se veía, el origen muestra otra y termina de
+// dibujarse antes de cambiar de lado; si no, el origen no se toca (una web abierta allí no se recarga).
 async function moveTab(path, src, dst) {
   activatePane(src);
   if (!await askUnsaved(path)) return; // Word/imagen/PDF en edición: guardar o descartar antes de cambiar de lado
@@ -2392,6 +2435,8 @@ async function moveTab(path, src, dst) {
   activatePane(dst);
   openTab(path, true);
 }
+// Divide o junta. Al dividir, lo que se ve se queda y el lado nuevo se lleva la pestaña vista justo antes
+// (o empieza vacío). Al juntar, las pestañas del segundo lado pasan al primero.
 function setSplit(on) {
   if (on === !!panes[1]) return;
   if (on) {
@@ -2424,6 +2469,7 @@ function renderTabsOf(i) {
   renderTabs();
   ({ tabs, cur, previewTab, paneEl, active } = keep);
 }
+// El borde entre los dos lados: arrastrar cambia el reparto (15 %–85 %) y se recuerda; doble clic, mitad y mitad.
 function gripWire(grip) {
   const P = $('#panes');
   grip.onpointerdown = e => {
@@ -2448,6 +2494,8 @@ addEventListener('keydown', e => { // Ctrl+\: dividir o juntar
 const hist = [];
 let hi = -1;
 
+// Abre (o enseña) una pestaña en el lado activo. Sin fijar, reemplaza a la de vista previa (como VS Code);
+// fijada, se queda. fromHist: viene de ← →, no se añade al historial de navegación.
 function openTab(path, pin = false, fromHist = false) {
   const usePreview = AJ.pestanas_vista_previa !== false;
   if (!tabs.includes(path)) {
@@ -2479,6 +2527,7 @@ async function askUnsaved(path) {
   return tabs.includes(path) && !(after && isDirty(after)); // un «nuevo N» guardado ya es otra pestaña: no se cierra
 }
 const endEdit = st => { if (st === wedit) wedit = null; if (st === iedit) iedit = null; if (st === pedit) pedit = null; };
+// Cierra una pestaña (pregunta si hay cambios), libera su web o su edición y muestra la pestaña de al lado.
 async function closeTab(path) {
   if (!await askUnsaved(path)) return;
   dropWebBox(path, paneEl);
@@ -2501,6 +2550,8 @@ addEventListener('keydown', e => {
   if (e.key === 'Tab') { e.preventDefault(); e.stopPropagation(); const i = tabs.indexOf(cur); if (tabs.length > 1) openTab(tabs[(i + (e.shiftKey ? -1 : 1) + tabs.length) % tabs.length]); }
   else if (!e.shiftKey && e.key.toLowerCase() === 'w') { e.preventDefault(); e.stopPropagation(); closeTab(cur); }
 }, true);
+// Barra de pestañas del lado activo: nombre (con ● si hay cambios), cerrar, menú del archivo, arrastrar para
+// reordenar, al chat o al otro lado, y los botones de barra lateral, dividir y panel de IA en los extremos.
 function renderTabs() {
   const T = $('#tabs'); T.innerHTML = '';
   for (const p of tabs) {
@@ -2663,6 +2714,9 @@ const fmtSize = n => n < 1024 ? n + ' B' : n < 1048576 ? (n / 1024).toFixed(1) +
 let renderSeq = 0; // número único de cada render; cada lado guarda el último suyo (panes[i].seq)
 // un render sigue vivo mientras sea el último de su lado: el del otro lado no lo cancela
 const curSeq = () => panes[active].seq, live = s => panes.some(p => p.seq === s);
+// Dibuja la pestaña activa del lado activo: cabecera (migas, editar, buscar, ⋮…) y el visor según el tipo o
+// el editor si está en edición. Cada render tiene un número (seq): si mientras carga empieza otro en el
+// mismo lado, este se abandona. Antes, si se deja un Word/imagen/PDF con cambios sin guardar, pregunta.
 async function render() {
   // se fue del Word, imagen o PDF que estaba editando: sin cambios, se sale; con cambios, se queda y pregunta
   const away = [wedit, iedit, pedit].find(st => st && st.path !== cur && !otherShows(st.path)); // el otro lado puede seguir editándolo
@@ -2812,6 +2866,7 @@ const button = (t, fn) => Object.assign(document.createElement('button'), { text
 
 // ---------- edición ----------
 const norm = t => t.replace(/\r\n/g, '\n'); // el editor trabaja con \n; el servidor restaura CRLF al guardar
+// Entra en edición de texto: el texto queda en `edits` (sobrevive a cambiar de pestaña) con su original para saber si hay cambios.
 function startEdit(path, f) {
   edits.set(path, { f, text: norm(f.texto), orig: norm(f.texto), shown: false });
   preview = false;
@@ -2824,6 +2879,8 @@ function textDesc(a, b) {
   const line = (y[i] ?? x[i] ?? '').trim();
   return `✎ Línea ${i + 1}` + (line ? `: ${line.slice(0, 60)}` : y.length < x.length ? ' (borrada)' : '');
 }
+// Editor CodeMirror del texto en edición: modo por extensión, buscar de Atril, copia de recuperación al
+// escribir y un paso del historial tras cada pausa.
 function editorView(V, ed, name, path) {
   V.className = 'flush';
   const cm = CodeMirror(V, { value: ed.text, lineNumbers: true, matchBrackets: true, indentUnit: AJ.editor_tab || 4, tabSize: AJ.editor_tab || 4, lineWrapping: wrapOn(),
@@ -2986,6 +3043,7 @@ function findAttach(p) {
   findP?.clear(); findP = p; findN = 0; findI = -1;
   if (p && findSt.get(cur)?.open) { findDraw(); findRun(true); } else $('#find').hidden = true;
 }
+// Abre la barra de buscar (repl: también reemplazar) con lo seleccionado; false si la pestaña no se puede buscar (web).
 function findOpen(repl) {
   if (!cur || isWeb(cur)) return false; // web de otro origen: no se puede leer; Ctrl+F sigue al buscador del navegador
   const st = findState();
@@ -3005,6 +3063,7 @@ function findClose() {
   $('#find').hidden = true; findP?.clear(); findN = 0; findI = -1;
   findP?.cm?.focus();
 }
+// Coloca la barra de buscar bajo la cabecera de la vista y refleja sus opciones (Aa, palabra, .*, á).
 function findDraw() {
   const F = $('#find'), st = findState(), V = $('#view');
   F.hidden = false;
@@ -3015,6 +3074,7 @@ function findDraw() {
   $('#fq').value = st.q; $('#fr').value = st.r;
   F.querySelectorAll('[data-o]').forEach(b => b.classList.toggle('on', !!st[b.dataset.o]));
 }
+// Busca con lo escrito y marca las coincidencias; near: salta a la más cercana a lo que se ve.
 async function findRun(near) {
   const st = findState(), seq = ++findSeq, re = findRe(st);
   $('#find').classList.toggle('bad', re === undefined);
@@ -3105,11 +3165,13 @@ const isWeb = p => p.startsWith('web:'); // pestaña web: «web:» + dirección 
 const isVirtual = p => isUntitled(p) || isWeb(p); // pestañas que no son un archivo del disco
 const webHost = u => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return u; } };
 const tabName = p => isUntitled(p) ? 'nuevo ' + p.slice(6) : isWeb(p) ? (p.length > 4 ? '🌐 ' + webHost(p.slice(4)) : '🌐 Nueva pestaña') : p.split(/[\\/]/).pop();
+// Clave del archivo de recuperación: «nuevo-N» o un hash corto de la ruta (sin caracteres raros para el nombre de archivo).
 function recKey(path) {
   if (isUntitled(path)) return 'nuevo-' + path.slice(6);
   let h = 5381; for (const ch of path.toLowerCase()) h = (h * 33 ^ ch.charCodeAt(0)) >>> 0;
   return 'f-' + h.toString(16);
 }
+// Programa la copia de recuperación: tras N s sin escribir, pero como mucho cada M s escribiendo seguido.
 function backupSoon(path) {
   const now = Date.now(), b = backupTimers.get(path) || { first: now };
   clearTimeout(b.t);
@@ -3122,6 +3184,7 @@ function backupBody(path) {
   return ed && { clave: recKey(path), ruta: isUntitled(path) ? null : path, titulo: ed.f.nombre, texto: ed.text,
     mtime: ed.f.mtime, codificacion: ed.f.codificacion, eol: ed.f.eol };
 }
+// Copia de recuperación ya; sin cambios, se borra. keepalive: también si la ventana se está cerrando.
 function backupNow(path, keepalive = false) {
   clearTimeout(backupTimers.get(path)?.t); backupTimers.delete(path);
   const ed = edits.get(path);
@@ -3133,6 +3196,7 @@ function dropBackup(path) {
   clearTimeout(backupTimers.get(path)?.t); backupTimers.delete(path);
   api('/api/recup/borrar', { clave: recKey(path) }).catch(() => {});
 }
+// Al cerrar la ventana: copia ya lo pendiente; true si había algo, para que el navegador pregunte antes de cerrar.
 function flushBackups() {
   const pending = [...backupTimers.keys()];
   pending.forEach(p => backupNow(p, true));
@@ -3140,6 +3204,7 @@ function flushBackups() {
 }
 const untitledFile = n => ({ nombre: 'nuevo ' + n, ruta: 'nuevo:' + n, texto: '', codificacion: 'utf-8', eol: 'CRLF',
   mtime: null, tam: 0, fecha: Date.now() / 1000, truncado: false, ejecutar: null });
+// Pestaña «nuevo N» sin archivo en disco (Ctrl+N), con el primer número libre.
 function newUntitled(texto = '') {
   const used = tabs.filter(isUntitled).map(p => +p.slice(6));
   let n = 1; while (used.includes(n)) n++;
@@ -3243,6 +3308,8 @@ function ask(title, msg, buttons, { danger, input } = {}) {
   });
 }
 
+// Guarda el texto en el archivo conservando codificación y saltos de línea. Si cambió fuera de Atril
+// desde que se abrió (409), pregunta qué versión conservar. Marca el paso del historial como guardado.
 async function save(path, force = false) {
   const ed = edits.get(path); if (!ed) return;
   if (isUntitled(path)) return saveUntitled(path);
@@ -3267,6 +3334,7 @@ async function save(path, force = false) {
 // ---------- el archivo abierto cambió en el disco (otro programa, la IA, git…): se recarga solo o se pregunta ----------
 // ⚙ «Preguntar antes de recargar…» (predeterminado: no). Con cambios sin guardar aquí, siempre se pregunta.
 const diskSkip = new Map(); // ruta → mtime que el usuario decidió no recargar (no se vuelve a preguntar por ese mismo cambio)
+// Cada pocos segundos: si el archivo abierto cambió en disco (otro programa, la IA, git), lo recarga o avisa si hay cambios sin guardar.
 async function diskPoll() {
   try {
     const path = cur, f = curFile;
@@ -3286,6 +3354,7 @@ async function diskPoll() {
     await reloadFromDisk(path);
   } catch {} finally { setTimeout(diskPoll, 3000); }
 }
+// Recarga el archivo abierto conservando el scroll (y, en edición, el cursor) sin salir de lo que se estaba haciendo.
 async function reloadFromDisk(path) {
   const V = $('#view'), top = V.scrollTop, ed = edits.get(path), name = path.split(/[\\/]/).pop();
   let cm = null;
@@ -3307,6 +3376,7 @@ async function reloadFromDisk(path) {
 }
 setTimeout(diskPoll, 3000);
 
+// Descartar cambios: vuelve al texto guardado y el historial al paso del archivo en disco.
 async function discard(path) {
   const ed = edits.get(path);
   if (isDirty(ed) && await ask('Descartar cambios', `¿Volver a la última versión guardada de "${ed.f.nombre}"?`, ['Descartar', 'Cancelar']) !== 'Descartar') return;
@@ -3314,6 +3384,7 @@ async function discard(path) {
   const h = hists.get(path); if (h) { clearTimeout(ed.histT); h.actual = h.disco; } // de vuelta al archivo en disco
   render();
 }
+// Sale de edición (📖) preguntando si hay cambios; un «nuevo N» solo sale guardándolo.
 async function leaveEdit(path) {
   const ed = edits.get(path);
   if (isUntitled(path)) return save(path); // un "nuevo N" solo sale de edición guardándolo
@@ -3326,6 +3397,7 @@ function frame(src) {
   if (!/\.pdf(#|$)/i.test(src)) f.sandbox = 'allow-scripts allow-forms allow-modals allow-popups';
   return f;
 }
+// Documento en lectura (Markdown, notebook…): imágenes relativas desde la carpeta del archivo, enlaces en otra ventana y código coloreado.
 function page(html, dir) {
   const d = document.createElement('div'); d.className = 'page'; d.innerHTML = html;
   // imágenes relativas del Markdown → se cargan desde la carpeta del archivo
@@ -3334,6 +3406,7 @@ function page(html, dir) {
   d.querySelectorAll('pre code').forEach(c => hljs.highlightElement(c));
   return d;
 }
+// Código en lectura con números de línea y colores (sin colores por encima de 500 KB, para no bloquear la ventana).
 function codeView(V, text, lang) {
   const lines = text.split('\n').length, d = document.createElement('div');
   d.className = 'code';
@@ -3342,6 +3415,7 @@ function codeView(V, text, lang) {
   if (text.length < 500000 && hljs.getLanguage(lang)) { code.className = 'language-' + lang; hljs.highlightElement(code); }
   V.className = 'flush'; V.append(d);
 }
+// CSV/TSV a filas, con comillas y saltos de línea dentro de los campos ("" es una comilla).
 function parseDelimited(t, sep) {
   const rows = []; let row = [], f = '', q = false;
   for (let i = 0; i < t.length; i++) {
@@ -3355,6 +3429,7 @@ function parseDelimited(t, sep) {
   if (f || row.length) { row.push(f); rows.push(row); }
   return rows;
 }
+// Tabla en lectura: la primera fila como cabecera y hasta 2000 filas (avisa si hay más).
 function tableView(V, text, sep) {
   const rows = parseDelimited(text, sep), max = 2000;
   const t = document.createElement('table'); t.className = 'grid';
@@ -3362,6 +3437,7 @@ function tableView(V, text, sep) {
   if (rows.length > max) V.insertAdjacentHTML('beforeend', `<div class="warnbox">Se muestran ${max} de ${rows.length} filas.</div>`);
   V.append(t);
 }
+// Notebook de Jupyter en lectura: celdas Markdown, código coloreado y salidas (texto e imágenes).
 function notebookView(V, text, dir) {
   let nb; try { nb = JSON.parse(text); } catch { return codeView(V, text, 'json'); }
   const lang = nb.metadata?.kernelspec?.language || 'python', src = s => Array.isArray(s) ? s.join('') : s || '';
@@ -3381,6 +3457,8 @@ function notebookView(V, text, dir) {
   }
   V.append(page(DOMPurify.sanitize(html), dir));
 }
+// Word en lectura con docx-preview (colores, fuentes y páginas como en Word); sin internet, mammoth.
+// Editando se dibuja el Word del paso actual del historial y se activan la edición y el soltar imágenes.
 async function docxView(V, f) {
   const s = curSeq(); // si mientras convierte se abre otra cosa, no se añade encima
   try {
@@ -3423,6 +3501,8 @@ async function docxMap(box, path, node) {
   }
   return { ps, fuera, mtime };
 }
+// Convierte los párrafos emparejados en editables (contentEditable) y conecta: historial (un paso tras
+// cada pausa), Enter bloqueado (párrafos nuevos → IA), pegar solo texto y Ctrl+B/I/U.
 async function wordEditable(box, path) {
   const { ps, fuera, mtime } = await docxMap(box, path, wedit.node);
   Object.assign(wedit, { ps }, wedit.node ? {} : { mtime });
@@ -3471,6 +3551,8 @@ function wordStep() {
   const p = wedit.ps.find(x => x.i === ops[0].parrafo), t = p ? p.base.trim().slice(0, 50) : '';
   return histStep(path, `✎ Texto${t ? ': ' + t : ''}`, b64txt(JSON.stringify(ops)));
 }
+// Negrita, cursiva, subrayado o color sobre la selección (dentro de un párrafo): se ve al momento con
+// execCommand y queda como paso del historial {parrafo, desde, buscar, …} que el servidor aplica al guardar.
 function wordFormat(key, color) {
   const s = getSelection();
   if (!s.rangeCount || s.isCollapsed) return flash('Selecciona primero el texto');
@@ -3547,6 +3629,8 @@ async function wordLeave() {
 const EDIT_IMG = set('png jpg jpeg webp');
 let iedit = null; // { path, mtime, cv, b, c, dirty, saved, last }
 function imageEdit(path) { pinTab(path); iedit = { path, fresh: true, b: 100, c: 100, dirty: false }; render(); }
+// Editor de imagen: barra (girar, voltear, recortar, ancho, brillo, contraste) y el lienzo. Cada cambio es
+// un lienzo nuevo y un paso del historial (PNG + brillo y contraste); brillo y contraste se aplican al guardar.
 async function imageEditView(V, f) {
   const s = curSeq();
   if (!iedit.cv) { // primera vez: la imagen del disco en un lienzo
@@ -3612,6 +3696,7 @@ function canvasOf(src, w, h, crop) {
   }
   return cv;
 }
+// Recortar: se arrastra un rectángulo sobre el lienzo (en píxeles reales de la imagen) y ✓ lo aplica.
 function cropMode(W, done) {
   const cv = iedit.cv, box = Object.assign(document.createElement('div'), { className: 'icrop' });
   const bar = Object.assign(document.createElement('div'), { className: 'icropbar', innerHTML: '<span>Arrastra para elegir la zona · </span>' });
@@ -3638,6 +3723,7 @@ function imageDirty() {
   iedit.dirty = true; iedit.saved = false;
   const b = $('#isave'); if (b) Object.assign(b, { disabled: false, textContent: 'Guardar ●' });
 }
+// Guarda la imagen en su formato con brillo y contraste aplicados (JPEG sobre fondo blanco) y marca el paso como guardado.
 async function imageSave() {
   if (!iedit?.dirty) return flash('No hay cambios');
   const ext = kind(iedit.path).ext, type = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
@@ -3687,6 +3773,8 @@ const pdfCanvas = async (page, vp) => {
 };
 let pdfCtl = null; // el PDF en lectura de la pestaña actual: teclas AvPág/RePág/Inicio/Fin y Ctrl + / −
 const PDF_ZOOMS = [50, 75, 90, 100, 110, 125, 150, 200];
+// Visor de PDF propio (pdf.js): páginas perezosas, capa de texto seleccionable, miniaturas, zoom, ir a
+// página y buscar; recuerda la página de cada PDF. Sin pdf.js (sin internet), el visor de Edge.
 async function pdfReadView(V, f) {
   const s = curSeq(), path = f.ruta;
   let doc;
@@ -3854,6 +3942,8 @@ function pdfDirty() {
   pedit.dirty = true; pedit.saved = false;
   const b = $('#isave'); if (b) Object.assign(b, { disabled: false, textContent: 'Guardar ●' });
 }
+// Editor de PDF: texto y resaltado encima de cada página (en coordenadas del PDF), girar, mover y borrar
+// páginas. Cada cambio es un paso del historial (JSON de páginas y notas sobre la copia de partida).
 async function pdfEditView(V, f) {
   const s = curSeq();
   if (!pedit.doc) {
@@ -3971,6 +4061,8 @@ async function pdfEditView(V, f) {
   pels[Math.min(pdfAt(pedit.path), pels.length) - 1]?.scrollIntoView({ block: 'start' }); // la página que se estaba leyendo
   pdfTrack(V, () => pels, pedit.path);
 }
+// Escribe el PDF con pdf-lib a partir de su copia de partida: dibuja notas y resaltados, y reordena, gira o
+// quita páginas sin rehacer el documento (conserva marcadores y enlaces de las que quedan).
 async function pdfSave() {
   if (!pedit?.dirty) return flash('No hay cambios');
   try {
@@ -4043,12 +4135,14 @@ async function histSaved(path) { // el archivo ya tiene el estado del paso actua
   histBar();
 }
 const histUndoTo = h => h.actual ? histNode(h, h.actual)?.padre || null : null;
+// Paso al que lleva ↷: el que se acaba de deshacer si es hijo del actual; si no, el hijo más reciente.
 function histRedoTo(h, from = h.actual, vino = h.vino) {
   if (!from) return null;
   if (vino && histNode(h, vino)?.padre === from) return vino;
   return h.nodos.filter(n => n.padre === from).map(n => n.id).sort().at(-1) || null; // la más reciente
 }
 const histDirty = path => { const h = hists.get(path); return !!h?.actual && h.actual !== h.disco; };
+// Va a un paso: el editor carga su estado y el servidor anota que es el actual. vino: de qué paso se venía, para ↷.
 async function histGo(path, id, vino = null) {
   const h = hists.get(path);
   if (!h || !id) return;
@@ -4202,6 +4296,7 @@ addEventListener('keydown', e => { // Ctrl+Z / Ctrl+Y en Word, imagen y PDF (en 
   if (k === 'z' && !e.shiftKey) { e.preventDefault(); e.stopPropagation(); histUndo(cur); }
   if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); e.stopPropagation(); histRedo(cur); }
 }, true);
+// Fuente (.ttf, .otf, .woff) en lectura: se carga con FontFace y se muestra el alfabeto y una frase de prueba.
 function fontView(V, f) {
   const fam = 'f' + Math.random().toString(36).slice(2), s = curSeq();
   new FontFace(fam, `url(${raw(f.ruta)})`).load().then(ff => {
@@ -4210,6 +4305,7 @@ function fontView(V, f) {
     V.insertAdjacentHTML('beforeend', `<div class="page font" style="font-family:${fam}">ABCDEFGHIJKLMNÑOPQRSTUVWXYZ<br>abcdefghijklmnñopqrstuvwxyz<br>0123456789 ¿?¡! áéíóú<br><span style="font-size:18px">El veloz murciélago hindú comía feliz cardillo y kiwi.</span></div>`);
   }).catch(() => card(V, f));
 }
+// Ficha de un archivo que Atril no sabe mostrar: tamaño, fecha y la sugerencia de abrirlo con su programa.
 function card(V, f) {
   V.insertAdjacentHTML('beforeend', `<div class="card"><b></b><dl><dt>Tamaño</dt><dd>${fmtSize(f.tam)}</dd>
     <dt>Modificado</dt><dd>${new Date(f.fecha * 1000).toLocaleString()}</dd><dt>Tipo</dt><dd>Binario · sin vista previa en Atril</dd></dl>
@@ -4223,6 +4319,7 @@ const runsUI = [];
 let curRun = null;
 const fmtDur = s => s.toFixed(1).replace('.', ',') + ' s';
 
+// Confirmación antes de ejecutar: la orden (editable para las pruebas), la carpeta y «no volver a preguntar».
 function runDialog(title, comando, carpeta, editable, note = '') {
   const d = $('#dlg');
   d.innerHTML = `<b></b><label class="fld">Comando <input id="rCmd" spellcheck="false"></label><p class="ok"></p>
@@ -4241,6 +4338,7 @@ function runDialog(title, comando, carpeta, editable, note = '') {
   });
 }
 
+// ▶ Ejecutar el archivo: guarda antes si hay cambios, confirma (salvo «no volver a preguntar») y lo lanza en la consola.
 async function runFile(path, f) {
   const ed = edits.get(path);
   if (ed && isDirty(ed)) {
@@ -4256,6 +4354,7 @@ async function runFile(path, f) {
   launch(again, f.nombre, f.ejecutar.texto, f.ejecutar.carpeta, path);
 }
 
+// Ejecutar las pruebas del proyecto con el comando detectado o el guardado (se recuerda el que se confirme).
 async function runTests(path, name) {
   const t = await api('/api/pruebas?ruta=' + encodeURIComponent(path));
   let comando = t.comando;
@@ -4270,12 +4369,14 @@ async function runTests(path, name) {
   launch(() => api('/api/pruebas', { ruta: path, comando }), 'Pruebas · ' + name, comando, path, path);
 }
 
+// Arranca un proceso en el servidor y crea su pestaña en la consola; poll() va trayendo la salida.
 async function launch(start, label, cmd, cwd, ruta, onDone = null) {
   let res;
   try { res = await start(); } catch (e) { return ask('No se pudo ejecutar', e.message, ['Entendido']); }
   const r = { id: res.id, label, cmd, cwd, ruta, onDone, again: start, trozos: [], fin: false, codigo: null, dur: 0 };
   runsUI.push(r); curRun = r; showPanel(true); drawRuns(); poll(r);
 }
+// Trae la salida nueva de un proceso cada 300 ms hasta que termina; al final llama a onDone (p. ej. «Explicar error»).
 async function poll(r) {
   while (!r.fin) {
     try {
@@ -4288,6 +4389,7 @@ async function poll(r) {
   }
   r.onDone?.(r);
 }
+// Pestañas de la consola: una por ejecución, con ✓/✗ según el código de salida.
 function drawRunTabs() {
   const T = $('#runtabs'); T.innerHTML = '';
   for (const r of runsUI) {
@@ -4306,6 +4408,7 @@ function closeRun(r) {
   if (curRun === r) curRun = runsUI.at(-1) ?? null;
   drawRuns();
 }
+// La consola de la ejecución elegida: la orden, la carpeta y toda su salida.
 function drawRuns() {
   drawRunTabs();
   const O = $('#out'); O.innerHTML = '';
@@ -4313,11 +4416,13 @@ function drawRuns() {
   else { O.append(Object.assign(document.createElement('span'), { className: 'cmd', textContent: `$ ${curRun.cmd}   (${curRun.cwd})\n` })); appendOut(curRun.trozos); }
   drawRunBar();
 }
+// Añade salida a la consola; solo baja al final si ya se estaba al final (no mueve a quien está leyendo arriba).
 function appendOut(trozos) {
   const O = $('#out'), stick = O.scrollHeight - O.scrollTop - O.clientHeight < 40;
   for (const [k, t] of trozos) O.append(Object.assign(document.createElement('span'), { className: k === 'out' ? '' : k, textContent: t }));
   if (stick) O.scrollTop = O.scrollHeight;
 }
+// Barra de la consola: estado y duración, Repetir, Detener, Limpiar, Abrir en una terminal y 🤖 Explicar error.
 function drawRunBar() {
   const B = $('#runbar'), r = curRun; B.innerHTML = '';
   $('#inrow').hidden = !r || r.fin;
@@ -4376,6 +4481,7 @@ function setIA(on) {
   if (on) iaOnFile();
   renderTabs(); editorCM?.refresh();
 }
+// Estado de las IA (instalada, sesión, versión) para el selector del chat; refresh: volver a comprobarlo.
 async function loadIA(refresh = false) {
   iaState = await api('/api/ia' + (refresh ? '?refrescar=1' : ''));
   const S = $('#iaSel'), prev = S.value;
@@ -4445,6 +4551,8 @@ const cachedText = ruta => {
 
 let ctxTimer = 0, ctxSeq = 0;
 function iaRefresh() { clearTimeout(ctxTimer); ctxTimer = setTimeout(buildContext, 350); }
+// «Se enviará»: el archivo abierto, los nombrados en el mensaje, las páginas pedidas de un PDF, la selección
+// y lo soltado, con sus tokens. Las peticiones que llegan tarde (otro mensaje ya escrito) se descartan.
 async function buildContext(msgText) { // msgText: al enviar, el cuadro ya está vacío
   if (!document.body.classList.contains('ia')) return ctx;
   const seq = ++ctxSeq, msg = msgText ?? $('#convQ').value, pages = parsePages(msg), items = [];
@@ -4480,6 +4588,7 @@ async function buildContext(msgText) { // msgText: al enviar, el cuadro ya está
   return ctx;
 }
 const toSendList = () => [...ctx.filter(c => !c.aviso && !c.enviado && !c.quitado), ...dropped, ...(consoleCtx ? [consoleCtx] : [])];
+// Dibuja «Se enviará»: cada adjunto con sus tokens, ✕ para quitarlo, 👁 en imágenes y los avisos con su nombre.
 function drawCtx() {
   const C = $('#ctx'); C.innerHTML = '';
   const all = [...ctx, ...dropped, ...(consoleCtx ? [consoleCtx] : [])];
@@ -4555,6 +4664,7 @@ const setConvMap = (tab, id) => { const m = convMap(); m[tab] = id || ''; LS('at
 const sameTab = (a, b) => (a || '').toLowerCase() === (b || '').toLowerCase();
 const draftKey = () => linked && cur ? 'atril.borrador:' + recKey(cur) : 'atril.borrador'; // borrador por pestaña
 
+// Selector de conversaciones: con 🔗, las de la pestaña actual; si no, todas. Elige la indicada o la más reciente.
 async function loadConvList(selectId) {
   const all = await api('/api/conv').catch(() => []), S = $('#convSel');
   const list = linked ? all.filter(c => cur && sameTab(c.vinculo, cur)) : all;
@@ -4568,6 +4678,7 @@ async function loadConvList(selectId) {
   else drawConv();
   drawLink();
 }
+// Abre una conversación (o ninguna = chat nuevo) y recuerda cuál es la de esta pestaña o la general.
 async function openConv(id) {
   conv = id ? await api('/api/conv?id=' + id).catch(() => null) : null;
   if (!linked) LS('atril.conv', conv?.id || '');
@@ -4581,6 +4692,7 @@ async function syncConvToTab(force = false) {
   $('#convQ').value = LS(draftKey()) || '';
   await loadConvList(cur ? convMap()[cur] : ''); // undefined → la más reciente de la pestaña
 }
+// Botón 🔗: chat vinculado a la pestaña (cada archivo su conversación) o chat general.
 function drawLink() {
   const B = $('#convLink');
   B.classList.toggle('on', linked);
@@ -4602,6 +4714,7 @@ $('#convDel').onclick = async () => {
   if (linked && cur) setConvMap(cur, '');
   loadConvList('');
 };
+// La conversación: mensajes del usuario y respuestas de la IA con sus acciones (aplicar, deshacer, crear archivo…).
 function drawConv() {
   const L = $('#convLog'); L.innerHTML = '';
   if (!conv) L.innerHTML = '<p class="ok" style="padding:4px">Escribe lo que necesitas. Si nombras un archivo del proyecto o unas páginas del PDF abierto, Atril los adjunta solo (míralo en «Se enviará»). La conversación se recuerda.</p>';
@@ -4632,6 +4745,7 @@ function replyDocx(t) {
   }
   return ops;
 }
+// Texto legible de un cambio propuesto para Word, p. ej. «Título»: color rojo, negrita · 🖼 portada.png después de «…».
 function describeOp(o) {
   if (o.error) return `⚠ bloque ilegible: ${o.error.slice(0, 60)}`;
   if (o.imagen) return `🖼 ${String(o.imagen).split(/[\\/]/).pop()} ${o.posicion === 'antes' ? 'antes de' : 'después de'} «${o.buscar}»` + (o.ancho_cm ? ` · ${o.ancho_cm} cm` : '');
@@ -4661,6 +4775,7 @@ async function applyDocx(ruta, ops, mtime) { // mtime: edición a mano (falla si
     return r;
   } catch (e) { ask('No se aplicó', e.message, ['Entendido']); return null; }
 }
+// «↩ Deshacer» de un cambio de la IA en un Word: vuelve a la copia de antes y lo marca como deshecho.
 async function undoDocx(ruta, key, st) {
   try {
     await api('/api/docx/deshacer', { ruta, id: st.deshacer });
@@ -4669,6 +4784,8 @@ async function undoDocx(ruta, key, st) {
     drawConv(); flash('↩ Cambio deshecho');
   } catch (e) { ask('No se pudo deshacer', e.message, ['Entendido']); }
 }
+// Tarjeta de respuesta de la IA: Markdown, tokens usados y, según lo que proponga, «Aplicar al Word»,
+// «Aplicar al archivo», crear archivos, verificar citas o guardar como nuevo; con su estado (aplicado, deshecho).
 function iaMsg(m, abierto, i) {
   const key = (conv?.id || '') + ':' + i, st = applied()[key];
   const c = document.createElement('div'); c.className = 'iacard';
@@ -4718,6 +4835,7 @@ function iaMsg(m, abierto, i) {
   actions(c, list);
   return c;
 }
+// Crea el archivo que propone la IA (<<<ARCHIVO …>>>) en la carpeta del proyecto, sin pisar uno existente (nombre-2…).
 async function makeFile(f, auto) {
   const folder = conv?.proyecto || curFile?.ruta.replace(/[\\/][^\\/]*$/, '');
   if (!folder) return ask('Crear archivo', 'Abre un archivo del proyecto: el nuevo se crea en su carpeta.', ['Entendido']);
@@ -4737,6 +4855,7 @@ async function makeFile(f, auto) {
     }
   }
 }
+// Aplica bloques BUSCAR/REEMPLAZAR de la IA al archivo abierto en el editor (sin guardar: se revisa y se guarda).
 async function applyEditBlocks(ruta, blocks) {
   if (!ruta) { ask('Aplicar cambios', 'Este mensaje no tenía un archivo abierto al que aplicar los cambios.', ['Entendido']); return false; }
   if (cur !== ruta) openTab(ruta, true);
@@ -4751,6 +4870,7 @@ async function applyEditBlocks(ruta, blocks) {
 function parseBlocks(t) {
   return [...norm(t).matchAll(/<<<<<<< BUSCAR\n([\s\S]*?)\n?=======\n([\s\S]*?)\n?>>>>>>> REEMPLAZAR/g)].map(m => [m[1], m[2]]);
 }
+// Cada BUSCAR debe aparecer exactamente una vez; si no, null y no se cambia nada (todo o nada).
 function applyBlocks(text, blocks) {
   let out = text;
   for (const [s, r] of blocks) {
@@ -4760,6 +4880,7 @@ function applyBlocks(text, blocks) {
   }
   return out;
 }
+// «Guardar como nuevo» desde una respuesta de la IA: pide el nombre y lo crea en la carpeta del proyecto.
 async function saveAsNew(texto) {
   const folder = conv?.proyecto || curFile?.ruta.replace(/[\\/][^\\/]*$/, '');
   if (!folder) return ask('Guardar como', 'Abre primero un archivo: el nuevo se crea en su carpeta.', ['Entendido']);
@@ -4785,6 +4906,8 @@ $('#convQ').oninput = iaRefresh;
 $('#convQ').onkeydown = e => { if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); convSend(); } };
 $('#convSend').onclick = () => convSend();
 
+// Envía el mensaje: sale del cuadro al momento, se arma «Se enviará» (páginas de PDF incluidas), se avisa si
+// pasa del límite de tokens y, con la respuesta, se crean archivos y se aplican cambios si así está en Ajustes.
 async function convSend() {
   const msg = $('#convQ').value.trim();
   if (!msg) return $('#convQ').focus();
@@ -4829,6 +4952,7 @@ async function convSend() {
 // Sin «Pedir confirmación» (⚙ Ajustes, predeterminado), los cambios de la IA se aplican al llegar; queda «Deshacer»
 const applied = () => { try { return JSON.parse(LS('atril.aplicados') || '{}'); } catch { return {}; } };
 const markApplied = (key, v) => { const a = applied(); a[key] = v; LS('atril.aplicados', JSON.stringify(a)); };
+// Sin «Pedir confirmación» (Ajustes), aplica al llegar lo que propone la respuesta i: cambios de Word o de texto.
 async function autoApply(i) {
   if (AJ.ia_confirmar_aplicar || !conv) return;
   const m = conv.mensajes[i], abierto = conv.mensajes[i - 1]?.abierto || '', key = conv.id + ':' + i;
@@ -4862,6 +4986,7 @@ function askPages(nombre, total) {
   });
 }
 const sensitiveBlocked = nombre => kind(nombre).lock && AJ.ia_permitir_sensibles === false;
+// Adjuntar al chat un archivo de Atril (arrastrado del árbol o de una pestaña); de un PDF pregunta qué páginas.
 async function dropPath(path) {
   if (isWeb(path)) return ask('Adjuntar', 'Una pestaña web no se puede adjuntar: copia el texto de la página y pégalo en el mensaje.', ['Entendido']);
   const nombre = path.split(/[\\/]/).pop();
@@ -4888,6 +5013,8 @@ async function imageForAI(src) {
   const g = cv.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, cv.width, cv.height); g.drawImage(img, 0, 0, cv.width, cv.height);
   return { media: 'image/jpeg', data: cv.toDataURL('image/jpeg', .85).split(',')[1] };
 }
+// Adjuntar un archivo soltado desde el Explorador (sin ruta): PDF por páginas, Word con mammoth, texto
+// tal cual y el resto (imágenes, Excel, binarios) por el servidor; muy grandes, solo como referencia.
 async function dropExternal(file) {
   const nombre = file.name, ext = kind(nombre).ext;
   if (sensitiveBlocked(nombre)) return ask('Adjuntar', `🔒 ${nombre}: el envío a la IA de archivos sensibles está desactivado en ⚙ Ajustes.`, ['Entendido']);
@@ -4956,6 +5083,7 @@ function findRefs(t) {
   }
   return [...out];
 }
+// ✓ Verificar citas: ejecuta verificar_citas.py del proyecto con las referencias bíblicas de la respuesta (editables).
 function verifyCites(texto) {
   const d = $('#dlg');
   d.className = 'wide'; d.oninput = d.onchange = null; d.onclose = null;
@@ -5029,6 +5157,7 @@ function addRule(t, rule, sec) {
   const end = next < 0 ? t.length : after + next;
   return t.slice(0, end).replace(/\n*$/, '\n') + line + '\n' + (end < t.length ? '\n' + t.slice(end) : '');
 }
+// Modal de reglas.md: editor a la izquierda y vista previa a la derecha; se guarda en el proyecto.
 function rulesDialog() {
   const info = rulesInfo?.reglas, proj = rulesInfo?.proyecto;
   if (!info) return;
@@ -5107,6 +5236,7 @@ function paintMax(b) {
   b.innerHTML = svg(on ? 'min' : 'max');
   b.title = on ? 'Volver a como estaba (Esc)' : `Ampliar ${ZONE_NAME[b.dataset.zone]} a toda la ventana`;
 }
+// ⤢ Pantalla completa de una zona (documento, IA o consola); Esc vuelve. CodeMirror necesita refresh al cambiar de tamaño.
 function setMax(zone) {
   maxZone = zone;
   document.body.classList.remove('max-doc', 'max-ia', 'max-con');
