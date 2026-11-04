@@ -363,9 +363,17 @@ dialog#dlg.cmp[open]{display:flex}
 .clist{position:relative}
 .cpick.missing{color:var(--muted);font-style:italic}
 /* combo de versiones: commit con ▸ y sus archivos debajo */
-.menu .vrow{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center}
+.menu .vrow{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;border-left:3px solid transparent;border-radius:4px;min-width:460px}
+.menu .vrow.on{border-left-color:var(--accent);background:var(--active)}
+.menu .vmain{display:flex;flex-direction:column;align-items:stretch;gap:1px;text-align:left;padding:6px 10px;min-width:0}
+.menu .vt{display:flex;gap:14px;align-items:baseline}.menu .vt b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;color:var(--ink)}
+.menu .vw{flex:none;font-size:11.5px;color:var(--muted)}
+.menu .vd{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.menu .va{font-size:11.5px;color:var(--faint)}.menu .vh{display:none}
+.menu .vfile .vn{flex:none;font:11px Consolas,monospace}.menu .vfile ins{color:#2e8b57;text-decoration:none}.menu .vfile del{color:#c0392b;text-decoration:none}
 .menu .vrow[hidden]{display:none}
-.menu .vexp{padding:4px 8px;font-size:11px;color:var(--muted);border-radius:4px}.menu .vexp:hover{color:var(--accent)}
+.menu .vexp{margin:0 8px 6px 0;padding:2px 9px;font-size:11.5px;color:var(--ink);border:1px solid var(--line);border-radius:11px;white-space:nowrap}
+.menu .vexp:hover{border-color:var(--accent);color:var(--accent)}
 .menu .vfiles{grid-column:1/-1;display:flex;flex-direction:column;margin:0 0 4px 18px;padding-left:8px;border-left:2px solid var(--line)}
 .menu .vfiles[hidden]{display:none}.menu .vfiles .ok{padding:4px 6px;font-size:12px}
 .menu .vfile{display:flex;gap:8px;align-items:center;padding:3px 6px;font:12px/1.4 Consolas,monospace}
@@ -1442,7 +1450,10 @@ async function compareDialog(path, carry = null) {
   const disk = { id: 'disco', label: '💾 Disco (actual)' };
   disk.get = safe(disk, async () => norm((await api('/api/abrir?ruta=' + encodeURIComponent(path))).texto ?? ''));
   vers.push(disk);
-  for (const c of log.commits) { const v = { id: c.hash, label: `${c.corto} · ${c.fecha} · ${c.autor} · ${c.mensaje}`, title: `${c.hash}\n${c.ruta}\n${c.mensaje}` }; at(v, c.hash, c.ruta); vers.push(v); }
+  for (const c of log.commits) {
+    const v = { id: c.hash, c, label: `${msgParts(c.mensaje)[0]} · ${fmtWhen(c.ts)}`, title: `${c.corto} · ${c.autor} · ${c.fecha}\n${c.ruta}\n\n${c.mensaje}` };
+    at(v, c.hash, c.ruta); vers.push(v);
+  }
   // commits elegidos en el archivo anterior que no tocan este: se leen igual (el archivo tal como estaba en ese commit)
   for (const p of carry?.picks || []) if (/^[0-9a-f]{40}$/.test(p.id) && !vers.some(v => v.id === p.id)) {
     const v = { id: p.id, label: p.label, title: p.title + '\n\n(este commit no cambió este archivo)' }; at(v, p.id, log.rel); vers.push(v);
@@ -1505,7 +1516,7 @@ async function compareDialog(path, carry = null) {
     const H = d.querySelector('.cheads'), body = d.querySelector('.cbody');
     H.replaceChildren(...pick.slice(0, cols).map((v, i) => {
       const h = document.createElement('div'); h.className = 'chead';
-      const sel = Object.assign(button(v.label + (v.missing ? ' · no existe en esta versión' : '') + ' ▾', e => { e.stopPropagation(); openMenu(sel, vers.map(x => versionRow(x, x === v, i)), { search: 'Filtrar: mensaje, autor, fecha, hash o archivo desplegado' }); }),
+      const sel = Object.assign(button(v.label + (v.missing ? ' · no existe en esta versión' : '') + ' ▾', e => { e.stopPropagation(); openMenu(sel, versionItems(v, i), { search: 'Filtrar: mensaje, autor, fecha, hash o archivo desplegado' }); }),
         { className: 'cpick' + (v.missing ? ' missing' : ''), title: (v.title || v.label) + '\n\nClic: elegir otra versión' });
       const back = Object.assign(button('↩', () => restore(v)), { className: 'small', title: 'Restaurar esta versión: se copia al editor sin guardar, para revisarla antes de guardar' });
       h.append(sel, back); return h;
@@ -1747,8 +1758,8 @@ async function compareDialog(path, carry = null) {
       clear(); if (!c || !$('#cblame').checked) return;
       shown = ln;
       tag.style.setProperty('--ac', authorColor(c));
-      tag.textContent = c.local ? '● Sin commit · cambio local' : `● ${c.autor} · ${c.fecha} · ${c.corto} · ${c.mensaje}`;
-      tag.title = c.local ? 'Esta línea aún no está en ningún commit' : `${c.hash}\n${c.autor} · ${c.fecha}\n\n${c.mensaje}`;
+      tag.textContent = c.local ? '● Sin commit · cambio local' : `● ${c.autor} · ${fmtWhen(c.ts)} · ${msgParts(c.mensaje)[0]}`;
+      tag.title = c.local ? 'Esta línea aún no está en ningún commit' : `${c.corto} · ${c.autor} · ${c.fecha}\n\n${c.mensaje}`;
       const top = cm.charCoords({ line: ln, ch: 0 }, 'window').top, bottom = cm.charCoords({ line: ln, ch: 0 }, 'window').bottom;
       tag.hidden = false;
       tag.style.top = top - W.getBoundingClientRect().top + (bottom - top - tag.offsetHeight) / 2 + 'px';
@@ -1767,29 +1778,45 @@ async function compareDialog(path, carry = null) {
     flash('↩ Versión copiada al editor: revísala y pulsa Guardar');
   }
   // fila del combo: clic = esa versión; en un commit, ▸ despliega sus archivos y clic en uno = comparar ese archivo con las mismas versiones
+  // Lista de versiones agrupada por día (Hoy, Ayer, …); al filtrar, los títulos de día se ocultan
+  function versionItems(v, i) {
+    const items = []; let day = null;
+    for (const x of vers) {
+      const k = x.c && dayKey(x.c.ts); if (k && k !== day) items.push({ head: (day = k)[0].toUpperCase() + k.slice(1) });
+      items.push(versionRow(x, x === v, i));
+    }
+    return items;
+  }
+  // Fila de un commit: título y hora, detalle del mensaje, autor y el botón «📄 N archivos» que despliega sus archivos.
+  // El hash y la fecha completa van ocultos en la fila para que el filtro los siga encontrando.
   function versionRow(x, on, i) {
-    const label = (on ? '✓ ' : '') + x.label, choose = () => { pick[i] = x; build(); };
-    if (!/^[0-9a-f]{40}$/.test(x.id)) return [label, choose, { title: x.title || x.label }];
-    const row = document.createElement('div'); row.className = 'vrow';
-    const main = Object.assign(button(label, () => { closeMenu(); choose(); }), { title: x.title || x.label });
+    const choose = () => { pick[i] = x; build(); };
+    if (!/^[0-9a-f]{40}$/.test(x.id)) return [(on ? '✓ ' : '') + x.label, choose, { title: x.title || x.label }];
+    const c = x.c, [t, det] = c ? msgParts(c.mensaje) : [x.label, ''];
+    const row = document.createElement('div'); row.className = 'vrow' + (on ? ' on' : '');
+    const main = Object.assign(button('', () => { closeMenu(); choose(); }), { title: x.title || x.label, className: 'vmain' });
+    main.innerHTML = `<span class="vt"><b>${esc(t)}</b><span class="vw">${c ? esc(dayKey(c.ts) === 'Hoy' ? fmtWhen(c.ts) : hhmm(c.ts)) : ''}</span></span>`
+      + (det ? `<span class="vd">${esc(det)}</span>` : '') + (c ? `<span class="va">${esc(c.autor)}</span><span class="vh">${esc(c.corto)} ${esc(c.fecha)}</span>` : '');
     const files = Object.assign(document.createElement('div'), { className: 'vfiles', hidden: true });
-    const exp = Object.assign(button('▸', async e => {
+    const nTxt = n => n ? `📄 ${n} archivo${n === 1 ? '' : 's'}` : '📄 Archivos';
+    const exp = Object.assign(button(nTxt(c?.n) + ' ▸', async e => {
       e.stopPropagation();
-      files.hidden = !files.hidden; exp.textContent = (files.hidden ? '▸' : '▾') + (exp.dataset.n ? ' ' + exp.dataset.n : '');
+      files.hidden = !files.hidden; exp.textContent = nTxt(c?.n ?? +exp.dataset.n) + (files.hidden ? ' ▸' : ' ▾');
       if (files.hidden || files.dataset.done) return;
       files.dataset.done = 1; files.innerHTML = '<span class="ok">Cargando archivos…</span>';
       let r; try { r = await api(`/api/git/archivos?ruta=${encodeURIComponent(path)}&hash=${x.id}`); }
       catch (err) { files.innerHTML = `<span class="ok">⚠️ ${esc(err.message)}</span>`; return; }
-      exp.dataset.n = r.archivos.length; exp.textContent = '▾ ' + r.archivos.length;
+      exp.dataset.n = r.archivos.length; exp.textContent = nTxt(r.archivos.length) + ' ▾';
       const ST = { M: 'modificado', A: 'añadido', D: 'borrado', R: 'renombrado', C: 'copiado', T: 'cambió de tipo' };
       files.replaceChildren(...r.archivos.map(f => {
         const a = button('', () => { closeMenu(); if (f.ruta.toLowerCase() !== path.toLowerCase()) switchTo(f.ruta); });
         a.className = 'vfile' + (f.estado === 'D' ? ' del' : ''); a.title = `${ST[f.estado] || f.estado}: ${f.rel}${f.antes ? '\nantes: ' + f.antes : ''}\n\nClic: comparar este archivo con las mismas versiones`;
-        a.innerHTML = `<b class="st ${f.estado}">${f.estado}</b><span><bdi></bdi></span>${f.ruta.toLowerCase() === path.toLowerCase() ? '<i>● este</i>' : ''}`;
+        a.innerHTML = `<b class="st ${f.estado}">${f.estado}</b><span><bdi></bdi></span>${f.ruta.toLowerCase() === path.toLowerCase() ? '<i>● este</i>' : ''}`
+          + (f.mas == null ? '' : `<small class="vn">${f.mas ? `<ins>+${f.mas}</ins>` : ''} ${f.menos ? `<del>−${f.menos}</del>` : ''}</small>`);
         a.querySelector('bdi').textContent = f.rel; // <bdi>: la ruta en su orden aunque se recorte por la izquierda
         return a;
       }));
-    }), { className: 'vexp', title: 'Ver los archivos de este commit' });
+    }), { className: 'vexp', title: 'Ver los archivos de este commit (clic en uno: compararlo con las mismas versiones)' });
     row.append(main, exp, files);
     return { el: row, btn: main };
   }
@@ -2359,10 +2386,10 @@ function gitColumns(cs) {
 function gitRow(c, lead, msg, cls = '') {
   const refs = c.refs.map(f => { const h = f.startsWith('HEAD -> '), n = h ? f.slice(8) : f;
     return `<span class="gref${h ? ' head' : ''}${n.includes('/') && !h ? ' rem' : ''}">${esc(n.replace(/^tag: /, '🏷 '))}</span>`; }).join('');
-  const row = Object.assign(document.createElement('div'), { className: 'gfrow' + cls + (gfSel === c.hash ? ' on' : ''), title: `${c.hash}\n${c.mensaje}` });
+  const row = Object.assign(document.createElement('div'), { className: 'gfrow' + cls + (gfSel === c.hash ? ' on' : ''), title: `${c.corto} · ${c.autor} · ${c.fecha}\n\n${c.mensaje}` });
   row.dataset.lado = c.lado; row.dataset.hash = c.hash;
-  row.innerHTML = lead + `<span class="gl">${c.lado === 'entrante' ? '↓' : c.lado === 'saliente' ? '↑' : ''}</span><span class="gh">${esc(c.corto)}</span>${refs}`
-    + `<span class="gm">${msg ?? esc(c.mensaje)}</span><span class="ga">${esc(c.autor)}</span><span class="gfdate">${esc(c.fecha)}</span>`;
+  row.innerHTML = lead + `<span class="gl">${c.lado === 'entrante' ? '↓' : c.lado === 'saliente' ? '↑' : ''}</span>${refs}`
+    + `<span class="gm">${msg ?? esc(c.mensaje)}</span><span class="ga">${esc(c.autor)}</span><span class="gfdate" title="${esc(c.fecha)}">${esc(fmtWhen(c.ts))}</span>`;
   row.onclick = () => { gfSel = c.hash; $('#gfGraph').querySelectorAll('.gfrow.on').forEach(e => e.classList.remove('on')); row.classList.add('on'); gitCommitDetail(c); };
   return row;
 }
@@ -2417,6 +2444,20 @@ function gitGraphDraw(keep = false) {
 // padres que llevan a su fila del grafo, ramas y etiquetas que lo contienen, totales) y la tabla de archivos, que se
 // ordena por columnas (se recuerda) y se filtra. «Ver»: comparador en texto, imágenes antes/después lado a lado.
 const IMG_EXT = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'ico']);
+// Commits para personas: el día («Hoy», «Ayer», «lunes 2 nov», «2 nov 2025»), la hora o «hace N min», y el mensaje
+// partido en título (lo que va antes de «: », si es corto) y detalle. ts: segundos (author time de git).
+const DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'], MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+function dayKey(ts) {
+  const d = new Date(ts * 1000), t = new Date(), n = Math.round((new Date(t.getFullYear(), t.getMonth(), t.getDate()) - new Date(d.getFullYear(), d.getMonth(), d.getDate())) / 864e5);
+  return n === 0 ? 'Hoy' : n === 1 ? 'Ayer' : `${n < 7 ? DIAS[d.getDay()] + ' ' : ''}${d.getDate()} ${MESES[d.getMonth()]}${d.getFullYear() !== t.getFullYear() ? ' ' + d.getFullYear() : ''}`;
+}
+const hhmm = ts => new Date(ts * 1000).toTimeString().slice(0, 5);
+function fmtWhen(ts) {
+  if (!ts) return '';
+  const m = (Date.now() / 1000 - ts) / 60, k = dayKey(ts);
+  return m < 1 ? 'ahora' : m < 60 ? `hace ${Math.round(m)} min` : k === 'Hoy' ? hhmm(ts) : k === 'Ayer' ? 'ayer ' + hhmm(ts) : k;
+}
+const msgParts = m => { const i = m.indexOf(': '); return i > 0 && i <= 50 ? [m.slice(0, i), m.slice(i + 2)] : [m, '']; };
 const fmtRel = t => { const m = Math.round((Date.now() / 1000 - t) / 60); return m < 1 ? 'ahora' : m < 60 ? `hace ${m} min` : m < 1440 ? `hace ${Math.round(m / 60)} h`
   : m < 2880 ? 'ayer' : m < 43200 ? `hace ${Math.round(m / 1440)} días` : m < 525600 ? `hace ${Math.round(m / 43200)} meses` : `hace ${Math.round(m / 525600)} años`; };
 let gdSort = (() => { try { return JSON.parse(LS('desklens.git.orden') || 'null') || { col: 'rel', dir: 1 }; } catch { return { col: 'rel', dir: 1 }; } })();
@@ -2470,8 +2511,8 @@ async function gitCommitDetail(c) {
         + `<td class="num gc">${f.tam == null ? '—' : fmtSize(f.tam)}</td><td class="gact2"></td>`;
       const img = IMG_EXT.has(f.ext), canSee = f.mas != null || img;
       const ver = button('Ver', () => img ? gitImageCompare(f, c) : compareDialog(f.ruta, { cols: 2, picks: [
-        c.padres[0] ? { id: c.padres[0], label: `${c.padres[0].slice(0, 7)} · antes de este commit`, title: c.padres[0] } : { id: 'disco', label: 'Disco', title: '' },
-        { id: c.hash, label: `${c.corto} · ${c.mensaje}`, title: c.hash }] }));
+        c.padres[0] ? { id: c.padres[0], label: `Antes de «${msgParts(c.mensaje)[0]}»`, title: c.padres[0] } : { id: 'disco', label: 'Disco', title: '' },
+        { id: c.hash, label: `${msgParts(c.mensaje)[0]} · ${fmtWhen(c.ts)}`, title: `${c.corto} · ${c.mensaje}` }] }));
       ver.className = 'small'; ver.disabled = !canSee; ver.title = img ? 'Imagen antes y después, lado a lado' : canSee ? 'Antes ↔ este commit' : 'Archivo binario: no se compara como texto';
       const abrir = button('Abrir', () => { gitFullClose(true); openTab(f.ruta, true); });
       abrir.className = 'small'; abrir.disabled = f.estado === 'D' || c.lado === 'entrante'; // entrante: aún no está en tu disco
@@ -2490,7 +2531,7 @@ function gitSelectCommit(hash) {
 }
 // ⋯ del commit: copiar hash, crear una rama aquí, revertir
 function gitCommitMenu(anchor, c, info) {
-  openMenu(anchor, [{ head: `${c.corto} · ${c.mensaje}` },
+  openMenu(anchor, [{ head: msgParts(c.mensaje)[0] },
     ['⧉  Copiar el hash', () => copyText(info.hash, 'Hash copiado')],
     ['⎇  Crear una rama aquí…', async () => {
       const rama = await ask('Crear una rama aquí', `Nueva rama que empieza en ${c.corto} («${c.mensaje}»). No se cambia a ella.`, ['Crear', 'Cancelar'], { input: '' });

@@ -2352,13 +2352,25 @@ def git_log(path):
         return {"repositorio": None, "commits": []}
     rel = str(p.relative_to(repo)).replace("\\", "/")
     out = git_run(repo, "-c", "core.quotePath=false", "log", "--follow", "-n", "1000", "--name-only", "--date=format:%d/%m/%Y %H:%M",
-                  "--format=\x1e%H\x1f%h\x1f%ad\x1f%an\x1f%s", "--", rel)
+                  "--format=\x1e%H\x1f%h\x1f%ad\x1f%an\x1f%s\x1f%at", "--", rel)
     commits = []
     for rec in filter(None, out.split("\x1e")):  # git_run hace strip(), que también quita el primer \x1e
         head, _, names = rec.partition("\n")
-        h, short, date, author, msg = (head.split("\x1f") + [""] * 5)[:5]
+        h, short, date, author, msg, ts = (head.split("\x1f") + [""] * 6)[:6]
         name = next((n for n in names.splitlines() if n.strip()), rel)
-        commits.append({"hash": h, "corto": short, "fecha": date, "autor": author, "mensaje": msg, "ruta": name})
+        commits.append({"hash": h, "corto": short, "fecha": date, "autor": author, "mensaje": msg, "ruta": name,
+                        "ts": int(ts or 0), "n": None})
+    # cuántos archivos cambió cada commit en total: con la ruta en el log, --shortstat contaría solo este archivo, así que
+    # va en una 2.ª llamada sin ruta (una sola para todos). ponytail: 1000 hashes ≈ 41 KB de línea de órdenes, bajo el
+    # límite de Windows (32 K caracteres) solo hasta ~780; más allá se queda sin número (n = None)
+    if commits and len(commits) <= 700:
+        cnt = git_run(repo, "log", "--no-walk=unsorted", "--diff-merges=first-parent", "--format=\x1e%H", "--shortstat", *(c["hash"] for c in commits))
+        by = {c["hash"]: c for c in commits}
+        for rec in filter(None, cnt.split("\x1e")):
+            h, _, st = rec.partition("\n")
+            if h.strip() in by:
+                m = re.search(r"(\d+) files? changed", st)
+                by[h.strip()]["n"] = int(m.group(1)) if m else 0  # merge: lo que trajo (contra su 1.er padre, como git_files)
     return {"repositorio": str(repo), "rel": rel, "commits": commits}
 
 
@@ -2441,15 +2453,15 @@ def git_graph(path, todas=False, limit=300):
     up = git_run(repo, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}")
     refs = ["--branches", "--remotes", "--tags", "HEAD"] if todas else ["HEAD", *([up] if up else [])]
     out = git_do(repo, "-c", "core.quotePath=false", "log", "--date-order", f"-n{limit}", "--date=format:%d/%m/%Y %H:%M",
-                 "--format=%x1e%H%x1f%P%x1f%h%x1f%an%x1f%ad%x1f%s%x1f%D", *refs, "--")
+                 "--format=%x1e%H%x1f%P%x1f%h%x1f%an%x1f%ad%x1f%s%x1f%D%x1f%at", *refs, "--")
     incoming = set(git_run(repo, "rev-list", f"HEAD..{up}").split()) if up else set()
     outgoing = set(git_run(repo, "rev-list", f"{up}..HEAD").split()) if up else set()
     commits = []
     for rec in out.split("\x1e"):
         if not rec.strip():
             continue
-        h, parents, short, author, date, subject, deco = (rec.strip("\n").split("\x1f") + [""] * 7)[:7]
-        commits.append({"hash": h, "padres": parents.split(), "corto": short, "autor": author, "fecha": date,
+        h, parents, short, author, date, subject, deco, ts = (rec.strip("\n").split("\x1f") + [""] * 8)[:8]
+        commits.append({"hash": h, "padres": parents.split(), "corto": short, "autor": author, "fecha": date, "ts": int(ts or 0),
                         "mensaje": subject, "refs": [r.strip() for r in deco.split(",") if r.strip()],
                         "lado": "entrante" if h in incoming else "saliente" if h in outgoing else ""})
     return {"commits": commits, "remota": up or None, "mas": len(commits) >= limit}
@@ -2503,7 +2515,8 @@ def git_blame(path, commit="", rel="", text=None):
         d, local = info[h], set(h) == {"0"}
         when = time.strftime("%d/%m/%Y %H:%M", time.localtime(int(d.get("author-time", 0))))
         commits[i] = {"hash": h, "corto": h[:7], "autor": "Sin commit" if local else d.get("author", ""),
-                      "fecha": when, "mensaje": "cambio local" if local else d.get("summary", ""), "local": local}
+                      "fecha": when, "ts": int(d.get("author-time", 0)),
+                      "mensaje": "cambio local" if local else d.get("summary", ""), "local": local}
     return {"commits": commits, "lineas": lines}
 
 
