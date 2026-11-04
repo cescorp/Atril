@@ -211,11 +211,25 @@ body.gitfull #gitv .shead{display:none} /* la barra de arriba ya dice «Git» */
 .gfrow .gl{flex:none;font-size:11px;font-weight:600}.gfrow[data-lado=entrante] .gl{color:#2f7fd8}.gfrow[data-lado=saliente] .gl{color:var(--accent)}
 .gref{flex:none;font-size:10.5px;padding:0 6px;border-radius:8px;border:1px solid var(--line);color:var(--muted)}
 .gref.head{border-color:var(--accent);color:var(--accent)}.gref.rem{border-style:dashed}
-.gfdetail{border-top:1px solid var(--line);max-height:40vh;overflow:auto;padding:8px 12px;background:var(--side)}
-.gfdetail:empty{display:none}.gfdetail .gdh{font-size:13px;margin-bottom:6px}.gfdetail .gdh small{color:var(--muted);font-size:11.5px;margin-left:6px}
-.gfdetail .gdf{display:flex;align-items:center;gap:8px;font-size:12.5px;padding:3px 0}
-.gfdetail .gdf .gst{width:14px;font:600 11px Consolas,monospace;text-align:center}.gfdetail .gdf .rb{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.gfdetail .gdn{font:11.5px Consolas,monospace}.gfdetail .gdn i{font-style:normal;color:#2e8b57}.gfdetail .gdn em{font-style:normal;color:#d33;margin-left:4px}
+.gfdetail{border-top:1px solid var(--line);max-height:45vh;overflow:auto;padding:8px 12px;background:var(--side)}
+.gfdetail:empty{display:none}.gdh{font-size:13px;margin-bottom:6px}.gdt{display:flex;align-items:center;gap:6px}.gdt .sp{flex:1}
+.gdbody{margin:4px 0;font:12.5px/1.45 Inter,sans-serif;white-space:pre-wrap;color:var(--muted);max-height:9em;overflow:auto}
+.gdm{font-size:11.5px;color:var(--muted);margin-top:3px;display:flex;flex-wrap:wrap;align-items:center;gap:4px}.gdm .mail{color:var(--faint)}
+.gdm a{color:var(--accent);font-family:Consolas,monospace}.gdm .entrante{color:#2f7fd8}.gdm .saliente{color:var(--accent)}
+.gdtot{justify-content:space-between;margin-top:6px}.gdtot i{font-style:normal;color:#2e8b57}.gdtot em{font-style:normal;color:#d33}
+.gdtot input{width:220px;font-size:12px;padding:3px 8px;border:1px solid var(--line);border-radius:6px;background:var(--paper);color:var(--ink)}
+.gdtab{width:100%;border-collapse:collapse;font-size:12.5px}
+.gdtab th{position:sticky;top:-8px;background:var(--side);text-align:left;font-weight:600;font-size:11px;color:var(--muted);padding:4px 6px;border-bottom:1px solid var(--line);cursor:pointer;user-select:none;white-space:nowrap}
+.gdtab th.on{color:var(--accent)}.gdtab th[data-k=""]{cursor:default}.gdtab .num{text-align:right;font-family:Consolas,monospace;font-size:11.5px}
+.gdtab td{padding:3px 6px;border-bottom:1px solid color-mix(in srgb,var(--line) 60%,transparent);white-space:nowrap}
+.gdtab tr:hover td{background:var(--hover)}.gdtab .gn{max-width:340px;overflow:hidden;text-overflow:ellipsis}.gdtab .gn small{color:#2f7fd8}
+.gdtab .gc{color:var(--muted)}.gdtab i{font-style:normal;color:#2e8b57}.gdtab em{font-style:normal;color:#d33}.gdtab .gact2{text-align:right}.gdtab .gact2 button{margin-left:4px}
+.gdtab .gst{display:inline-block;width:14px;font:600 11px Consolas,monospace;text-align:center}
+.gst[data-s=R]{color:#2f7fd8}
+/* imágenes antes/después de un commit */
+dialog#dlg.imgcmp{width:min(1200px,94vw);max-width:none}.imgcmp header{display:flex;align-items:center;gap:10px;margin-bottom:10px}.imgcmp header .ok{flex:1}
+.imgcmp-b{display:grid;grid-template-columns:1fr 1fr;gap:14px}.imgcmp figure{margin:0;display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0}
+.imgcmp figcaption{font-size:12px;font-weight:600;color:var(--muted)}.imgcmp img{max-width:100%;max-height:70vh;object-fit:contain;background:repeating-conic-gradient(#ddd 0 25%,#fff 0 50%) 0 0/16px 16px;border:1px solid var(--line)}
 .gfmore{padding:8px 12px;font-size:12px;color:var(--muted)}
 /* selector de repositorio: cada dato con su color */
 .gfpi>span:first-child{margin-left:0!important}
@@ -230,7 +244,7 @@ body.gitfull #gitv .shead{display:none} /* la barra de arriba ya dice «Git» */
 .gsec{margin-top:6px}.gsec>.node{font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
 .gsec.fold>.gitems{display:none}.gsec:not(.fold)>.node .chev{transform:rotate(90deg)}
 .grow{padding-left:14px}.grow .gst{flex:none;width:14px;font:600 11px Consolas,monospace;text-align:center}
-.grow .gst[data-s=M]{color:#c08a00}.grow .gst[data-s=A],.grow .gst[data-s=U]{color:#2e8b57}.grow .gst[data-s=D]{color:#d33}.grow .gst[data-s="!"]{color:#d33}
+:is(.grow,.gdtab) .gst[data-s=M]{color:#c08a00}:is(.grow,.gdtab) .gst:is([data-s=A],[data-s=U]){color:#2e8b57}:is(.grow,.gdtab) .gst:is([data-s=D],[data-s="!"]){color:#d33}
 .grow .rb{display:flex;flex-direction:column;min-width:0;flex:1}.grow small{color:var(--faint);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .grow .gact,.gsec>.node .gact{display:none;gap:2px}.grow:hover .gact,.gsec>.node:hover .gact{display:flex}
 .gact button{border:0;background:none;color:var(--muted);width:20px;height:20px;padding:0;border-radius:4px;font-size:13px;cursor:pointer}
@@ -2333,29 +2347,105 @@ function gitGraphDraw() {
   if (gfGraph.mas) G.insertAdjacentHTML('beforeend', '<p class="gfmore">Se muestran los 300 commits más recientes.</p>');
   const sel = gfSel && cs.find(c => c.hash === gfSel); if (sel) gitCommitDetail(sel); else $('#gfDetail').innerHTML = '';
 }
-// Detalle de un commit: sus archivos con +/− líneas; «ver cambios» abre el comparador con el commit anterior y este
+// Detalle de un commit: cabecera completa (mensaje entero, hash con copiar, autor y email, fecha absoluta y relativa,
+// padres que llevan a su fila del grafo, ramas y etiquetas que lo contienen, totales) y la tabla de archivos, que se
+// ordena por columnas (se recuerda) y se filtra. «Ver»: comparador en texto, imágenes antes/después lado a lado.
+const IMG_EXT = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'ico']);
+const fmtRel = t => { const m = Math.round((Date.now() / 1000 - t) / 60); return m < 1 ? 'ahora' : m < 60 ? `hace ${m} min` : m < 1440 ? `hace ${Math.round(m / 60)} h`
+  : m < 2880 ? 'ayer' : m < 43200 ? `hace ${Math.round(m / 1440)} días` : m < 525600 ? `hace ${Math.round(m / 43200)} meses` : `hace ${Math.round(m / 525600)} años`; };
+let gdSort = (() => { try { return JSON.parse(LS('desklens.git.orden') || 'null') || { col: 'rel', dir: 1 }; } catch { return { col: 'rel', dir: 1 }; } })();
 async function gitCommitDetail(c) {
   const D = $('#gfDetail');
-  D.innerHTML = `<div class="gdh"><b>${esc(c.mensaje)}</b><small>${esc(c.corto)} · ${esc(c.autor)} · ${esc(c.fecha)}${c.padres.length > 1 ? ' · merge' : ''}${c.lado ? ` · ${c.lado === 'entrante' ? '↓ por traer' : '↑ por subir'}` : ''}</small></div><p class="gfmore">Cargando archivos…</p>`;
-  let r;
-  try { r = await api(`/api/git/archivos?ruta=${encodeURIComponent(gst.ruta)}&hash=${c.hash}`); } catch (e) { D.lastChild.textContent = e.message; return; }
+  D.innerHTML = `<div class="gdh"><b>${esc(c.mensaje)}</b></div><p class="gfmore">Cargando…</p>`;
+  let r, info;
+  try {
+    [r, info] = await Promise.all([api(`/api/git/archivos?ruta=${encodeURIComponent(gst.ruta)}&hash=${c.hash}`),
+      api(`/api/git/commit?ruta=${encodeURIComponent(gst.ruta)}&hash=${c.hash}`)]);
+  } catch (e) { D.lastChild.textContent = e.message; return; }
   if (gfSel !== c.hash) return;
-  D.lastChild.remove();
-  const before = c.padres[0];
-  for (const f of r.archivos) {
-    const row = Object.assign(document.createElement('div'), { className: 'gdf', title: f.ruta + (f.antes ? `\n(antes: ${f.antes})` : '') });
-    row.innerHTML = `<span class="gst" data-s="${esc(f.estado)}">${esc(f.estado)}</span><span class="rb">${esc(f.rel)}</span>`
-      + `<span class="gdn">${f.mas == null ? 'binario' : `<i>+${f.mas}</i><em>−${f.menos}</em>`}</span>`;
-    const ver = button('Ver cambios', () => compareDialog(f.ruta, { cols: 2, picks: [
-      before ? { id: before, label: `${before.slice(0, 7)} · antes de este commit`, title: before } : { id: 'disco', label: 'Disco', title: '' },
-      { id: c.hash, label: `${c.corto} · ${c.mensaje}`, title: c.hash }] }));
-    ver.className = 'small';
-    const abrir = button('Abrir', () => { gitFullClose(true); openTab(f.ruta, true); });
-    abrir.className = 'small'; abrir.disabled = f.estado === 'D' || c.lado === 'entrante'; // entrante: aún no está en tu disco
-    abrir.title = abrir.disabled ? 'No está en tu disco (borrado o aún sin traer)' : 'Abrir el archivo tal como está ahora';
-    row.append(ver, abrir); D.append(row);
-  }
-  if (!r.archivos.length) D.insertAdjacentHTML('beforeend', '<p class="gfmore">Este commit no cambia archivos.</p>');
+  const [titulo, ...resto] = info.mensaje.split('\n'), cuerpo = resto.join('\n').trim();
+  const fecha = new Date(info.fecha * 1000), files = r.archivos.map(f => {
+    const name = f.rel.split('/').pop(), dir = f.rel.slice(0, -name.length - 1);
+    return { ...f, name, dir, ext: name.includes('.') ? name.split('.').pop().toLowerCase() : '', tam: info.tamanos[f.rel] ?? null };
+  });
+  const mas = files.reduce((a, f) => a + (f.mas || 0), 0), menos = files.reduce((a, f) => a + (f.menos || 0), 0), bin = files.filter(f => f.mas == null).length;
+  const chips = [...info.ramas.map(b => `<span class="gref${b.includes('/') ? ' rem' : ''}">${esc(b)}</span>`), ...info.etiquetas.map(t => `<span class="gref">🏷 ${esc(t)}</span>`)].join('');
+  D.innerHTML = `<div class="gdh"><div class="gdt"><b>${esc(titulo)}</b><span class="sp"></span>
+      <button class="small" data-copy title="Copiar el hash completo\n${esc(info.hash)}">⧉ ${esc(info.hash.slice(0, 7))}</button><button class="small" data-more title="Más acciones">⋯</button></div>
+    ${cuerpo ? `<pre class="gdbody">${esc(cuerpo)}</pre>` : ''}
+    <div class="gdm">👤 ${esc(info.autor)} <span class="mail">&lt;${esc(info.email)}&gt;</span> · ${fecha.toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })} (${fmtRel(info.fecha)})
+      ${info.aplico ? ` · aplicado por ${esc(info.aplico)}` : ''} · ${info.padres.length ? `padre${info.padres.length > 1 ? 's' : ''} ${info.padres.map(p => `<a href="#" data-p="${p}">${p.slice(0, 7)}</a>`).join(' + ')}` : 'primer commit'}
+      ${c.lado ? ` · <b class="${c.lado}">${c.lado === 'entrante' ? '↓ por traer' : '↑ por subir'}</b>` : ''}</div>
+    ${chips ? `<div class="gdm">En: ${chips}</div>` : ''}
+    <div class="gdm gdtot"><span>${files.length} archivo${files.length === 1 ? '' : 's'} · <i>+${mas}</i> <em>−${menos}</em>${bin ? ` · ${bin} binario${bin === 1 ? '' : 's'}` : ''}</span>
+      <input type="search" placeholder="Filtrar archivos…" spellcheck="false"></div></div>
+    <table class="gdtab"><thead><tr></tr></thead><tbody></tbody></table>`;
+  D.querySelector('[data-copy]').onclick = () => copyText(info.hash, 'Hash copiado');
+  D.querySelector('[data-more]').onclick = e => gitCommitMenu(e.currentTarget, c, info);
+  D.querySelectorAll('[data-p]').forEach(a => a.onclick = e => { e.preventDefault(); gitSelectCommit(a.dataset.p); });
+  const cols = [['estado', 'Estado'], ['rel', 'Archivo'], ['dir', 'Carpeta'], ['ext', 'Tipo'], ['mas', '+'], ['menos', '−'], ['tam', 'Tamaño'], ['', '']];
+  const head = D.querySelector('thead tr'), body = D.querySelector('tbody'), q = D.querySelector('input');
+  const draw = () => {
+    head.innerHTML = cols.map(([k, t]) => `<th data-k="${k}" class="${k && gdSort.col === k ? 'on' : ''}${['mas', 'menos', 'tam'].includes(k) ? ' num' : ''}">${t}${k ? `<span>${gdSort.col === k ? (gdSort.dir > 0 ? ' ▲' : ' ▼') : ''}</span>` : ''}</th>`).join('');
+    head.querySelectorAll('th[data-k]:not([data-k=""])').forEach(th => th.onclick = () => {
+      gdSort = { col: th.dataset.k, dir: gdSort.col === th.dataset.k ? -gdSort.dir : 1 }; LS('desklens.git.orden', JSON.stringify(gdSort)); draw();
+    });
+    const w = q.value.trim().toLowerCase(), k = gdSort.col === 'rel' ? 'name' : gdSort.col;
+    const list = files.filter(f => !w || f.rel.toLowerCase().includes(w)).sort((a, b) => {
+      const x = a[k] ?? -1, y = b[k] ?? -1;
+      return (typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y), 'es', { numeric: true })) * gdSort.dir;
+    });
+    body.innerHTML = '';
+    for (const f of list) {
+      const tr = document.createElement('tr'); tr.title = f.ruta + (f.antes ? `\n(antes: ${f.antes})` : '');
+      tr.innerHTML = `<td><span class="gst" data-s="${esc(f.estado)}">${esc(f.estado)}</span></td>`
+        + `<td class="gn">${esc(f.name)}${f.antes ? ` <small>← ${esc(f.antes.split('/').pop())}</small>` : ''}</td><td class="gc">${esc(f.dir || '·')}</td><td class="gc">${esc(f.ext)}</td>`
+        + (f.mas == null ? '<td class="num gc" colspan="2">binario</td>' : `<td class="num"><i>+${f.mas}</i></td><td class="num"><em>−${f.menos}</em></td>`)
+        + `<td class="num gc">${f.tam == null ? '—' : fmtSize(f.tam)}</td><td class="gact2"></td>`;
+      const img = IMG_EXT.has(f.ext), canSee = f.mas != null || img;
+      const ver = button('Ver', () => img ? gitImageCompare(f, c) : compareDialog(f.ruta, { cols: 2, picks: [
+        c.padres[0] ? { id: c.padres[0], label: `${c.padres[0].slice(0, 7)} · antes de este commit`, title: c.padres[0] } : { id: 'disco', label: 'Disco', title: '' },
+        { id: c.hash, label: `${c.corto} · ${c.mensaje}`, title: c.hash }] }));
+      ver.className = 'small'; ver.disabled = !canSee; ver.title = img ? 'Imagen antes y después, lado a lado' : canSee ? 'Antes ↔ este commit' : 'Archivo binario: no se compara como texto';
+      const abrir = button('Abrir', () => { gitFullClose(true); openTab(f.ruta, true); });
+      abrir.className = 'small'; abrir.disabled = f.estado === 'D' || c.lado === 'entrante'; // entrante: aún no está en tu disco
+      abrir.title = abrir.disabled ? 'No está en tu disco (borrado o aún sin traer)' : 'Abrir el archivo tal como está ahora';
+      tr.lastChild.append(ver, abrir); body.append(tr);
+    }
+    if (!list.length) body.innerHTML = `<tr><td colspan="8" class="gc">${files.length ? 'Ningún archivo coincide.' : 'Este commit no cambia archivos.'}</td></tr>`;
+  };
+  q.oninput = draw; draw();
+}
+// Lleva a un commit del grafo (p. ej. un padre): lo marca, lo enseña y muestra su detalle
+function gitSelectCommit(hash) {
+  const i = gfGraph?.commits.findIndex(x => x.hash === hash);
+  if (i == null || i < 0) return flash('Ese commit no está en el historial que se ve (prueba «Todas las ramas»)');
+  const row = $('#gfGraph').querySelectorAll('.gfrow')[i]; row?.click(); row?.scrollIntoView({ block: 'center' });
+}
+// ⋯ del commit: copiar hash, crear una rama aquí, revertir
+function gitCommitMenu(anchor, c, info) {
+  openMenu(anchor, [{ head: `${c.corto} · ${c.mensaje}` },
+    ['⧉  Copiar el hash', () => copyText(info.hash, 'Hash copiado')],
+    ['⎇  Crear una rama aquí…', async () => {
+      const rama = await ask('Crear una rama aquí', `Nueva rama que empieza en ${c.corto} («${c.mensaje}»). No se cambia a ella.`, ['Crear', 'Cancelar'], { input: '' });
+      if (rama?.trim() && await gitDo('rama_desde', [], { rama: rama.trim(), mensaje: info.hash })) flash(`✓ Rama «${rama.trim()}» creada en ${c.corto}`);
+    }],
+    ['↶  Revertir este commit…', async () => {
+      if (await ask('Revertir este commit', `Se crea un commit nuevo en «${gst.rama}» que deshace los cambios de ${c.corto} («${c.mensaje}»). El historial no se borra.`,
+        ['Revertir', 'Cancelar'], { danger: true }) === 'Revertir' && await gitDo('revertir', [], { mensaje: info.hash })) flash('✓ Commit revertido');
+    }]]);
+}
+// Imagen antes y después lado a lado (la del commit anterior y la de este); si una no existe, se dice
+function gitImageCompare(f, c) {
+  const src = (h, rel) => `/api/git/blob?ruta=${encodeURIComponent(gst.ruta)}&hash=${h}&rel=${encodeURIComponent(rel)}`;
+  const before = c.padres[0] && f.estado !== 'A' ? src(c.padres[0], f.antes || f.rel) : null, after = f.estado !== 'D' ? src(c.hash, f.rel) : null;
+  const d = $('#dlg'); d.className = 'imgcmp'; d.onclose = null;
+  const fig = (url, t) => `<figure><figcaption>${t}</figcaption>${url ? `<img src="${url}" alt="">` : '<p class="gfmore">No existe en esta versión</p>'}</figure>`;
+  d.innerHTML = `<header><b>${esc(f.rel)}</b><span class="ok">${esc(c.corto)} · ${esc(c.mensaje)}</span><button class="ic" data-x title="Cerrar (Esc)">✕</button></header>
+    <div class="imgcmp-b">${fig(before, 'Antes')}${fig(after, 'Después')}</div>`;
+  d.querySelector('[data-x]').onclick = () => d.close();
+  d.querySelectorAll('img').forEach(i => i.onload = () => i.insertAdjacentHTML('afterend', `<small class="ok">${i.naturalWidth} × ${i.naturalHeight} px</small>`));
+  d.showModal();
 }
 // Botones y avisos de la vista Git (se llama al arrancar, cuando ya existen button/iconBtn)
 function gitInit() {

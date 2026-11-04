@@ -2392,6 +2392,44 @@ def git_files(path, commit):
     return {"repositorio": str(repo), "archivos": files}
 
 
+def git_commit_info(path, commit):
+    """Todo lo de un commit para su detalle: mensaje completo, autor con email, fecha (epoch, la ventana la muestra
+    absoluta y relativa), quien lo aplicó si es otro, padres completos, ramas y etiquetas que lo contienen y el
+    tamaño de cada archivo en ese commit ({ruta relativa: bytes})."""
+    repo = repo_of(path)
+    if not re.fullmatch(r"[0-9a-f]{4,40}", commit or ""):
+        raise ValueError("commit no válido")
+    out = git_do(repo, "show", "-s", "--format=%H%x1f%P%x1f%an%x1f%ae%x1f%at%x1f%cn%x1f%ce%x1f%B", commit)
+    h, parents, an, ae, at, cn, ce, body = (out.split("\x1f") + [""] * 8)[:8]
+    ramas = git_run(repo, "branch", "-a", "--contains", h, "--format=%(refname:short)").splitlines()
+    etiquetas = git_run(repo, "tag", "--contains", h).splitlines()
+    changed = [ln.split("\t")[-1] for ln in git_run(repo, "-c", "core.quotePath=false", "show", "--format=", "--name-only",
+                                                       "--diff-merges=first-parent", h).splitlines() if ln]
+    sizes = {}
+    if changed and len(changed) <= 400:  # ponytail: con más archivos no se piden tamaños (línea de órdenes de Windows ~32 KB)
+        for ln in git_run(repo, "-c", "core.quotePath=false", "ls-tree", "-l", h, "--", *changed).splitlines():
+            meta, _, rel = ln.partition("\t")  # «100644 blob <hash>     1234\truta»
+            size = meta.split()[-1]
+            if size.isdigit():
+                sizes[rel] = int(size)
+    return {"hash": h, "padres": parents.split(), "autor": an, "email": ae, "fecha": int(at or 0),
+            "aplico": cn if (cn, ce) != (an, ae) else None, "mensaje": body.strip(),
+            "ramas": [r for r in ramas if not r.endswith("/HEAD") and r != "origin"], "etiquetas": etiquetas, "tamanos": sizes}
+
+
+def git_blob(path, commit, rel):
+    """Bytes de un archivo tal como estaba en un commit (para ver imágenes antes/después). Hasta 30 MB."""
+    repo = repo_of(path)
+    if not re.fullmatch(r"[0-9a-f]{4,40}", commit or "") or not rel or rel.startswith(("-", ":")):
+        raise ValueError("versión no válida")
+    r = subprocess.run(["git", "-C", str(repo), "show", f"{commit}:{rel}"], capture_output=True, timeout=30, creationflags=NO_WINDOW)
+    if r.returncode:
+        raise ValueError(r.stderr.decode("utf-8", "replace").strip() or "no existe en esa versión")
+    if len(r.stdout) > 30_000_000:
+        raise ValueError("demasiado grande para mostrarlo")
+    return r.stdout
+
+
 def git_graph(path, todas=False, limit=300):
     """Historial para la pantalla completa de Git: la rama actual y su remota (o todas las ramas), del más nuevo al más
     viejo, con padres (para dibujar el grafo), etiquetas de ramas y si cada commit es entrante (está en el remoto y aún
@@ -2559,7 +2597,8 @@ def git_overview(path):
             # cambios guardados aparte (stash): [{id: stash@{N}, mensaje, fecha}], el más reciente primero
             "stashes": [dict(zip(("id", "mensaje", "fecha"), ln.split("\x1f"))) for ln in
                         git_run(repo, "-c", "core.quotePath=false", "stash", "list", "--format=%gd\x1f%s\x1f%cr").splitlines() if ln],
-            "fusionando": bool(git_run(repo, "rev-parse", "-q", "--verify", "MERGE_HEAD")),
+            "fusionando": bool(git_run(repo, "rev-parse", "-q", "--verify", "MERGE_HEAD")
+                               or git_run(repo, "rev-parse", "-q", "--verify", "REVERT_HEAD")),  # merge o revert a medias
             "comprobado": git_fetch_time(repo),
             "preparados": staged, "cambios": changes, "conflictos": conflicts}
 
@@ -2708,6 +2747,21 @@ def git_action(path, accion, archivos=(), mensaje="", rama="", todo=False, modo=
         except ValueError:
             raise ValueError("Algunos de los cambios guardados chocan con lo que hay ahora: aparecen en «Conflictos». "
                              "Siguen guardados en el stash por si acaso.")
+    elif accion == "rama_desde":  # crear una rama en un commit del historial (sin cambiar a ella)
+        if not re.fullmatch(r"[0-9a-f]{4,40}", mensaje):
+            raise ValueError("commit no válido")
+        git_do(repo, "branch", git_branch_name(repo, rama), mensaje)
+    elif accion == "revertir":  # commit nuevo que deshace ese commit (en un merge, respecto a su 1.er padre)
+        if not re.fullmatch(r"[0-9a-f]{4,40}", mensaje):
+            raise ValueError("commit no válido")
+        merge = len(git_run(repo, "rev-list", "--parents", "-n1", mensaje).split()) > 2
+        try:
+            git_do(repo, "revert", "--no-edit", *(["-m", "1"] if merge else []), mensaje)
+        except ValueError as e:
+            if "conflict" in str(e).lower():
+                raise ValueError("Deshacer ese commit choca con cambios posteriores: los archivos aparecen en «Conflictos». "
+                                 "Resuélvelos, márcalos con + y haz commit (o «git revert --abort» para cancelar).")
+            raise
     elif accion == "deshacer_commit":  # solo un commit que aún no se ha subido (sigue en la rama, en preparados)
         ov = git_overview(repo)
         if ov["remota"] and not ov["adelante"]:
@@ -2919,6 +2973,19 @@ class Handler(BaseHTTPRequestHandler):
                 if not allowed(p) or not p.is_file():
                     return self.send_json(404, {"error": "no permitido o no existe"})
                 return self.send_file(p, sandbox=p.suffix.lower() != ".pdf")
+            if url.path == "/api/git/blob":  # imagen de una versión (para <img>, que no envía la cabecera X-DeskLens)
+                if not self.guard(need_header=False) or self.denied(q.get("ruta", "")):
+                    return
+                try:
+                    data = git_blob(q.get("ruta", ""), q.get("hash", ""), q.get("rel", ""))
+                except (ValueError, subprocess.TimeoutExpired) as e:
+                    return self.send_json(404, {"error": str(e)})
+                self.send_response(200)
+                self.send_header("Content-Type", mimetypes.guess_type(q.get("rel", ""))[0] or "application/octet-stream")
+                self.send_header("Content-Length", str(len(data)))
+                self.send_header("Content-Security-Policy", "sandbox")  # un SVG del repositorio no ejecuta nada
+                self.end_headers()
+                return self.wfile.write(data)
             if url.path in ("/api/hist/dato", "/api/hist/docx"):  # sin cabecera propia: también para <img src>
                 if not self.guard(need_header=False):
                     return
@@ -3011,6 +3078,11 @@ class Handler(BaseHTTPRequestHandler):
             if url.path == "/api/git/estado":
                 try:
                     return self.send_json(200, git_overview(ruta))
+                except (ValueError, subprocess.TimeoutExpired) as e:
+                    return self.send_json(400, {"error": str(e)})
+            if url.path == "/api/git/commit":
+                try:
+                    return self.send_json(200, git_commit_info(ruta, q.get("hash", "")))
                 except (ValueError, subprocess.TimeoutExpired) as e:
                     return self.send_json(400, {"error": str(e)})
             if url.path == "/api/git/grafo":

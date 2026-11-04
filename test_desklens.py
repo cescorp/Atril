@@ -770,6 +770,22 @@ assert.deepStrictEqual(findRefs('Ver 1 Samuel 4:4 y 1 Samuel 8:5, 20; Deuteronom
     assert code == 200 and (rep / "h.md").read_text() == "1\n2\ntres\n" and not ov["stashes"]
     assert post("/api/git/accion", {"ruta": str(rep), "accion": "recuperar_stash", "rama": "HEAD; rm"})[0] == 400
     git(rep, "checkout", "--", "h.md")
+    # detalle del commit: mensaje completo, email, ramas, tamaños; versión binaria; crear rama aquí; revertir
+    (rep / "i.md").write_text("cuatro\n"); (rep / "logo.png").write_bytes(b"\x89PNG\r\n\x1a\n" + b"\0" * 20)
+    post("/api/git/accion", {"ruta": str(rep), "accion": "commit", "mensaje": "Título\n\nCuerpo largo\nen dos líneas", "todo": True})
+    h = subprocess.run(["git", "-C", str(rep), "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+    code, d = get(port, f"/api/git/commit?ruta={urllib.request.quote(str(rep))}&hash={h}")
+    i = json.loads(d)
+    assert i["mensaje"] == "Título\n\nCuerpo largo\nen dos líneas" and i["email"] == "prueba@example.com" and "main" in i["ramas"]
+    assert i["tamanos"] == {"i.md": 7, "logo.png": 28} and len(i["padres"]) == 1  # tamaño en el commit (git guarda LF)
+    code, png = get(port, f"/api/git/blob?ruta={urllib.request.quote(str(rep))}&hash={h}&rel=logo.png")
+    assert code == 200 and png.startswith(b"\x89PNG")
+    assert get(port, f"/api/git/blob?ruta={urllib.request.quote(str(rep))}&hash={h}&rel=-x")[0] == 404
+    code, ov = post("/api/git/accion", {"ruta": str(rep), "accion": "rama_desde", "rama": "desde-aqui", "mensaje": h})
+    assert "desde-aqui" in ov["ramas"] and ov["rama"] == "main"  # creada, sin cambiar a ella
+    code, ov = post("/api/git/accion", {"ruta": str(rep), "accion": "revertir", "mensaje": h})
+    assert code == 200 and not (rep / "i.md").exists() and not ov["cambios"]
+    assert "Revert" in subprocess.run(["git", "-C", str(rep), "log", "-1", "--format=%s"], capture_output=True, text=True).stdout
     resumen = json.loads(get(port, "/api/git/resumen")[1])
     assert any(x["ruta"] == str(proj) for x in resumen)  # un proyecto por fila (sin git: rama None)
     srv.shutdown()
