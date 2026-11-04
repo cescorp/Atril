@@ -1,15 +1,15 @@
-# Formatos de Atril
+# Formatos de DeskLens
 Los ~380 formatos de la lista se pueden abrir todos, pero no todos igual: unos se ven y editan, otros solo se ven y otros solo muestran una ficha con botón para abrirlos en Windows.
 
 ## Regla universal (cubre cualquier extensión, incluso las que no están en la lista)
 1. Si la extensión es conocida → se usa su vista.
 2. Si no: se miran los primeros 8 KB. Sin bytes nulos = **es texto** → se muestra y edita como texto.
 3. Si es binario desconocido → **ficha**: nombre, tamaño, fecha, tipo + botón "Mostrar en carpeta" o "Abrir con el programa de Windows".
-   - Ejecutables e instaladores **nunca** se abren con doble clic desde Atril: solo "Mostrar en carpeta".
+   - Ejecutables e instaladores **nunca** se abren con doble clic desde DeskLens: solo "Mostrar en carpeta".
 
 ## Resumen
 
-| Nivel | Qué hace Atril | ¿Instalar algo? | Formatos aprox. |
+| Nivel | Qué hace DeskLens | ¿Instalar algo? | Formatos aprox. |
 |---|---|---|---|
 | 1. Texto | Ver con colores + **editar** + ejecutar (scripts) | No | ~170 |
 | 2. Nativo del navegador | Ver / reproducir | No | ~35 |
@@ -82,7 +82,7 @@ env, pem, key (si es clave), p12, pfx, gpg, pgp, asc, crt, cer, der, p7b, p7c, c
 ## Correcciones a la lista original
 | Entrada | Observación |
 |---|---|
-| .ipynb_checkpoints | Es una **carpeta** de Jupyter, no una extensión → Atril la oculta |
+| .ipynb_checkpoints | Es una **carpeta** de Jupyter, no una extensión → DeskLens la oculta |
 | .dockerfile | El nombre habitual es `Dockerfile`, sin extensión → se reconocen ambos |
 | .alac | No existe como extensión: el audio ALAC va dentro de `.m4a` |
 | .key | Ambiguo: Keynote (ZIP) o clave privada (texto) → se detecta por contenido |
@@ -97,4 +97,4 @@ env, pem, key (si es clave), p12, pfx, gpg, pgp, asc, crt, cer, der, p7b, p7c, c
 2. **Nivel 3 por demanda**: primero docx, xlsx/csv, ipynb y zip; el resto cuando aparezca un archivo real que lo necesite.
 3. **Nivel 4**: solo si se decide instalar LibreOffice o ffmpeg.
 
-Origen: Atril · 2026-10-31
+Origen: DeskLens · 2026-10-31

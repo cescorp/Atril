@@ -1,5 +1,5 @@
-# Implementación de Atril
-Atril es un visor local con pestañas para leer, editar y ejecutar archivos de muchos proyectos, y pedir cambios a Claude, Codex o Gemini gastando los mínimos tokens.
+# Implementación de DeskLens
+DeskLens es un visor local con pestañas para leer, editar y ejecutar archivos de muchos proyectos, y pedir cambios a Claude, Codex o Gemini gastando los mínimos tokens.
 
 ## Problema que resuelve
 - El chat de las IAs es difícil de leer con textos largos.
@@ -76,7 +76,7 @@ EN EL CONTENIDO · Mi curso
 - **Índice (SQLite FTS5, viene con Python):** `historial/indice.db`, fuera de git. Los archivos siguen siendo la fuente: el índice se puede borrar y se regenera solo.
   - Se indexa **todo** lo de los proyectos y sueltos (también los 🔒: el índice es local). Solo se salta la carpeta interna `.git`. Binarios: solo el nombre. Texto: hasta 20 MB por archivo. `.docx`: su texto.
   - **PDF:** los lee la ventana con pdf.js en segundo plano, uno a uno (el más pequeño primero), página por página; el buscador indica la página.
-  - En segundo plano al abrir Atril, repasa cada 5 min **solo lo que cambió** (tamaño/fecha) y al momento lo que se guarda o crea desde Atril. Guarda cada 100 archivos: **si se cierra Atril, sigue donde se quedó**.
+  - En segundo plano al abrir DeskLens, repasa cada 5 min **solo lo que cambió** (tamaño/fecha) y al momento lo que se guarda o crea desde DeskLens. Guarda cada 100 archivos: **si se cierra DeskLens, sigue donde se quedó**.
   - Medido con los proyectos reales: 917 archivos en 39 s la 1.ª vez; la 2.ª pasada sin cambios, 0 s. La base ocupa ≈ 230 MB (sobre todo por la Biblia en JSON).
   - Búsqueda: sin tildes ni mayúsculas, prefijos (`filist` → filisteos), "frases entre comillas"; primero por nombre, luego por contenido con fragmento resaltado. Esc vuelve al árbol.
   - **Conmutadores dentro del cuadro (como VS Code), 2026-11-02:** `Aa` mayúsculas y tildes exactas (apagado por defecto) · 📄 buscar en el nombre · ≡ buscar en el contenido. 📄 y ≡ no se apagan los dos a la vez; se recuerdan al reabrir. Con `Aa`, cada palabra debe aparecer tal cual se escribió (en el contenido se comprueba sobre el texto completo, no solo el fragmento).
@@ -99,17 +99,17 @@ EN EL CONTENIDO · Mi curso
 - **Nuevo archivo / nueva carpeta:** en la carpeta elegida (clic en una carpeta), si no, en la del archivo abierto, si no, en el primer proyecto. También en el ⋮ de cada proyecto («… aquí»). El formato sale de la extensión; los de texto se abren ya en edición; `.docx` crea un Word vacío. Nunca sobrescribe.
 - **Ctrl+N → «nuevo 1»:** pestaña sin nombre ni archivo; sobrevive a cierres y reinicios. Guardar (Ctrl+S) pide nombre y carpeta.
 - **Recuperación como Notepad++:** lo no guardado se copia a `historial\recuperacion\` 2 s después de dejar de escribir (como máximo cada 10 s; ajustable). El archivo original no se toca hasta Ctrl+S. Escritura atómica (archivo aparte + reemplazo + fsync): un corte de luz no deja copias rotas. No va en Temp de Windows (el liberador lo vacía).
-  - Al abrir Atril: reabre las pestañas con su texto y ● y avisa «Se recuperó…». Si el archivo cambió en disco después de la copia: «Usar mi versión recuperada / Usar la del disco / Ver las dos». Si el archivo ya no existe, el texto se abre como «nuevo N».
-  - Guardar, descartar o cerrar la pestaña borra su copia. Al cerrar Atril se guarda lo pendiente al instante.
+  - Al abrir DeskLens: reabre las pestañas con su texto y ● y avisa «Se recuperó…». Si el archivo cambió en disco después de la copia: «Usar mi versión recuperada / Usar la del disco / Ver las dos». Si el archivo ya no existe, el texto se abre como «nuevo N».
+  - Guardar, descartar o cerrar la pestaña borra su copia. Al cerrar DeskLens se guarda lo pendiente al instante.
   - También se conserva lo que se estaba escribiendo en el chat.
-  - Probado: con una copia de «nuevo 1», Atril la reabrió en el editor con su texto y el aviso.
+  - Probado: con una copia de «nuevo 1», DeskLens la reabrió en el editor con su texto y el aviso.
 - **🔍 de la cinta:** lleva al buscador de la barra lateral. **⚙ Ajustes:** los valores que antes estaban fijos en el código, por grupos (General, Índice, Bitácora, Git, IA, Recuperación, Editor y lectura), con rango y valor por defecto; se guardan en `config.json` («Restablecer valores» vuelve a los de fábrica; el puerto se aplica al reabrir).
 - **Modal (i):** botones de copiar agrupados — Copiar nombre · Copiar ruta · Copiar ruta relativa (al proyecto) — y aparte Mostrar en carpeta / Cerrar.
 
 ### Explorador para añadir (botón + de Proyectos o de Sueltos)
 
 ```
-┌ Añadir a Atril ─────────────────────────────────────┐
+┌ Añadir a DeskLens ─────────────────────────────────────┐
 │ [↑] Este equipo › G: › proyectos        [C:][G:][H:] │
 ├─────────────────────────────────────────────────────┤
 │ 📁 mi-web      Laravel · git   ✅ ya añadido      │
@@ -136,7 +136,7 @@ EN EL CONTENIDO · Mi curso
 |---|---|
 | ⚠️ Sin reglas | Falta `reglas.md` |
 
-`AGENTS.md`, `CLAUDE.md` y `GEMINI.md` son **opcionales** (2026-11-01): solo sirven si se trabaja con esa IA directamente dentro de la carpeta del proyecto. Atril no los exige ni avisa de ellos, y en la plantilla aparecen desmarcados.
+`AGENTS.md`, `CLAUDE.md` y `GEMINI.md` son **opcionales** (2026-11-01): solo sirven si se trabaja con esa IA directamente dentro de la carpeta del proyecto. DeskLens no los exige ni avisa de ellos, y en la plantilla aparecen desmarcados.
 | ⚠️ Sin bitácora | Falta `bitacora.md` |
 | 🟡 Bitácora grande | Más de 200 líneas |
 | ⏳ Sin actividad | Última entrada con más de 30 días (opcional, pendiente de decidir) |
@@ -154,7 +154,7 @@ Al hacer clic aparece el botón **"Crear desde plantilla"**. Solo se crean archi
 | `.php`, `.blade.php`, `.py`, `.bat`, `.ps1`, `.js`, `.css`, `.sql`, `.json`, `.yaml` | Código con colores y números de línea |
 | App en marcha (Laravel, Flask…) | Pestaña con la URL `localhost` |
 
-Clasificación completa de ~380 formatos en 5 niveles, regla universal para extensiones desconocidas y archivos sensibles 🔒 (nunca se envían a la IA): ver [formatos_atril.md](formatos_atril.md). Lista de los 256 viables sin instalar nada: [formatos_viables.txt](formatos_viables.txt).
+Clasificación completa de ~380 formatos en 5 niveles, regla universal para extensiones desconocidas y archivos sensibles 🔒 (nunca se envían a la IA): ver [formatos_desklens.md](formatos_desklens.md). Lista de los 256 viables sin instalar nada: [formatos_viables.txt](formatos_viables.txt).
 
 ## Memoria por proyecto (archivos `.md`)
 
@@ -227,7 +227,7 @@ Reglas:
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
-│ Atril     IA:  [● Claude]  [⚠ Codex]  [○ Gemini]            [Conectar IA] │
+│ DeskLens     IA:  [● Claude]  [⚠ Codex]  [○ Gemini]            [Conectar IA] │
 ├──────────────┬───────────────────────────────────────────────────────────┤
 
 ┌ Conectar IA ──────────────────────────────────────────────────────────┐
@@ -239,11 +239,11 @@ Reglas:
 └───────────────────────────────────────────────────────────────────────┘
 ```
 
-- ● conectada · ⚠ instalada sin sesión · ○ no instalada. Se comprueba al abrir Atril, sin gastar tokens (versión del programa).
-- **Cómo instalar:** muestra el comando para copiar; Atril no instala nada por su cuenta.
+- ● conectada · ⚠ instalada sin sesión · ○ no instalada. Se comprueba al abrir DeskLens, sin gastar tokens (versión del programa).
+- **Cómo instalar:** muestra el comando para copiar; DeskLens no instala nada por su cuenta.
 - **Iniciar sesión:** abre una consola con el login oficial (`codex login`, `claude`, `gemini`); después, **Comprobar**.
 - **Probar:** envía "responde OK", tras confirmar, y mide la carga fija real de tokens de esa IA (si el CLI informa del consumo). Resuelve con datos la duda pendiente sobre los CLIs.
-- Atril nunca guarda contraseñas ni claves: cada CLI guarda su propia sesión.
+- DeskLens nunca guarda contraseñas ni claves: cada CLI guarda su propia sesión.
 
 Decidido (2026-11-01):
 - Solo CLIs (suscripciones); claves API solo si la carga fija medida resulta alta.
@@ -252,14 +252,14 @@ Decidido (2026-11-01):
 
 ### Panel de IA: un solo chat (rehecho el 2026-11-02)
 
-El primer diseño (modos Rápido/Conversación, Alcance, Destino y adjuntar a mano) resultó **demasiado complicado** y se sustituyó por un único chat en el que Atril prepara el contexto solo.
+El primer diseño (modos Rápido/Conversación, Alcance, Destino y adjuntar a mano) resultó **demasiado complicado** y se sustituyó por un único chat en el que DeskLens prepara el contexto solo.
 
 ```
 │ ✦ IA   [● Claude ▾] [Conectar]                    │
 │ 📜 Reglas: Mi curso · 9 reglas                 │ ← clic: modal de reglas
 │ [conversaciones guardadas ▾] [Nueva] [Borrar]      │
 │  …conversación (se recuerda)…                      │
-│ Se enviará: 📄 1 & 2 Samuel.pdf · pág. 40 (abierto) ✕│ ← Atril lo detecta solo, sin IA
+│ Se enviará: 📄 1 & 2 Samuel.pdf · pág. 40 (abierto) ✕│ ← DeskLens lo detecta solo, sin IA
 │             📄 montaña_narrativa.md   ≈ 4.500 tok ✕ │
 │             + Otro archivo                          │
 │ [ lee la página 40 y usa montaña narrativa… ]       │
@@ -273,13 +273,13 @@ El primer diseño (modos Rápido/Conversación, Alcance, Destino y adjuntar a ma
   - **Texto seleccionado** en el documento.
   - Todo aparece en **«Se enviará»** con sus tokens; ✕ lo quita, ↺ lo devuelve. **+ Otro archivo** (con buscador) para lo que no se nombre.
 - **Memoria:** conversación continua guardada en `historial/conversaciones/`. Con Claude continúa su sesión (`--resume`): reglas y archivos se envían **una sola vez** («ya en la conversación») y lo anterior va en caché. Un archivo de texto que cambió se vuelve a enviar. Con otras IAs se reenvía todo en cada turno.
-- **Respuestas que Atril ejecuta de forma segura** (la IA no tiene herramientas):
-  - `<<<ARCHIVO nombre.md … ARCHIVO>>>` → Atril **crea el archivo** en la carpeta del proyecto (nunca sobrescribe: añade « (2)») y **lo abre** en una pestaña. Probado con Claude: «lee la página 40… muéstramelo en un archivo .md» → `preguntas_pagina_40.md` (≈ 1.550 tokens).
+- **Respuestas que DeskLens ejecuta de forma segura** (la IA no tiene herramientas):
+  - `<<<ARCHIVO nombre.md … ARCHIVO>>>` → DeskLens **crea el archivo** en la carpeta del proyecto (nunca sobrescribe: añade « (2)») y **lo abre** en una pestaña. Probado con Claude: «lee la página 40… muéstramelo en un archivo .md» → `preguntas_pagina_40.md` (≈ 1.550 tokens).
   - Bloques `BUSCAR / REEMPLAZAR` → cambios al archivo que estaba abierto, en rojo/verde con **Aplicar** (solo si cada texto aparece una vez); se guardan con Ctrl+S.
   - **✓ Verificar citas** (si el proyecto tiene `verificar_citas.py`): extrae las referencias (editables), ejecuta el script en la consola y deja el resultado en el chat para enviarlo.
-- **Crear cualquier formato y abrirlo solo** (2026-11-02): la IA escribe el contenido; Atril lo convierte sin IA y lo abre en una pestaña.
+- **Crear cualquier formato y abrirlo solo** (2026-11-02): la IA escribe el contenido; DeskLens lo convierte sin IA y lo abre en una pestaña.
 
-  | Pides | Cómo lo crea Atril |
+  | Pides | Cómo lo crea DeskLens |
   |---|---|
   | `.md`, `.txt`, `.csv`, `.html`, `.json`, `.svg`, `.py`, `.bat`, `.ps1`, `.sql`… | Texto UTF-8 tal cual |
   | `.docx` | Markdown → HTML (marked) → Word con Python estándar: títulos, negrita, cursiva, código, listas, citas, tablas; A4; sin imágenes |
@@ -290,8 +290,8 @@ El primer diseño (modos Rápido/Conversación, Alcance, Destino y adjuntar a ma
 - **Cambiar formato y texto de un Word desde el chat** (2026-11-02):
   - **Visor fiel** con `docx-preview` (+ JSZip): colores, fuentes, tamaños, resaltado, bordes de tabla y páginas, como en Word. Antes (mammoth) se perdían los colores; mammoth queda de reserva si no hay internet.
   - Cada mensaje dice a la IA cuál es el **ARCHIVO ABIERTO**; si es `.docx`, también cómo proponer cambios: `<<<DOCX {"buscar": "texto exacto", "color": "rojo"} DOCX>>>` con `color`, `negrita`, `cursiva`, `subrayado`, `tamano` (pt), `resaltado`, `fuente`, `reemplazar` (conserva el formato) y `todas`.
-  - Atril lo muestra como lista y **solo cambia el Word al pulsar «Aplicar al Word»**: toca únicamente los fragmentos de texto afectados (los parte si hace falta), conserva el resto del archivo y sus declaraciones; **todo o nada** (si un texto no aparece, no se toca nada); `.bak` la primera vez si no hay git; escritura de golpe; si el Word está abierto en Microsoft Word, avisa en lugar de escribir. Después el visor se recarga.
-  - Probado con una **copia** de «Exposición – 2 Samuel 6:1 – 7:29.docx»: Claude propuso el bloque (≈ 4.800 tokens), Atril lo aplicó, **Microsoft Word abrió el archivo sin errores con el título en rojo**, y el visor de Atril lo muestra en rojo.
+  - DeskLens lo muestra como lista y **solo cambia el Word al pulsar «Aplicar al Word»**: toca únicamente los fragmentos de texto afectados (los parte si hace falta), conserva el resto del archivo y sus declaraciones; **todo o nada** (si un texto no aparece, no se toca nada); `.bak` la primera vez si no hay git; escritura de golpe; si el Word está abierto en Microsoft Word, avisa en lugar de escribir. Después el visor se recarga.
+  - Probado con una **copia** de «Exposición – 2 Samuel 6:1 – 7:29.docx»: Claude propuso el bloque (≈ 4.800 tokens), DeskLens lo aplicó, **Microsoft Word abrió el archivo sin errores con el título en rojo**, y el visor de DeskLens lo muestra en rojo.
   - No hace: márgenes, columnas, encabezados/pies, insertar imágenes o tablas nuevas (para eso, generar un `.docx` nuevo).
 - **Arrastrar al chat** (2026-11-02): soltar en el panel de IA un archivo del árbol o una pestaña lo adjunta con su ruta (vinculado); desde el Explorador de Windows, solo su contenido («desde Windows · solo lectura»: la IA lo lee pero no puede aplicarle cambios). Texto, `.docx` (texto con mammoth) y PDF (cuadro «de … a …» si el mensaje no dice qué páginas). Las carpetas no se adjuntan.
 - **Archivos sensibles** (🔒 `.env`, claves, `.npmrc`, `.netrc`, `id_rsa`, `credentials.json`, `wp-config.php`, `.ppk`, `.kdbx`…): ajuste «Permitir adjuntar y enviar a la IA archivos sensibles», **activado por defecto** (decisión del usuario: son archivos locales). Copiar, buscar y editar siempre estuvieron permitidos. Desactivado, el servidor rechaza su envío aunque la interfaz fallara.
@@ -331,40 +331,40 @@ El primer diseño (modos Rápido/Conversación, Alcance, Destino y adjuntar a ma
 - **Servidor:** Python, solo la biblioteca estándar (ya instalado, sin paquetes).
 - **Interfaz:** HTML + JavaScript. El navegador muestra PDF, imágenes, audio y video; las librerías del nivel 3 son JS desde CDN.
 - Descartados: Electron (pesado, Node), Tauri (compilar Rust), Laravel (excesivo para local), C# escritorio (sin Markdown/PDF nativos).
-- **Arranque:** doble clic en `atril.pyw` (sin consola) → abre una ventana de **Edge en modo aplicación** (`msedge --app=…`), que parece un programa normal.
+- **Arranque:** doble clic en `desklens.pyw` (sin consola) → abre una ventana de **Edge en modo aplicación** (`msedge --app=…`), que parece un programa normal.
 - Al cerrar la ventana, el servidor se apaga solo.
-- **Posición y tamaño de la ventana** (2026-11-02): se guardan en `config.json` mientras se usa (cada 2 s si cambian) y Atril abre la siguiente vez con `--window-position` / `--window-size`. Si Edge ignorara esas opciones (pasa si ya había otra ventana de Edge abierta), la propia página corrige tamaño y posición al cargar.
-- Abrir archivos: botón **+** de Sueltos (diálogo de Windows) o arrastrarlos sobre el icono de `atril.pyw`. Soltarlos dentro de la ventana no sirve: el navegador no entrega la ruta real, y sin ella no se puede editar el original.
+- **Posición y tamaño de la ventana** (2026-11-02): se guardan en `config.json` mientras se usa (cada 2 s si cambian) y DeskLens abre la siguiente vez con `--window-position` / `--window-size`. Si Edge ignorara esas opciones (pasa si ya había otra ventana de Edge abierta), la propia página corrige tamaño y posición al cargar.
+- Abrir archivos: botón **+** de Sueltos (diálogo de Windows) o arrastrarlos sobre el icono de `desklens.pyw`. Soltarlos dentro de la ventana no sirve: el navegador no entrega la ruta real, y sin ella no se puede editar el original.
 - Seguridad local: solo escucha en `127.0.0.1`; las llamadas a la API exigen una cabecera propia para que ninguna web externa pueda usarla.
 
 ## Estructura del proyecto
 
 ```
-Atril/
-├─ atril.pyw          → servidor local (Python stdlib) y arranque de la ventana
+DeskLens/
+├─ desklens.pyw          → servidor local (Python stdlib) y arranque de la ventana
 ├─ index.html         → interfaz: proyectos, pestañas, vistas (consola y chat en pasos 4 y 5)
-├─ test_atril.py      → prueba automática
+├─ test_desklens.py      → prueba automática
 ├─ plantillas/        → AGENTS.md, CLAUDE.md, GEMINI.md, reglas.md, bitacora.md
-└─ implementacion_atril.md
+└─ implementacion_desklens.md
 ```
 
 `config.json` (proyectos y archivos sueltos) y `historial/` (respuestas de IA) se crean solos y van en `.gitignore`, porque contienen rutas y textos personales.
 
 ## Orden de construcción
-1. ✅ **Explorador** (2026-11-01): proyectos, sueltos, pestañas, vistas de niveles 1, 2 y 5 (+ docx), regla universal, 🔒 y avisos. Sin IA. Prueba: `python test_atril.py`.
+1. ✅ **Explorador** (2026-11-01): proyectos, sueltos, pestañas, vistas de niveles 1, 2 y 5 (+ docx), regla universal, 🔒 y avisos. Sin IA. Prueba: `python test_desklens.py`.
 2. ✅ **Edición** (2026-11-01): editor CodeMirror (colores, números, Ctrl+F, Ctrl+S), guardar en el original, `.bak` una vez por sesión si no hay git, diálogo de conflicto (Recargar / Sobrescribir / Cancelar), misma codificación y saltos de línea, bloqueo si un carácter no cabe en ANSI, vista previa para Markdown y HTML, ● en pestañas con cambios y aviso al cerrar.
 3. ✅ **Plantillas** (2026-11-01): los avisos son botones.
    - ⚠️ Sin reglas / Sin bitácora → "Crear desde plantilla": descripción + tecnología detectada, casillas por archivo, vista previa de AGENTS.md. Crea solo lo que falta (nunca sobrescribe; un CLAUDE.md o GEMINI.md propio solo recibe un aviso).
    - 🟡 Bitácora grande → "Archivar": quedan las 20 entradas más recientes; las antiguas van a `bitacora/AAAA.md` según la fecha de su título (las sin fecha se quedan). Nada se borra.
-   - No encontrado → "Quitar de Atril".
+   - No encontrado → "Quitar de DeskLens".
    - Plantillas editables en `plantillas/`, con marcadores `{{proyecto}}`, `{{descripcion}}`, `{{tecnologia}}`, `{{fecha}}`.
 4. ✅ **Consola** (2026-11-01):
    - ▶ en la cabecera de archivos ejecutables (`.py`, `.pyw`, `.bat`, `.cmd`, `.ps1`, `.vbs`, `.js`, `.php`, `.sh`). Desactivado con el motivo si falta el programa (Node, PHP, Git Bash).
-   - Confirmación con comando y carpeta + casilla "No volver a preguntar (hasta cerrar Atril)". Con cambios sin guardar: "Guardar y ejecutar".
+   - Confirmación con comando y carpeta + casilla "No volver a preguntar (hasta cerrar DeskLens)". Con cambios sin guardar: "Guardar y ejecutar".
    - Panel abajo (como VS Code), redimensionable, con >_ en la cinta: una sub-pestaña por ejecución (● / ✓ / ✗), errores en rojo, línea de entrada para `pause`/S/N/`input()`, Detener (mata también los procesos hijos), Repetir, Limpiar, "Abrir en consola de Windows" para programas interactivos, "🤖 Explicar error" desactivado hasta el paso 5.
    - Codificación de salida: UTF-8 para Python/Node/PHP/bash; la de consola de Windows (OEM) para `.bat`, `.ps1`, `.vbs`. Python usa el `.venv` del proyecto si existe.
    - ⋮ de cada proyecto → **Ejecutar pruebas**: detecta `php artisan test` (artisan), `npm test` (package.json con script test) o `pytest` (pytest.ini o carpeta tests); la primera vez se puede corregir y se recuerda en `config.json`.
-   - Al cerrar la ventana de Atril se detiene todo lo que esté en ejecución.
+   - Al cerrar la ventana de DeskLens se detiene todo lo que esté en ejecución.
 5. ✅ **IA** (2026-11-01): Conectar IA (estado, instalar, iniciar sesión, Probar con medición de carga fija, IA predeterminada y límite), panel de IA con reglas, alcance, destino, contador, cambios propuestos, Otra IA, Nuevo archivo, Explicar error y modal de reglas. **Pendiente de probar con los CLIs reales instalados** (la lectura de su salida está probada con ejemplos de su formato).
 
 ## Pendiente de decidir
@@ -375,16 +375,16 @@ Atril/
   |---|---|
   | `claude -p` normal (herramientas, MCP, CLAUDE.md global, hooks y plugins) | 41.091 |
   | + `--tools "" --strict-mcp-config --disable-slash-commands --system-prompt …` | 3.321 |
-  | **+ `--setting-sources ""`** (sin ajustes, hooks ni plugins de usuario) — **el que usa Atril** | **851** |
+  | **+ `--setting-sources ""`** (sin ajustes, hooks ni plugins de usuario) — **el que usa DeskLens** | **851** |
   | `--bare` | no sirve con suscripción (pide clave API) |
 
   Prueba real de "Modificar" con Claude: 1.167 de entrada + 44 de salida, bloque BUSCAR/REEMPLAZAR correcto.
 - [ ] Medir Gemini (con clave API) y Codex cuando estén conectados; buscar sus equivalentes de modo mínimo si la carga es alta.
 - Gemini CLI ya no admite "Sign in with Google" para cuentas personales (2026-11): usar clave API (`GEMINI_API_KEY`).
 - [ ] Nivel 4 de formatos: ¿instalar LibreOffice y/o ffmpeg más adelante?
-- [ ] "Abrir con Atril" en el menú contextual del Explorador (requiere entrada en el registro del usuario).
+- [ ] "Abrir con DeskLens" en el menú contextual del Explorador (requiere entrada en el registro del usuario).
 
 ## Prototipo
-El prototipo inicial (`server.py` con chat que enviaba el documento entero) se reemplazó por `atril.pyw` en el paso 1. El chat se rehará en el paso 5 con las reglas de ahorro.
+El prototipo inicial (`server.py` con chat que enviaba el documento entero) se reemplazó por `desklens.pyw` en el paso 1. El chat se rehará en el paso 5 con las reglas de ahorro.
 
-Origen: Atril · 2026-10-31
+Origen: DeskLens · 2026-10-31

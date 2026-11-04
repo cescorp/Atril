@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Atril: visor local de proyectos y archivos.
+"""DeskLens: visor local de proyectos y archivos.
 
 Abre una ventana en modo aplicación (Edge, Chrome, Chromium o Brave); al cerrarla, el servidor se apaga.
-Windows: doble clic en atril.pyw · macOS: atril.command · Linux: atril.sh
-Uso: atril.pyw [archivo ...]   (arrastrar archivos sobre el icono los abre en pestañas)
-     python atril.pyw --sin-ventana   (solo servidor, para desarrollo)
+Windows: doble clic en desklens.pyw · macOS: desklens.command · Linux: desklens.sh
+Uso: desklens.pyw [archivo ...]   (arrastrar archivos sobre el icono los abre en pestañas)
+     python desklens.pyw --sin-ventana   (solo servidor, para desarrollo)
 """
 import base64
 import codecs
@@ -61,7 +61,7 @@ def save_config(cfg):
 # ---------- ajustes (antes valores fijos en el código; se cambian en ⚙ Ajustes) ----------
 # clave, grupo, etiqueta, valor por defecto, mínimo, máximo (True/False = casilla)
 SETTINGS = [
-    ("puerto", "General", "Puerto del servidor local (se aplica al reabrir Atril)", 8765, 1024, 65535),
+    ("puerto", "General", "Puerto del servidor local (se aplica al reabrir DeskLens)", 8765, 1024, 65535),
     ("vista_max_mb", "General", "Tamaño máximo para ver y editar un archivo de texto (MB)", 2, 1, 200),
     ("indice_max_mb", "Índice", "Texto máximo indexado por archivo (MB)", 20, 1, 500),
     ("indice_repaso_min", "Índice", "Repasar los cambios cada (minutos)", 5, 1, 240),
@@ -88,7 +88,7 @@ SETTINGS = [
     ("historial_mb", "Historial de cambios", "Espacio máximo de todo el historial (MB)", 1000, 50, 100000),
     ("historial_pausa_seg", "Historial de cambios", "Al escribir, un paso nuevo tras una pausa de (segundos)", 2, 1, 30),
     # lista de opciones: valor por defecto de texto y en «mínimo» las opciones (valor, nombre)
-    ("web_buscador", "Web", "Buscador de la pestaña web (Google, Bing, Yahoo y Wikipedia se ven dentro de Atril; los demás, con «Abrir en el navegador»)",
+    ("web_buscador", "Web", "Buscador de la pestaña web (Google, Bing, Yahoo y Wikipedia se ven dentro de DeskLens; los demás, con «Abrir en el navegador»)",
      "google", [("google", "Google"), ("bing", "Bing"), ("yahoo", "Yahoo"), ("wikipedia", "Wikipedia (español)"),
                 ("duckduckgo", "DuckDuckGo"), ("ecosia", "Ecosia"), ("brave", "Brave Search")], None),
 ]
@@ -207,7 +207,7 @@ def backup_once(p):
 def replace_atomic(p, src, busy):
     """Escribe de golpe (temporal + os.replace): nunca queda el archivo a medias.
     src: bytes, o una ruta que se copia con sus fechas. busy: el aviso si otro programa lo tiene abierto."""
-    tmp = p.with_name(p.name + ".atril-tmp")
+    tmp = p.with_name(p.name + ".desklens-tmp")
     if isinstance(src, Path):
         shutil.copy2(src, tmp)
     else:
@@ -224,7 +224,7 @@ def save_text(path, text, encoding, eol, mtime, force=False):
     p = Path(path).resolve()
     current, _, truncated = read_text(p)
     if current is None or truncated:
-        return 400, {"error": "Este archivo es de solo lectura en Atril (binario o mayor de 2 MB)."}
+        return 400, {"error": "Este archivo es de solo lectura en DeskLens (binario o mayor de 2 MB)."}
     st = p.stat()
     if not force and str(st.st_mtime_ns) != str(mtime):
         return 409, {"error": "conflicto", "fecha": st.st_mtime}
@@ -329,7 +329,7 @@ def status(project):
     if not p.is_dir():
         return ["No encontrado"]
     avisos = []
-    if not (p / "reglas.md").exists():  # AGENTS.md/CLAUDE.md/GEMINI.md son opcionales: Atril no los necesita
+    if not (p / "reglas.md").exists():  # AGENTS.md/CLAUDE.md/GEMINI.md son opcionales: DeskLens no los necesita
         avisos.append("Sin reglas")
     bit = p / "bitacora.md"
     if not bit.exists():
@@ -341,12 +341,12 @@ def status(project):
     return avisos
 
 
-CODE_MTIME = Path(__file__).stat().st_mtime_ns  # atril.pyw al arrancar: si cambia, hay que reiniciar Atril
+CODE_MTIME = Path(__file__).stat().st_mtime_ns  # desklens.pyw al arrancar: si cambia, hay que reiniciar DeskLens
 
 
 def estado():
     """Lo que dibuja la barra lateral: proyectos con sus avisos y archivos sueltos (con su estado de git).
-    reiniciar: atril.pyw cambió desde que arrancó este servidor (index.html se lee nuevo; el servidor, no)."""
+    reiniciar: desklens.pyw cambió desde que arrancó este servidor (index.html se lee nuevo; el servidor, no)."""
     cfg = load_config()
     return {
         "reiniciar": Path(__file__).stat().st_mtime_ns != CODE_MTIME,
@@ -494,7 +494,7 @@ def command_for(path):
     """(argumentos, codificación de la salida) para ejecutar el archivo, o (None, motivo)."""
     p = Path(path)
     ext = p.suffix.lower()
-    here = Path(sys.executable).parent  # con atril.pyw, sys.executable es pythonw.exe
+    here = Path(sys.executable).parent  # con desklens.pyw, sys.executable es pythonw.exe
     if ext in (".py", ".pyw"):
         gui = ext == ".pyw"
         exe = find_venv_python(p, gui) or (str(here / ("pythonw.exe" if gui else "python.exe")) if WINDOWS else sys.executable)
@@ -625,7 +625,7 @@ def open_console(rid):
         line = r.args if isinstance(r.args, str) else subprocess.list2cmdline(r.args)
     else:
         line = r.args[-1] if r.args[:2] == ["bash", "-lc"] else shlex.join(r.args)
-    open_terminal(line, r.cwd, "Atril")
+    open_terminal(line, r.cwd, "DeskLens")
 
 
 def open_terminal(line, cwd, title):
@@ -643,7 +643,7 @@ def open_terminal(line, cwd, title):
     raise RuntimeError("No se encontró ninguna terminal (x-terminal-emulator, gnome-terminal, konsole, xterm…)")
 
 
-# ---------- IA: CLIs con la suscripción de cada uno (Atril no guarda claves) ----------
+# ---------- IA: CLIs con la suscripción de cada uno (DeskLens no guarda claves) ----------
 
 AIS = {
     "claude": {"nombre": "Claude", "instalar": "npm install -g @anthropic-ai/claude-code", "login": "claude",
@@ -654,7 +654,7 @@ AIS = {
                "sesion": [".gemini/oauth_creds.json"], "env": "GEMINI_API_KEY"},
 }
 # Carpeta neutra: así los CLIs no cargan AGENTS.md, la bitácora ni archivos del proyecto en cada petición
-IA_DIR = Path(tempfile.gettempdir()) / "atril-ia"
+IA_DIR = Path(tempfile.gettempdir()) / "desklens-ia"
 SENSITIVE = {".env", ".pem", ".key", ".asc", ".crt", ".cer", ".csr", ".p12", ".pfx", ".gpg", ".pgp", ".der", ".p7b", ".p7c",
              ".ppk", ".jks", ".keystore", ".kdbx", ".ovpn"}
 # archivos de configuración con claves o contraseñas, por nombre
@@ -762,7 +762,7 @@ def ask_ai(ai, prompt, resume=None, images=()):
     if ai not in AIS or not exe:
         raise RuntimeError(f"{AIS.get(ai, {}).get('nombre', ai)} no está instalado")
     if images and ai != "claude":
-        raise RuntimeError(f"Desde Atril solo Claude puede ver imágenes: cambia a Claude o quita 👁 de la imagen")
+        raise RuntimeError(f"Desde DeskLens solo Claude puede ver imágenes: cambia a Claude o quita 👁 de la imagen")
     IA_DIR.mkdir(exist_ok=True)
     # Claude en modo mínimo: sin herramientas, sin MCP, sin ajustes/hooks/plugins de usuario y con prompt propio.
     # Medido 2026-11-01 con "Responde solo: OK": 41.091 tokens de entrada → 851. (--bare exige clave API, no sirve.)
@@ -894,7 +894,7 @@ def extract_text(path, data=None):
     if text is not None:
         return {"texto": text}
     if ext == ".pdf":
-        raise ValueError("Los PDF se leen por páginas en la ventana de Atril: di «página 40» o «páginas 27 a 35»")
+        raise ValueError("Los PDF se leen por páginas en la ventana de DeskLens: di «página 40» o «páginas 27 a 35»")
     size = len(data) if data is not None else p.stat().st_size
     with (io.BytesIO(data) if data is not None else open(p, "rb")) as f:
         dims = image_size(f.read(65536))
@@ -1004,13 +1004,13 @@ def conv_list():
 
 
 CONV_INTRO = """Conversación de trabajo. Responde en español y en Markdown.
-- Atril (el programa del usuario) te adjunta los archivos que el usuario abre o nombra; las páginas de un PDF llegan marcadas [Página N]. Usa los ARCHIVOS ADJUNTOS como fuente; si algo no está en ellos, dilo en vez de inventarlo.
+- DeskLens (el programa del usuario) te adjunta los archivos que el usuario abre o nombra; las páginas de un PDF llegan marcadas [Página N]. Usa los ARCHIVOS ADJUNTOS como fuente; si algo no está en ellos, dilo en vez de inventarlo.
 - No tienes herramientas (no lees archivos ni ejecutas comandos). Para verificar citas, el usuario usa su script y te pega el resultado.
-- Si el usuario pide el resultado en un archivo (por ejemplo "muéstramelo en un .md" o "créalo en Word / PDF"), escribe el contenido completo así y Atril lo creará y abrirá:
+- Si el usuario pide el resultado en un archivo (por ejemplo "muéstramelo en un .md" o "créalo en Word / PDF"), escribe el contenido completo así y DeskLens lo creará y abrirá:
 <<<ARCHIVO nombre.ext
 contenido
 ARCHIVO>>>
-  Para .docx y .pdf escribe el contenido en Markdown (títulos, negritas, listas, tablas): Atril lo convierte. Para .md, .txt, .csv, .html, .json, .py, etc., escribe el contenido final tal cual. Atril no puede crear .xlsx, .pptx ni imágenes: propone .csv o .docx.
+  Para .docx y .pdf escribe el contenido en Markdown (títulos, negritas, listas, tablas): DeskLens lo convierte. Para .md, .txt, .csv, .html, .json, .py, etc., escribe el contenido final tal cual. DeskLens no puede crear .xlsx, .pptx ni imágenes: propone .csv o .docx.
 - Para cambiar el ARCHIVO ABIERTO, usa bloques (BUSCAR debe ser texto exacto y único del archivo):
 <<<<<<< BUSCAR
 texto actual
@@ -1019,7 +1019,7 @@ texto nuevo
 >>>>>>> REEMPLAZAR"""
 
 
-DOCX_HINT = """Es un documento de Word: no lo reescribas. Para cambiar su formato o su texto, responde con bloques así (Atril los aplica cuando el usuario pulsa Aplicar):
+DOCX_HINT = """Es un documento de Word: no lo reescribas. Para cambiar su formato o su texto, responde con bloques así (DeskLens los aplica cuando el usuario pulsa Aplicar):
 <<<DOCX {"buscar": "texto exacto del documento", "color": "rojo"} DOCX>>>
 Claves: buscar (obligatoria, texto exacto), color (rojo/azul/verde/… o FF0000), negrita, cursiva, subrayado (true/false), tamano (puntos), resaltado (amarillo/verde/…/no), fuente, reemplazar (texto nuevo), todas (true = todas las apariciones). Uno o varios bloques.
 Para insertar una imagen adjunta (en su propio párrafo, centrada): {"imagen": "ruta o nombre de la imagen adjunta", "buscar": "texto exacto del párrafo de referencia", "posicion": "antes" o "despues", "ancho_cm": 12 (opcional; por defecto su tamaño, máx. 16)}."""
@@ -1052,7 +1052,7 @@ def conv_prompt(intro, reglas, adjuntos, historial, mensaje, abierto=""):
 
 def conv_send(data):
     """Un turno de conversación. Claude continúa su sesión (--resume): los adjuntos se envían una sola vez.
-    Las demás IAs no guardan sesión desde Atril: se les reenvía el contexto y la conversación cada turno."""
+    Las demás IAs no guardan sesión desde DeskLens: se les reenvía el contexto y la conversación cada turno."""
     ia, mensaje = data.get("ia"), data.get("mensaje", "")
     nuevos = [{"nombre": a["nombre"], "desc": a.get("desc", ""), "texto": a["texto"],
                "tokens": estimate_tokens(a["texto"])} for a in data.get("adjuntos", [])]
@@ -1089,7 +1089,7 @@ def conv_send(data):
 
 def open_login(ai):
     """Abre una terminal con el login de la CLI (claude, codex, gemini) para que el usuario inicie sesión allí."""
-    open_terminal(AIS[ai]["login"], Path.home(), f'Atril · {AIS[ai]["nombre"]}')
+    open_terminal(AIS[ai]["login"], Path.home(), f'DeskLens · {AIS[ai]["nombre"]}')
 
 
 # ---------- reglas del proyecto y archivos nuevos ----------
@@ -1119,7 +1119,7 @@ def rules_for(path):
     return {"proyecto": {"ruta": str(proj), "nombre": proj.name}, "reglas": file_info(f) if f.is_file() else None}
 
 
-# ---------- crear .docx y .pdf desde el HTML del Markdown (la IA escribe Markdown; Atril convierte, sin IA) ----------
+# ---------- crear .docx y .pdf desde el HTML del Markdown (la IA escribe Markdown; DeskLens convierte, sin IA) ----------
 
 def _x(t):
     """Escapa texto para meterlo en XML/HTML (Word y la página que se imprime a PDF)."""
@@ -1387,8 +1387,8 @@ def edge_path(choice=None):
     return found.get(choice) or next(iter(found.values()), None)
 
 
-# ⚙ Ajustes › General: con qué se abre Atril. Solo se ofrecen los navegadores instalados (se miran al arrancar).
-SETTINGS.insert(1, ("navegador", "General", "Navegador de la ventana de Atril (se aplica al reabrir Atril)", "auto",
+# ⚙ Ajustes › General: con qué se abre DeskLens. Solo se ofrecen los navegadores instalados (se miran al arrancar).
+SETTINGS.insert(1, ("navegador", "General", "Navegador de la ventana de DeskLens (se aplica al reabrir DeskLens)", "auto",
                     [("auto", "Automático (" + " › ".join(n for b, n, *_ in BROWSERS if b in browsers()) + ")" if browsers()
                       else "Automático"),
                      *[(b, n) for b, n, *_ in BROWSERS if b in browsers()],
@@ -1412,24 +1412,24 @@ def html_to_pdf(html, title=""):
         return out.read_bytes()
 
 
-# Formatos que Atril no sabe generar: mejor decirlo que crear un archivo roto
+# Formatos que DeskLens no sabe generar: mejor decirlo que crear un archivo roto
 NOT_CREATABLE = {".xlsx", ".xls", ".xlsm", ".pptx", ".ppt", ".doc", ".odt", ".ods", ".odp", ".rtf", ".png", ".jpg",
                  ".jpeg", ".gif", ".webp", ".bmp", ".ico", ".zip", ".rar", ".7z", ".exe", ".dll", ".msi", ".mp3",
                  ".mp4", ".wav", ".epub"}
 
 
 def create_file(folder, name, text, html=None):
-    """Crea un archivo nuevo (nunca sobrescribe) dentro de una carpeta añadida a Atril.
+    """Crea un archivo nuevo (nunca sobrescribe) dentro de una carpeta añadida a DeskLens.
     .docx y .pdf se generan desde el HTML del Markdown; el resto se guarda como texto UTF-8."""
     if not name or any(c in name for c in '\\/:*?"<>|') or name in (".", ".."):
         raise ValueError("Nombre de archivo no válido")
     p = Path(folder).resolve() / name
     ext = p.suffix.lower()
     if ext in NOT_CREATABLE:
-        raise ValueError(f"Atril no puede crear archivos {ext}. Pide .docx, .pdf, .md, .txt, .csv o .html.")
+        raise ValueError(f"DeskLens no puede crear archivos {ext}. Pide .docx, .pdf, .md, .txt, .csv o .html.")
     in_project = allowed(p)
     if not in_project and not any(Path(s).resolve().parent == p.parent for s in load_config()["sueltos"]):
-        raise PermissionError("Carpeta no añadida a Atril")
+        raise PermissionError("Carpeta no añadida a DeskLens")
     if p.exists():
         raise FileExistsError(str(p))
     html = html or f"<pre>{_x(text)}</pre>"
@@ -1566,11 +1566,11 @@ def _docx_image(root, pars, files, op, target, folder):
     cm = float(op.get("ancho_cm") or min(16, dims[0] / 96 * 2.54))
     cx = int(cm * 360000)
     cy = int(cx * dims[1] / dims[0])
-    n = 1 + sum(1 for k in files if k.startswith("word/media/atril"))
-    media = f"media/atril{n}{ext}"
+    n = 1 + sum(1 for k in files if k.startswith("word/media/desklens"))
+    media = f"media/desklens{n}{ext}"
     rels_name = "word/_rels/document.xml.rels"
     rels = files[rels_name].decode("utf-8")
-    rid = f"rIdAtril{n}"
+    rid = f"rIdDeskLens{n}"
     rels = rels.replace("</Relationships>", f'<Relationship Id="{rid}" Type="http://schemas.openxmlformats.org/officeDocument/'
                                             f'2006/relationships/image" Target="{media}"/></Relationships>')
     files[rels_name] = rels.encode("utf-8")
@@ -1699,7 +1699,7 @@ def write_with_backup(p, data, busy):
     return {"bak": str(bak) if bak else None, "mtime": str(p.stat().st_mtime_ns), "deshacer": undo_id}
 
 
-# ---------- pestaña web: ¿la página se deja mostrar dentro de Atril? ----------
+# ---------- pestaña web: ¿la página se deja mostrar dentro de DeskLens? ----------
 
 def web_check(url):
     """Descarga solo las cabeceras (GET, sigue redirecciones) y mira X-Frame-Options y CSP frame-ancestors.
@@ -1707,7 +1707,7 @@ def web_check(url):
     import urllib.request
     if not re.match(r"https?://", url, re.I):
         return {"permitido": False, "motivo": "La dirección debe empezar por http:// o https://", "url": url}
-    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (Atril)", "Accept": "text/html,*/*"})
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (DeskLens)", "Accept": "text/html,*/*"})
     try:
         with urllib.request.urlopen(req, timeout=8) as r:
             final, h = r.geturl(), r.headers
@@ -1808,11 +1808,11 @@ def hist_step(path, padre, desc, data, extra=None):
         meta = hist_meta(p)
         if padre is None:
             padre = hist_disk_node(p, meta)
-        if padre is None:  # primera vez, o el archivo cambió fuera de Atril
+        if padre is None:  # primera vez, o el archivo cambió fuera de DeskLens
             kind, raw = hist_kind(p), p.read_bytes()
             first = {"texto": ((read_text(p)[0] or "").replace("\r\n", "\n").encode("utf-8"), None),
                      "imagen": (raw, None)}.get(kind, (None, raw))
-            padre = _hist_add(meta, p, meta["actual"], "📂 Abierto" if not meta["nodos"] else "📂 Cambiado fuera de Atril",
+            padre = _hist_add(meta, p, meta["actual"], "📂 Abierto" if not meta["nodos"] else "📂 Cambiado fuera de DeskLens",
                               *first[:1], {"tipo": "abierto", "mtime": str(p.stat().st_mtime_ns)}, base=first[1])
         else:
             _hist_node(meta, padre)
@@ -1922,13 +1922,13 @@ EDIT_IMG = {".png", ".jpg", ".jpeg", ".webp"}  # lo que el navegador sabe volver
 
 
 def binary_save(path, data):
-    """Guarda una imagen o un PDF editados en Atril: .bak la primera vez, copia para Deshacer, de golpe."""
+    """Guarda una imagen o un PDF editados en DeskLens: .bak la primera vez, copia para Deshacer, de golpe."""
     p = Path(path)
     if p.suffix.lower() == ".pdf":
         if not data.startswith(b"%PDF-"):
             raise ValueError("Los datos recibidos no son un PDF")
     elif p.suffix.lower() not in EDIT_IMG:
-        raise ValueError(f"Atril solo guarda PDF e imágenes {', '.join(sorted(EDIT_IMG))}")
+        raise ValueError(f"DeskLens solo guarda PDF e imágenes {', '.join(sorted(EDIT_IMG))}")
     elif not image_size(data):
         raise ValueError("Los datos recibidos no son una imagen")
     return write_with_backup(p, data, f"«{p.name}» está abierto en otro programa: ciérralo allí y vuelve a guardar")
@@ -1968,25 +1968,25 @@ def create_folder(folder, name):
         raise ValueError("Nombre de carpeta no válido")
     p = Path(folder).resolve() / name
     if not allowed(p):
-        raise PermissionError("Las carpetas nuevas se crean dentro de un proyecto añadido a Atril")
+        raise PermissionError("Las carpetas nuevas se crean dentro de un proyecto añadido a DeskLens")
     p.mkdir()  # FileExistsError si ya existe: nunca se reutiliza en silencio
     return str(p)
 
 
 def to_trash(path):
     """«Eliminar»: a la papelera de reciclaje (Windows), la Papelera del Finder (macOS) o gio trash (Linux): se puede
-    recuperar. Nunca la carpeta de un proyecto (para eso, «Quitar de Atril»). Un suelto eliminado sale de la lista.
+    recuperar. Nunca la carpeta de un proyecto (para eso, «Quitar de DeskLens»). Un suelto eliminado sale de la lista.
     La ruta va por variable de entorno, no dentro del texto de la orden: un nombre con comillas no puede romperla."""
     p = Path(path).resolve()
     if not p.exists():
         raise FileNotFoundError(f"Ya no existe: {p}")
     if is_project(p):
-        raise PermissionError("Es la carpeta de un proyecto: quítalo con «Quitar de Atril»")
+        raise PermissionError("Es la carpeta de un proyecto: quítalo con «Quitar de DeskLens»")
     if WINDOWS:
         kind = "DeleteDirectory" if p.is_dir() else "DeleteFile"
         ps = ("Add-Type -AssemblyName Microsoft.VisualBasic; "
-              f"[Microsoft.VisualBasic.FileIO.FileSystem]::{kind}($env:ATRIL_RUTA, 'OnlyErrorDialogs', 'SendToRecycleBin')")
-        r = subprocess.run(["powershell", "-NoProfile", "-Command", ps], env={**os.environ, "ATRIL_RUTA": str(p)},
+              f"[Microsoft.VisualBasic.FileIO.FileSystem]::{kind}($env:DESKLENS_RUTA, 'OnlyErrorDialogs', 'SendToRecycleBin')")
+        r = subprocess.run(["powershell", "-NoProfile", "-Command", ps], env={**os.environ, "DESKLENS_RUTA": str(p)},
                            capture_output=True, timeout=120, creationflags=NO_WINDOW)
     elif MAC:  # ponytail: sin probar en macOS
         r = subprocess.run(["osascript", "-e", "on run a", "-e", 'tell application "Finder" to delete (POSIX file (item 1 of a))',
@@ -2106,7 +2106,7 @@ def recovery_delete(key):
 
 # ---------- índice de búsqueda (SQLite FTS5) ----------
 # Los archivos son la fuente; el índice se puede borrar y se regenera solo. Se indexa todo (son archivos locales),
-# en segundo plano y por fecha/tamaño: al reabrir Atril sigue donde se quedó. Los PDF los lee la ventana (pdf.js).
+# en segundo plano y por fecha/tamaño: al reabrir DeskLens sigue donde se quedó. Los PDF los lee la ventana (pdf.js).
 
 INDEX_DB = ROOT / "historial" / "indice.db"
 idx_state = {"fase": "esperando", "total": 0, "hechos": 0, "actual": "", "inicio": None, "fin": None}
@@ -2178,7 +2178,7 @@ def idx_targets():
 
 def idx_pass():
     """Una pasada del indexador: añade o actualiza lo que cambió (por mtime y tamaño) y borra lo que ya no existe.
-    Hace commit cada 100 archivos para que, si Atril se cierra, lo hecho no se repita."""
+    Hace commit cada 100 archivos para que, si DeskLens se cierra, lo hecho no se repita."""
     targets = list(idx_targets())
     idx_state.update(fase="indexando", total=len(targets), hechos=0, inicio=time.time(), fin=None)
     c = idx_conn()
@@ -2186,9 +2186,9 @@ def idx_pass():
         for i, (p, root) in enumerate(targets, 1):
             idx_state.update(actual=str(p), hechos=i)
             if idx_file(c, p, root) and i % 100 == 0:
-                c.commit()  # cada 100: si se cierra Atril, lo hecho queda guardado
+                c.commit()  # cada 100: si se cierra DeskLens, lo hecho queda guardado
         seen = {str(p) for p, _ in targets}
-        for (path,) in c.execute("select path from files").fetchall():  # borrados o ya fuera de Atril
+        for (path,) in c.execute("select path from files").fetchall():  # borrados o ya fuera de DeskLens
             if path not in seen:
                 c.execute("delete from files where path=?", (path,))
                 c.execute("delete from docs where path=?", (path,))
@@ -2215,7 +2215,7 @@ def indexer():
 
 
 def idx_update(path):
-    """Tras guardar o crear desde Atril: el índice queda al día al momento."""
+    """Tras guardar o crear desde DeskLens: el índice queda al día al momento."""
     p = Path(path).resolve()
     try:
         c = idx_conn()
@@ -2455,8 +2455,8 @@ def git_status_map(repo):
 
 
 # ---------- vista Git: cambios, preparar, commit, ramas, pull/push/merge (como el control de código de VS Code) ----------
-# Las órdenes rápidas se ejecutan aquí y devuelven el estado nuevo; pull, push, fetch y merge van a la consola de Atril
-# (pueden tardar y su salida interesa). Las credenciales son las de git del usuario (Git Credential Manager): Atril no
+# Las órdenes rápidas se ejecutan aquí y devuelven el estado nuevo; pull, push, fetch y merge van a la consola de DeskLens
+# (pueden tardar y su salida interesa). Las credenciales son las de git del usuario (Git Credential Manager): DeskLens no
 # las ve. GIT_TERMINAL_PROMPT=0: git nunca se queda esperando una contraseña por la terminal (no hay ninguna).
 
 GIT_ENV = {"GIT_TERMINAL_PROMPT": "0"}
@@ -2560,7 +2560,7 @@ def git_action(path, accion, archivos=(), mensaje="", rama="", todo=False):
             git_do(repo, "restore", "--", *tracked)
         for f in untracked:
             if not allowed(repo / f):  # repo más grande que el proyecto añadido: fuera de él no se borra nada
-                raise PermissionError(f"«{f}» está fuera de lo añadido a Atril")
+                raise PermissionError(f"«{f}» está fuera de lo añadido a DeskLens")
             to_trash(repo / f)
     elif accion == "commit":
         if not mensaje.strip():
@@ -2742,16 +2742,16 @@ class Handler(BaseHTTPRequestHandler):
     def guard(self, need_header=True):
         """Bloquea webs externas: Host local y cabecera propia (no se puede enviar sin CORS)."""
         host_ok = self.headers.get("Host", "").split(":")[0] in ("127.0.0.1", "localhost")
-        if not host_ok or (need_header and self.headers.get("X-Atril") != "1"):
+        if not host_ok or (need_header and self.headers.get("X-DeskLens") != "1"):
             self.send_json(403, {"error": "prohibido"})
             return False
         return True
 
     def denied(self, ruta):
-        """403 si la ruta no está dentro de lo añadido a Atril. True si ya respondió."""
+        """403 si la ruta no está dentro de lo añadido a DeskLens. True si ya respondió."""
         if allowed(ruta):
             return False
-        self.send_json(403, {"error": "ruta no añadida a Atril"})
+        self.send_json(403, {"error": "ruta no añadida a DeskLens"})
         return True
 
     def stale(self, ruta, mtime, msg):
@@ -2763,7 +2763,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         """Peticiones GET: la página (index.html), /raw/ (archivos de los proyectos, para visores e iframes) y /api/…
-        Todo exige Host local; la API además la cabecera X-Atril (una web externa no puede enviarla sin CORS).
+        Todo exige Host local; la API además la cabecera X-DeskLens (una web externa no puede enviarla sin CORS).
         Solo se sirven rutas dentro de proyectos o sueltos añadidos (allowed)."""
         url = urlparse(self.path)
         q = {k: v[0] for k, v in parse_qs(url.query, keep_blank_values=True).items()}
@@ -2910,8 +2910,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def post(self):
         """Todas las acciones que cambian algo: guardar, crear, ejecutar, IA, historial, Word, imágenes, PDF, ajustes…
-        ping/adiós llegan con sendBeacon, que no puede llevar cabeceras; el resto exige la cabecera X-Atril.
-        Cada acción vuelve a comprobar que la ruta está dentro de lo añadido a Atril."""
+        ping/adiós llegan con sendBeacon, que no puede llevar cabeceras; el resto exige la cabecera X-DeskLens.
+        Cada acción vuelve a comprobar que la ruta está dentro de lo añadido a DeskLens."""
         global last_ping, bye_at
         url = urlparse(self.path).path
         if url in ("/api/ping", "/api/adios"):  # sendBeacon no puede enviar cabeceras
@@ -3041,7 +3041,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json(423, {"error": str(e)})
             except (ValueError, OSError, KeyError, zipfile.BadZipFile, ET.ParseError) as e:
                 return self.send_json(400, {"error": str(e)})
-        if url == "/api/binario":  # imagen o PDF editados en Atril (llegan en base64)
+        if url == "/api/binario":  # imagen o PDF editados en DeskLens (llegan en base64)
             if self.denied(data.get("ruta", "")):
                 return
             if self.stale(data["ruta"], data.get("mtime"), "El archivo cambió en disco mientras lo editabas: descarta y vuelve a editar"):
@@ -3185,7 +3185,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Accept-Ranges", "bytes")
         self.send_header("Content-Length", str(max(0, end - start + 1)))
         self.send_header("Cache-Control", "no-store")
-        if sandbox:  # un HTML del usuario abierto aquí no puede usar la API de Atril
+        if sandbox:  # un HTML del usuario abierto aquí no puede usar la API de DeskLens
             self.send_header("Content-Security-Policy", "sandbox allow-scripts allow-forms allow-modals allow-popups")
         self.end_headers()
         with p.open("rb") as f:
@@ -3226,7 +3226,7 @@ def open_window(url):
 
 
 def main():
-    """Arranque: los archivos pasados como argumento (arrastrados sobre el icono) se añaden como sueltos; si Atril
+    """Arranque: los archivos pasados como argumento (arrastrados sobre el icono) se añaden como sueltos; si DeskLens
     ya está abierto en ese puerto, solo se abre otra ventana; si no, servidor, indexador, limpieza y ventana."""
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     files = [str(Path(a).resolve()) for a in args if Path(a).is_file()]
@@ -3237,7 +3237,7 @@ def main():
     try:
         server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
     except OSError:
-        server = None  # ya hay un Atril abierto: solo se abre otra ventana
+        server = None  # ya hay un DeskLens abierto: solo se abre otra ventana
     if "--sin-ventana" not in sys.argv:
         open_window(url)
     if server:

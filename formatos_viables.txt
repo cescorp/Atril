@@ -1,4 +1,4 @@
-Formatos viables en Atril sin instalar nada (niveles 1-3). Detalle en formatos_atril.md
+Formatos viables en DeskLens sin instalar nada (niveles 1-3). Detalle en formatos_desklens.md
 Total: 256 de 379
 
 extension | Nombre | Tipo | Nivel

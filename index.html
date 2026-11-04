@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Atril</title>
+<title>DeskLens</title>
 <!-- icono: una hoja de texto sobre su atril (ventana, barra de tareas y pestaña); en línea, sin archivo aparte -->
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%237c5cdb'/%3E%3Cpath d='M17 12h24l6 6v22H17z' fill='%23fff'/%3E%3Cpath d='M41 12v6h6' fill='%23d9cff7'/%3E%3Cpath d='M22 21h15M22 26.5h20M22 32h16' stroke='%237c5cdb' stroke-width='3' stroke-linecap='round'/%3E%3Cpath d='M12 42h40' stroke='%23fff' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M30 42h4v10h-4z' fill='%23fff'/%3E%3Crect x='22' y='50' width='20' height='5' rx='2.5' fill='%23fff'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Inter:wght@400;500;600&display=swap">
@@ -328,7 +328,7 @@ dialog#dlg.cmp[open]{display:flex}
 .cmerge{min-width:0;min-height:0;height:100%}
 .cheads{position:relative;height:40px} /* cada combo se coloca encima de su columna (syncHeads) */
 .cheads .chead{position:absolute;top:6px}
-/* ◧ arriba a la izquierda, sobre la lista (como el de la barra lateral de Atril) */
+/* ◧ arriba a la izquierda, sobre la lista (como el de la barra lateral de DeskLens) */
 .cheads #clistb{position:absolute;left:12px;top:50%;transform:translateY(-50%)}
 .cheads #clistb.on{color:var(--accent)}
 /* lista de cambios: una fila por cambio, la actual marcada; clic = ir */
@@ -566,7 +566,7 @@ dialog#dlg.prt[open]{display:flex}
 .ppreview{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:20px;background:var(--bg);min-height:0;overflow:hidden}
 .pholder{position:relative;flex:none}
 .psheet{position:absolute;top:0;left:0;transform-origin:0 0;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.25);overflow:hidden;box-sizing:border-box}
-/* en la hoja y en el papel: siempre colores de papel, aunque Atril esté en oscuro */
+/* en la hoja y en el papel: siempre colores de papel, aunque DeskLens esté en oscuro */
 .psheet,#printArea{--ink:#222;--paper:#fff;--bg:#fff;--muted:#5c5c5c;--faint:#999;--line:#ddd;color:#222;background:#fff}
 .pdoc .page{max-width:none;padding:0;font-size:11pt}
 .pdoc img{display:block}
@@ -769,7 +769,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 // Vista dividida: los dos lados repiten ids (#tabs, #bar, #view, #rpg…); $() busca primero en el lado activo.
 let paneEl = document.querySelector('.pane');
 const $ = s => paneEl.querySelector(s) || document.querySelector(s);
-const H = { 'X-Atril': '1' };
+const H = { 'X-DeskLens': '1' };
 const api = (url, body) => fetch(url, body === undefined ? { headers: H } :
   { method: 'POST', headers: { ...H, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
   .then(async r => {
@@ -778,7 +778,7 @@ const api = (url, body) => fetch(url, body === undefined ? { headers: H } :
     if (r.status === 404 && d.error === 'no existe' && url.startsWith('/api/')) throw new Error(RESTART);
     if (!r.ok) throw new Error(d.error); return d;
   });
-const RESTART = 'Atril se actualizó y el servidor que sigue en marcha es el anterior. Cierra todas las ventanas de Atril, espera unos segundos y vuelve a abrirlo.';
+const RESTART = 'DeskLens se actualizó y el servidor que sigue en marcha es el anterior. Cierra todas las ventanas de DeskLens, espera unos segundos y vuelve a abrirlo.';
 const sepOf = p => /^[A-Za-z]:|^\\\\/.test(p) ? '\\' : '/'; // C:\… o \\servidor → \ ; /home/… → /
 const pjoin = (dir, name) => dir.replace(/[\\/]+$/, '') + sepOf(dir) + name;
 const under = (path, dir) => { // ¿path está dentro de dir (o es dir)? sin distinguir mayúsculas ni separador
@@ -833,7 +833,7 @@ function iconBtn(name, title, fn, disabled = false) {
   return b;
 }
 
-// ---------- tipos (ver formatos_atril.md) ----------
+// ---------- tipos (ver formatos_desklens.md) ----------
 const IMG = set('jpg jpeg jpe png gif bmp dib webp avif ico svg'), AUD = set('mp3 wav flac aac m4a ogg oga opus'),
   VID = set('mp4 m4v webm ogv mov'), FONT = set('ttf otf woff woff2'), MD = set('md markdown mdx rmd'),
   HTML = set('html htm xhtml'), TABLE = { csv: ',', tsv: '\t', psv: '|' },
@@ -862,14 +862,14 @@ function kind(name) {
 }
 
 // ---------- barra lateral ----------
-// ruta → ¿abierta? Se recuerda entre sesiones (syncFold la guarda tras cada cambio): Atril se abre tal cual se dejó.
-const tree = new Map((() => { try { return JSON.parse(localStorage.getItem('atril.arbol') || '[]').map(r => [r, true]); } catch { return []; } })());
+// ruta → ¿abierta? Se recuerda entre sesiones (syncFold la guarda tras cada cambio): DeskLens se abre tal cual se dejó.
+const tree = new Map((() => { try { return JSON.parse(localStorage.getItem('desklens.arbol') || '[]').map(r => [r, true]); } catch { return []; } })());
 let side = { proyectos: [], sueltos: [] };
 // Árbol de la barra lateral: proyectos (con sus avisos: sin reglas, sin bitácora…) y archivos sueltos.
 // Las carpetas que estaban abiertas (mapa `tree`) se vuelven a desplegar antes de marcar el archivo actual.
 async function loadSide() {
   const st = side = await api('/api/estado');
-  if (st.reiniciar && !loadSide.warned) { loadSide.warned = true; ask('Hay que reiniciar Atril', RESTART, ['Entendido']); } // una vez por sesión
+  if (st.reiniciar && !loadSide.warned) { loadSide.warned = true; ask('Hay que reiniciar DeskLens', RESTART, ['Entendido']); } // una vez por sesión
   const P = $('#projects'); P.innerHTML = '';
   if (!st.proyectos.length) P.innerHTML = '<p class="ok" style="margin:0 8px">Pulsa + para añadir una carpeta.</p>';
   const pending = [];
@@ -917,20 +917,20 @@ function nodeEl(name, path, isDir, removable, git) {
     (k.lock && !isDir ? '<span title="Archivo sensible">🔒</span>' : '') +
     // archivos: punto con el estado de git; al pasar el ratón se cambia por (i) = información
     (!isDir ? `<span class="gd" data-g="${git || 'sin_git'}" title="${GIT_TXT[git || 'sin_git']}"></span><button class="ib" title="Información del archivo">i</button>` : '') +
-    (removable ? (isDir ? '<span class="x" title="Opciones del proyecto">⋮</span>' : '<span class="x" title="Quitar de Atril">✕</span>') : '');
+    (removable ? (isDir ? '<span class="x" title="Opciones del proyecto">⋮</span>' : '<span class="x" title="Quitar de DeskLens">✕</span>') : '');
   setName(el.querySelector('.n'), name, !isDir);
   if (k.lock && !isDir) el.classList.add('lock');
   if (!isDir && /\.bak$/i.test(name)) el.classList.add('bak');
-  const remove = async () => await ask('Quitar de Atril', `¿Quitar «${name}» de Atril?\nNo se borra nada del disco.`, ['Quitar', 'Cancelar'], { danger: true }) === 'Quitar' && api('/api/quitar', { ruta: removable }).then(loadSide);
+  const remove = async () => await ask('Quitar de DeskLens', `¿Quitar «${name}» de DeskLens?\nNo se borra nada del disco.`, ['Quitar', 'Cancelar'], { danger: true }) === 'Quitar' && api('/api/quitar', { ruta: removable }).then(loadSide);
   el.oncontextmenu = e => { e.preventDefault(); nodeMenu({ x: e.clientX, y: e.clientY }, path, isDir, git); };
   el.onclick = e => {
     if (e.target.classList.contains('ib')) return nodeMenu(e.target, path, isDir, git);
     if (e.target.classList.contains('x')) {
       if (!isDir) return remove();
-      const o = sortOf(path), setSort = m => { const all = sortMap(); all[path] = m; LS('atril.orden', JSON.stringify(all)); loadSide(); };
+      const o = sortOf(path), setSort = m => { const all = sortMap(); all[path] = m; LS('desklens.orden', JSON.stringify(all)); loadSide(); };
       return openMenu(e.target, [['Nuevo archivo aquí', () => newInline('archivo', path)], ['Nueva carpeta aquí', () => newInline('carpeta', path)],
         ['Ejecutar pruebas', () => runTests(path, name)],
-        ['Mostrar en carpeta', () => api('/api/mostrar', { ruta: path })], ['Quitar de Atril', remove],
+        ['Mostrar en carpeta', () => api('/api/mostrar', { ruta: path })], ['Quitar de DeskLens', remove],
         '-', { head: 'Ordenar (carpetas primero)' },
         sortRow('Alfabético', 'alfa', o, setSort, 'asc', [['asc', '↑', 'Ascendente: de la A a la Z'], ['desc', '↓', 'Descendente: de la Z a la A']]),
         sortRow('Fecha modificación', 'fecha', o, setSort, 'desc', [['asc', '↑', 'Ascendente: lo más antiguo primero'], ['desc', '↓', 'Descendente: lo más reciente primero']])]);
@@ -942,7 +942,7 @@ function nodeEl(name, path, isDir, removable, git) {
   if (!isDir) {
     el.ondblclick = e => !e.target.classList.contains('ib') && openTab(path, true); // doble clic: pestaña fija
     el.draggable = true; // arrastrar al chat = adjuntar
-    el.ondragstart = e => { e.dataTransfer.setData('text/atril-path', path); e.dataTransfer.effectAllowed = 'copy'; };
+    el.ondragstart = e => { e.dataTransfer.setData('text/desklens-path', path); e.dataTransfer.effectAllowed = 'copy'; };
   }
   return el;
 }
@@ -963,7 +963,7 @@ function nodeMenu(anchor, path, isDir, git, extra = []) {
   const trash = ['🗑  Eliminar (a la papelera)', () => trashPath(path, isDir), { title: 'Enviar a la papelera de reciclaje: se puede recuperar desde allí' }];
   if (isDir) return openMenu(anchor, [{ head: name }, ['ⓘ  Información…', () => infoDialog(path)], '-',
     ['＋  Nuevo archivo aquí', () => newInline('archivo', path)], ['＋  Nueva carpeta aquí', () => newInline('carpeta', path)], '-', ...copy,
-    ...(side.proyectos.some(p => p.ruta === path) ? [] : ['-', trash])]); // la carpeta de un proyecto se quita con «Quitar de Atril»
+    ...(side.proyectos.some(p => p.ruta === path) ? [] : ['-', trash])]); // la carpeta de un proyecto se quita con «Quitar de DeskLens»
   openMenu(anchor, [{ head: g ? `${name} · ${GIT_TXT[g]}` : name }, ...extra,
     ['ⓘ  Información…', () => infoDialog(path)],
     ['⇆  Comparar versiones (git)…', () => compareDialog(path), g === 'sin_git' ? { disabled: true, title: 'Sin git: este archivo no está en un repositorio' } : { title: 'Ver y comparar sus commits en 2 o 3 columnas' }],
@@ -987,7 +987,7 @@ async function trashPath(path, isDir) {
   await loadSide(); flash(`🗑 «${name}» está en la papelera`);
 }
 // ---------- pestaña web ----------
-// Un <iframe> con sandbox sin allow-top-navigation: la web no puede sacar a Atril de su página.
+// Un <iframe> con sandbox sin allow-top-navigation: la web no puede sacar a DeskLens de su página.
 // Antes de cargar, /api/web/permite mira X-Frame-Options y frame-ancestors; si la web no se deja mostrar,
 // se ofrece abrirla en el navegador. La dirección no sigue a los enlaces dentro de la web (el iframe es de otro
 // origen y no se puede leer); ← → usan el historial de la ventana, contando solo las cargas de este iframe.
@@ -996,7 +996,7 @@ const SEARCHERS = { google: 'https://www.google.com/search?igu=1&q=', bing: 'htt
   yahoo: 'https://search.yahoo.com/search?p=', wikipedia: 'https://es.wikipedia.org/w/index.php?search=',
   duckduckgo: 'https://duckduckgo.com/?q=', ecosia: 'https://www.ecosia.org/search?q=', brave: 'https://search.brave.com/search?q=' };
 const WEB_SEARCH = q => (SEARCHERS[AJ.web_buscador] || SEARCHERS.google) + encodeURIComponent(q);
-const webFavs = () => { try { return JSON.parse(LS('atril.favoritos') || '[]'); } catch { return []; } };
+const webFavs = () => { try { return JSON.parse(LS('desklens.favoritos') || '[]'); } catch { return []; } };
 function webUrl(t) { // lo escrito en la barra: dirección, dominio suelto o búsqueda
   t = t.trim();
   if (!t) return '';
@@ -1019,9 +1019,9 @@ async function webView(V, B, path) {
   const box = Object.assign(document.createElement('div'), { className: 'webbox' });
   box.dataset.path = path; paneEl.append(box);
   let url = path.slice(4);
-  // nav: posición en las cargas de este iframe. urls[pos]: la dirección de esa carga si la puso Atril (barra o
+  // nav: posición en las cargas de este iframe. urls[pos]: la dirección de esa carga si la puso DeskLens (barra o
   // favoritos); null si se llegó con un enlace de dentro, que no se puede leer. going: ±1 si la pidió ← →;
-  // expect: 'nuevo' (Atril cambió src, la dirección es pending) o 'recarga' (misma posición).
+  // expect: 'nuevo' (DeskLens cambió src, la dirección es pending) o 'recarga' (misma posición).
   const nav = { pos: 0, max: 0, going: 0, urls: [], expect: null, pending: '' };
   const HINT = 'Escribe una dirección o lo que quieras buscar';
   const go = Object.assign(document.createElement('input'), { className: 'waddr', value: url, placeholder: HINT, spellcheck: false });
@@ -1053,7 +1053,7 @@ async function webView(V, B, path) {
     if (!url) return;
     const favs = webFavs(), i = favs.findIndex(f => f.url === url);
     i >= 0 ? favs.splice(i, 1) : favs.push({ url, nombre: webHost(url) });
-    LS('atril.favoritos', JSON.stringify(favs)); paintStar();
+    LS('desklens.favoritos', JSON.stringify(favs)); paintStar();
   });
   star.className = 'small';
   const paintStar = () => { star.textContent = isFav() ? '★' : '☆'; star.title = isFav() ? 'Quitar de favoritos' : 'Añadir a favoritos'; };
@@ -1218,8 +1218,8 @@ async function compareFiles(a, b) {
     if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
     e.preventDefault(); e.stopPropagation(); d.querySelector(`[data-a=${e.key === 'ArrowDown' ? 'next' : 'prev'}]`).click();
   };
-  $('#ffold').checked = LS('atril.fcmpfold') === '1';
-  $('#ffold').onchange = e => { LS('atril.fcmpfold', e.target.checked ? '1' : ''); build(); };
+  $('#ffold').checked = LS('desklens.fcmpfold') === '1';
+  $('#ffold').onchange = e => { LS('desklens.fcmpfold', e.target.checked ? '1' : ''); build(); };
   d.onclose = () => { d.onkeydown = d.onclick = null; };
   d.showModal();
   build();
@@ -1231,7 +1231,7 @@ async function editPath(path) { // abre la pestaña y entra en edición según e
   if (EDIT_IMG.has(ext)) return imageEdit(path);
   if (ext === 'pdf') return pdfEdit(path);
   const f = await api('/api/abrir?ruta=' + encodeURIComponent(path));
-  if (f.texto === null || f.truncado) return flash('Este archivo no se puede editar en Atril');
+  if (f.texto === null || f.truncado) return flash('Este archivo no se puede editar en DeskLens');
   if (!edits.has(path)) startEdit(path, f);
 }
 
@@ -1279,15 +1279,15 @@ async function printContent(type, path, f, text) { // lo que se imprime, una vez
 // colores, Markdown, Word con su aspecto o imagen) con papel, orientación, márgenes y cómo encajar.
 async function printDialog(path) {
   const name = path.split(/[\\/]/).pop(), k = kind(path);
-  if (!canPrint(path)) return ask('Imprimir', `«${name}» no se puede imprimir desde Atril.`, ['Entendido']);
+  if (!canPrint(path)) return ask('Imprimir', `«${name}» no se puede imprimir desde DeskLens.`, ['Entendido']);
   if (k.ext === 'pdf') return printPdf(path);
   const ed = edits.get(path), type = IMG.has(k.ext) ? 'img' : k.ext === 'docx' ? 'docx' : 'text';
   let f = ed?.f;
   if (type !== 'img' && !f) { try { f = await api('/api/abrir?ruta=' + encodeURIComponent(path)); } catch (e) { return ask('Imprimir', e.message, ['Entendido']); } }
-  if (type === 'text' && f.texto == null) return ask('Imprimir', `«${name}» no es un documento que Atril sepa mostrar, así que no se puede imprimir.`, ['Entendido']);
+  if (type === 'text' && f.texto == null) return ask('Imprimir', `«${name}» no es un documento que DeskLens sepa mostrar, así que no se puede imprimir.`, ['Entendido']);
   const content = await printContent(type, path, f, ed ? ed.text : f?.texto); // en edición: lo que hay en el editor
   let st = { paper: 'A4', orient: 'v', margin: 15, fit: 'ajustar', mm: 120, center: true, nums: true, wrap: true };
-  try { Object.assign(st, JSON.parse(LS('atril.print') || '{}')); } catch {}
+  try { Object.assign(st, JSON.parse(LS('desklens.print') || '{}')); } catch {}
   // la hoja: tamaño, márgenes (el Word trae los suyos) y el contenido colocado según los ajustes
   const sheet = () => {
     const [a, b] = PAPERS[st.paper] || PAPERS.A4, [pw, ph] = st.orient === 'h' ? [b, a] : [a, b];
@@ -1341,7 +1341,7 @@ async function printDialog(path) {
     st = { ...st, paper: v('paper').value, orient: v('orient').value, ...(v('margin') && { margin: +v('margin').value }),
       ...(v('fit') && { fit: v('fit').value, mm: +v('mm').value || 120, center: v('center').checked }),
       ...(v('nums') && { nums: v('nums').checked, wrap: v('wrap').checked }) };
-    LS('atril.print', JSON.stringify(st)); preview();
+    LS('desklens.print', JSON.stringify(st)); preview();
   };
   d.querySelectorAll('[data-x]').forEach(b => b.onclick = () => d.close());
   d.querySelector('[data-go]').onclick = async () => {
@@ -1387,9 +1387,9 @@ async function compareDialog(path, carry = null) {
   }
   const cache = new Map(), text = v => cache.get(v.id) || cache.set(v.id, v.get()).get(v.id);
   const now = vers[0], c0 = vers.find(v => v.id === log.commits[0]?.hash), c1 = vers.find(v => v.id === log.commits[1]?.hash);
-  let cols = carry?.cols || +(LS('atril.cmpcols') || 2), pick = [c0 || now, now, now], hide = LS('atril.cmpfold') === '1', mv = null;
+  let cols = carry?.cols || +(LS('desklens.cmpcols') || 2), pick = [c0 || now, now, now], hide = LS('desklens.cmpfold') === '1', mv = null;
   if (carry) pick = carry.picks.map(p => vers.find(v => v.id === p.id) || now);
-  const setCols = n => { cols = n; LS('atril.cmpcols', n); pick = n === 2 ? [c0 || now, now] : [c1 || c0 || now, c0 || now, now]; build(); };
+  const setCols = n => { cols = n; LS('desklens.cmpcols', n); pick = n === 2 ? [c0 || now, now] : [c1 || c0 || now, c0 || now, now]; build(); };
   const keep = () => ({ cols, picks: pick.slice(0, cols).map(v => ({ id: v.id, label: v.label, title: v.title || v.label })) });
   // «←» lleva siempre al archivo con el que se abrió el comparador (con lo que se tenía elegido entonces)
   const switchTo = ruta => compareDialog(ruta, { ...keep(), tab, origin: carry?.origin || { path, carry: { ...keep(), tab } } });
@@ -1430,12 +1430,12 @@ async function compareDialog(path, carry = null) {
     if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') || !d.classList.contains('cmp')) return;
     e.preventDefault(); e.stopPropagation(); d.querySelector(`footer [data-n="${e.key === 'ArrowDown' ? 1 : -1}"]`).click();
   }, true);
-  $('#cfold').checked = hide; $('#cfold').onchange = e => { hide = e.target.checked; LS('atril.cmpfold', hide ? '1' : ''); build(); };
+  $('#cfold').checked = hide; $('#cfold').onchange = e => { hide = e.target.checked; LS('desklens.cmpfold', hide ? '1' : ''); build(); };
   $('#cwrap').checked = wrapOn(); $('#cwrap').onchange = () => toggleWrap();
   cmpWrap = () => { $('#cwrap').checked = wrapOn(); build(); };
   const blameUi = () => d.querySelector('.cbody').classList.toggle('noblame', !$('#cblame').checked);
-  $('#cblame').checked = LS('atril.cmpblame') !== '0';
-  $('#cblame').onchange = e => { LS('atril.cmpblame', e.target.checked ? '1' : '0'); blameUi(); };
+  $('#cblame').checked = LS('desklens.cmpblame') !== '0';
+  $('#cblame').onchange = e => { LS('desklens.cmpblame', e.target.checked ? '1' : '0'); blameUi(); };
   blameUi();
 
   async function build() {
@@ -1449,7 +1449,7 @@ async function compareDialog(path, carry = null) {
       h.append(sel, back); return h;
     }), listBtn);
     // mientras carga, la lista de la izquierda sigue (sin parpadeo ni salto de pestaña); solo el centro dice «Cargando…»
-    body.style.setProperty('--clw', Math.max(160, Math.min(600, +(LS('atril.cmplw') || 250))) + 'px'); // el ancho guardado ya, no al terminar de cargar
+    body.style.setProperty('--clw', Math.max(160, Math.min(600, +(LS('desklens.cmplw') || 250))) + 'px'); // el ancho guardado ya, no al terminar de cargar
     const keepList = body.querySelector('.clist') || oldList, keepMerge = body.querySelector('.cmerge') || oldMerge, keepMap = body.querySelector('.cmap') || oldMap;
     oldList = oldMerge = oldMap = null;
     const loading = Object.assign(document.createElement('p'), { className: 'ok cload', textContent: 'Cargando…' });
@@ -1544,15 +1544,15 @@ async function compareDialog(path, carry = null) {
     };
     const refresh = () => { panes.forEach(c => c.refresh()); syncHeads(); };
     // lista de cambios
-    const LW = () => +(LS('atril.cmplw') || 250), setLW = w => { body.style.setProperty('--clw', Math.max(160, Math.min(600, w)) + 'px'); };
+    const LW = () => +(LS('desklens.cmplw') || 250), setLW = w => { body.style.setProperty('--clw', Math.max(160, Math.min(600, w)) + 'px'); };
     setLW(LW());
     const g = Object.assign(document.createElement('div'), { className: 'clrs', title: 'Arrastra para cambiar el ancho · doble clic: ancho original' });
     body.querySelector('.clist').append(g);
     g.onmousedown = e => { const x0 = e.clientX, w0 = body.querySelector('.clist').offsetWidth;
-      drag(e, ev => { setLW(w0 + ev.clientX - x0); refresh(); }, () => LS('atril.cmplw', body.querySelector('.clist').offsetWidth)); };
-    g.ondblclick = () => { LS('atril.cmplw', 250); setLW(250); refresh(); };
+      drag(e, ev => { setLW(w0 + ev.clientX - x0); refresh(); }, () => LS('desklens.cmplw', body.querySelector('.clist').offsetWidth)); };
+    g.ondblclick = () => { LS('desklens.cmplw', 250); setLW(250); refresh(); };
     // columnas: el hueco entre dos columnas reparte el ancho entre esas dos
-    const M = body.querySelector('.CodeMirror-merge'), ps = [...M.querySelectorAll('.CodeMirror-merge-pane')], key = 'atril.cmpw' + cols;
+    const M = body.querySelector('.CodeMirror-merge'), ps = [...M.querySelectorAll('.CodeMirror-merge-pane')], key = 'desklens.cmpw' + cols;
     try { JSON.parse(LS(key) || 'null')?.forEach((w, i) => ps[i] && (ps[i].style.width = w + '%')); } catch {}
     M.querySelectorAll('.CodeMirror-merge-gap').forEach((gap, k) => {
       gap.title = 'Arrastra para cambiar el ancho de las columnas · doble clic: iguales';
@@ -1739,7 +1739,7 @@ function authorColor(c) {
 
 function toggle(el) { tree.set(el.dataset.path, !tree.get(el.dataset.path)); tree.get(el.dataset.path) ? expand(el) : collapse(el); syncFold(); }
 // Orden del árbol por proyecto (⋮ del proyecto): 'alfa-asc' | 'alfa-desc' | 'fecha-asc' | 'fecha-desc'; las carpetas siempre antes
-const sortMap = () => { try { return JSON.parse(LS('atril.orden') || '{}'); } catch { return {}; } };
+const sortMap = () => { try { return JSON.parse(LS('desklens.orden') || '{}'); } catch { return {}; } };
 function sortOf(ruta) {
   const low = ruta.toLowerCase(), p = side.proyectos.find(x => under(ruta, x.ruta));
   const o = (p && sortMap()[p.ruta]) || 'alfa-asc';
@@ -1786,7 +1786,7 @@ async function expand(el) {
   markActive();
 }
 // El árbol se pone al día solo: cada 4 s mira las carpetas desplegadas y redibuja la que cambió
-// (archivos nuevos, borrados, renombrados o con otro estado de git). Pausa con Atril oculto, un menú abierto o escribiendo en la barra.
+// (archivos nuevos, borrados, renombrados o con otro estado de git). Pausa con DeskLens oculto, un menú abierto o escribiendo en la barra.
 // ponytail: sondeo (sin vigilar el disco); con cientos de carpetas abiertas, pasar a ReadDirectoryChangesW en el servidor
 async function treePoll() {
   try {
@@ -1826,7 +1826,7 @@ const searchFolds = () => [...document.querySelectorAll('#results .sfile')].filt
 const searchOpen = () => searchFolds().some(f => !f.classList.contains('fold'));
 function syncFold() {
   setFoldBtn($('#treeFold'), treeOpen()); setFoldBtn($('#searchFold'), searchOpen());
-  LS('atril.arbol', JSON.stringify([...tree].filter(([, v]) => v).map(([r]) => r))); // carpetas abiertas, para la próxima vez
+  LS('desklens.arbol', JSON.stringify([...tree].filter(([, v]) => v).map(([r]) => r))); // carpetas abiertas, para la próxima vez
 }
 // Desplegar todo en el explorador: cada proyecto y sus carpetas de primer nivel (no más hondo: proyectos grandes).
 async function treeExpandAll() {
@@ -1845,11 +1845,11 @@ const targetDir = () => selDir || (cur && !isVirtual(cur) ? cur.replace(/[\\/][^
 async function newInline(type, dir = targetDir()) {
   if (!dir) return ask('Nuevo', 'Añade primero un proyecto: lo nuevo se crea dentro de él.', ['Entendido']);
   if (document.body.classList.contains('noside')) toggleSide();
-  document.body.classList.remove('vsearch', 'vgit'); LS('atril.vista', '');
+  document.body.classList.remove('vsearch', 'vgit'); LS('desklens.vista', '');
   tree.set(dir, true); await loadSide();
   const node = [...document.querySelectorAll('aside .node')].find(n => n.dataset.path === dir);
   const kids = node && kidsOf(node);
-  if (!kids) return ask('Nuevo', 'Esa carpeta no está dentro de un proyecto de Atril.', ['Entendido']);
+  if (!kids) return ask('Nuevo', 'Esa carpeta no está dentro de un proyecto de DeskLens.', ['Entendido']);
   const row = document.createElement('div'); row.className = 'node newrow';
   const def = type === 'archivo' ? 'nuevo' : 'nueva carpeta';
   const input = Object.assign(document.createElement('input'), { value: def, spellcheck: false });
@@ -1897,7 +1897,7 @@ let sideTimer = 0;
 const pdfPage = new Map(); // ruta → página a la que saltar al abrir (resultado de búsqueda en un PDF)
 $('#sideQ').oninput = () => { clearTimeout(sideTimer); sideTimer = setTimeout(sideSearch, 250); };
 // Aa · 📄 nombre · ≡ contenido (se recuerdan; nombre y contenido nunca se apagan los dos a la vez)
-const sopt = (() => { try { return { nombre: true, contenido: true, exacto: false, ...JSON.parse(localStorage.getItem('atril.buscar')) }; } catch { return { nombre: true, contenido: true, exacto: false }; } })();
+const sopt = (() => { try { return { nombre: true, contenido: true, exacto: false, ...JSON.parse(localStorage.getItem('desklens.buscar')) }; } catch { return { nombre: true, contenido: true, exacto: false }; } })();
 // Botones Aa (exacto), 📄 nombre y ≡ contenido del buscador lateral; nombre y contenido nunca quedan los dos apagados.
 function drawSearchToggles() {
   const T = $('#stog'); T.innerHTML = '';
@@ -1905,7 +1905,7 @@ function drawSearchToggles() {
     const b = button(label, () => {
       sopt[key] = !sopt[key];
       if (other && !sopt[key] && !sopt[other]) sopt[other] = true;
-      try { localStorage.setItem('atril.buscar', JSON.stringify(sopt)); } catch {}
+      try { localStorage.setItem('desklens.buscar', JSON.stringify(sopt)); } catch {}
       drawSearchToggles(); sideSearch();
     });
     b.className = sopt[key] ? 'on' : ''; b.title = title + (sopt[key] ? ' (activado)' : ' (desactivado)');
@@ -1918,10 +1918,10 @@ function drawSearchToggles() {
   $('#sideQ').placeholder = sopt.nombre && sopt.contenido ? 'Buscar…' : sopt.nombre ? 'Nombre…' : 'Contenido…';
 }
 // «En:» dónde busca: en todos los proyectos, en los marcados o en el del archivo abierto (se recuerda).
-const sscope = (() => { try { return { modo: 'todos', lista: [], ...JSON.parse(LS('atril.buscar.en') || '{}') }; } catch { return { modo: 'todos', lista: [] }; } })();
+const sscope = (() => { try { return { modo: 'todos', lista: [], ...JSON.parse(LS('desklens.buscar.en') || '{}') }; } catch { return { modo: 'todos', lista: [] }; } })();
 const scopeAll = () => [...(side?.proyectos || []).map(p => [p.ruta, p.nombre]), ['sueltos', 'Archivos sueltos']];
 const scopeName = r => scopeAll().find(a => a[0] === r)?.[1] || r;
-// Raíces que se envían al servidor; null = en todo. Un proyecto quitado de Atril deja de contar.
+// Raíces que se envían al servidor; null = en todo. Un proyecto quitado de DeskLens deja de contar.
 function scopeRoots() {
   if (sscope.modo === 'actual') return !cur || isVirtual(cur) ? null : [side?.proyectos.find(p => under(cur, p.ruta))?.ruta || 'sueltos'];
   const ok = sscope.lista.filter(r => scopeAll().some(a => a[0] === r));
@@ -1936,7 +1936,7 @@ function drawScope() {
 function setScope(modo, lista = []) {
   if (modo === 'lista' && lista.length === scopeAll().length) modo = 'todos'; // marcados todos = «Todos»
   Object.assign(sscope, { modo, lista: modo === 'lista' ? lista : [] });
-  LS('atril.buscar.en', JSON.stringify(sscope)); drawScope(); sideSearch();
+  LS('desklens.buscar.en', JSON.stringify(sscope)); drawScope(); sideSearch();
 }
 // Menú de «En:»: casillas por proyecto (el menú sigue abierto), «solo» deja ese, y las dos opciones de arriba y abajo.
 function scopeMenu(anchor) {
@@ -1971,7 +1971,7 @@ function sideView(v, keep) {
   const B = document.body.classList, hidden = B.contains('noside'), now = B.contains('vsearch') ? 'b' : B.contains('vgit') ? 'g' : 'e';
   if (!hidden && v === now && !keep) return toggleSide();
   if (hidden) toggleSide();
-  B.toggle('vsearch', v === 'b'); B.toggle('vgit', v === 'g'); LS('atril.vista', v === 'e' ? '' : v);
+  B.toggle('vsearch', v === 'b'); B.toggle('vgit', v === 'g'); LS('desklens.vista', v === 'e' ? '' : v);
   if (v === 'b') { $('#sideQ').focus(); $('#sideQ').select(); if (!sres) sideSearch(); }
   else if (v === 'g') gitLoad();
   else reveal(cur);
@@ -1984,7 +1984,7 @@ const gfold = new Set(); // secciones plegadas
 const gitOn = () => document.body.classList.contains('vgit') && !document.body.classList.contains('noside');
 // Repositorio que se ve: el elegido (se recuerda), el proyecto del archivo abierto o el primero
 function gitRepoPath() {
-  const ps = side?.proyectos || [], saved = LS('atril.git.repo');
+  const ps = side?.proyectos || [], saved = LS('desklens.git.repo');
   return (ps.find(p => p.ruta === saved) || ps.find(p => cur && under(cur, p.ruta)) || ps[0])?.ruta || null;
 }
 async function gitLoad() {
@@ -2093,7 +2093,7 @@ function gitBranchMenu(anchor) {
 }
 function gitRepoMenu(anchor) {
   openMenu(anchor, [{ head: 'Repositorio' }, ...(side?.proyectos || []).map(p =>
-    [(p.ruta === gst?.ruta ? '✓ ' : '\u2003 ') + p.nombre, () => { LS('atril.git.repo', p.ruta); gitLoad(); }, { title: p.ruta }])]);
+    [(p.ruta === gst?.ruta ? '✓ ' : '\u2003 ') + p.nombre, () => { LS('desklens.git.repo', p.ruta); gitLoad(); }, { title: p.ruta }])]);
 }
 // Botones y avisos de la vista Git (se llama al arrancar, cuando ya existen button/iconBtn)
 function gitInit() {
@@ -2287,7 +2287,7 @@ function fillIdx() {
   const est = i.por_estado || {}, pend = est.pdf_pendiente || 0;
   const row = (k, v) => `<dt>${esc(k)}</dt><dd>${v}</dd>`;
   d.innerHTML = `<b>Índice de búsqueda</b>
-    <p class="ok">Se crea solo y en segundo plano. Si cierras Atril, sigue donde se quedó. Repasa cada 5 minutos solo lo que cambió.</p>
+    <p class="ok">Se crea solo y en segundo plano. Si cierras DeskLens, sigue donde se quedó. Repasa cada 5 minutos solo lo que cambió.</p>
     <h4>Estado</h4><dl>
       ${row('Fase', esc(i.fase || '—'))}
       ${i.fase === 'indexando' ? row('Progreso', `<progress max="${i.total}" value="${i.hechos}"></progress> ${i.hechos} / ${i.total}`) : ''}
@@ -2351,7 +2351,7 @@ async function templateDialog(p) {
     F.insertAdjacentHTML('beforeend', `<label class="frow"><input type="checkbox" value="${a.nombre}" ${a.existe ? 'disabled' : optional ? '' : 'checked'}>` +
       `<span>${a.nombre}</span><span class="ok">${note}</span></label>`);
   }
-  $('#tNote').textContent = 'Atril solo necesita reglas.md y bitacora.md.';
+  $('#tNote').textContent = 'DeskLens solo necesita reglas.md y bitacora.md.';
   const fill = t => t.replaceAll('{{proyecto}}', info.proyecto)
     .replaceAll('{{descripcion}}', $('#tDesc').value.trim() || '(descripción)')
     .replaceAll('{{tecnologia}}', $('#tTec').value.trim() || 'sin definir')
@@ -2386,7 +2386,7 @@ async function archiveDialog(p) {
   await api('/api/archivar', { ruta: p.ruta }); loadSide();
 }
 async function removeMissing(p) {
-  if (await ask('Proyecto no encontrado', `${p.ruta} ya no existe o el disco no está conectado.`, ['Quitar de Atril', 'Cancelar']) === 'Quitar de Atril')
+  if (await ask('Proyecto no encontrado', `${p.ruta} ya no existe o el disco no está conectado.`, ['Quitar de DeskLens', 'Cancelar']) === 'Quitar de DeskLens')
     api('/api/quitar', { ruta: p.ruta }).then(loadSide);
 }
 
@@ -2436,7 +2436,7 @@ function drawExplorer() {
   P.append(...ex.lugares.map((p, n) => place(['🏠', '🖥', '📄', '⬇'][n] || '📁', p)));
   P.insertAdjacentHTML('beforeend', '<h4>Unidades</h4><div class="units"></div>');
   P.lastChild.append(...ex.unidades.map(u => button(u.replace('\\', ''), () => explore(u))));
-  if (ex.proyectos.length) { P.insertAdjacentHTML('beforeend', '<h4>Proyectos en Atril</h4>'); P.append(...ex.proyectos.map(p => place('📁', p))); }
+  if (ex.proyectos.length) { P.insertAdjacentHTML('beforeend', '<h4>Proyectos en DeskLens</h4>'); P.append(...ex.proyectos.map(p => place('📁', p))); }
 
   drawExList(); drawExSide();
 }
@@ -2478,7 +2478,7 @@ function drawExSide() {
     proj.insertAdjacentHTML('beforeend', `<div class="path">📁 ${esc(t.ruta)}</div>${t.tipo?.length ? `<p class="ok">${esc(t.tipo.join(' · '))}</p>` : ''}`);
     if (t.estado) {
       const p = projOf(t.ruta);
-      proj.insertAdjacentHTML('beforeend', `<p>${t.estado === 'añadido' ? '✅ Ya es proyecto de Atril.' : `Está dentro del proyecto <b>${esc(p?.nombre || '')}</b>.`}</p>`);
+      proj.insertAdjacentHTML('beforeend', `<p>${t.estado === 'añadido' ? '✅ Ya es proyecto de DeskLens.' : `Está dentro del proyecto <b>${esc(p?.nombre || '')}</b>.`}</p>`);
       proj.append(button('Mostrar en el árbol', () => revealInTree(t.ruta)));
     } else {
       proj.insertAdjacentHTML('beforeend', `<p class="ok">${t.avisos.length ? t.avisos.map(a => '⚠️ ' + esc(a)).join('<br>') : '✅ Quedará en orden.'}</p>`);
@@ -2499,7 +2499,7 @@ function drawExSide() {
       ul.append(li);
     }
     loose.append(ul);
-    if (known) loose.insertAdjacentHTML('beforeend', `<p class="ok">ⓘ ${known === files.length ? (known > 1 ? 'Ya están' : 'Ya está') : `${known} ya está${known > 1 ? 'n' : ''}`} en Atril: se ${known > 1 ? 'abren' : 'abre'}, no se ${known > 1 ? 'añaden' : 'añade'}.</p>`);
+    if (known) loose.insertAdjacentHTML('beforeend', `<p class="ok">ⓘ ${known === files.length ? (known > 1 ? 'Ya están' : 'Ya está') : `${known} ya está${known > 1 ? 'n' : ''}`} en DeskLens: se ${known > 1 ? 'abren' : 'abre'}, no se ${known > 1 ? 'añaden' : 'añade'}.</p>`);
     const s = n => n > 1 ? 's' : '';
     loose.append(Object.assign(button(fresh.length ? `Añadir ${fresh.length} suelto${s(fresh.length)}` : `Abrir ${files.length} archivo${s(files.length)}`, addLoose), { className: 'primary' }));
   }
@@ -2604,7 +2604,7 @@ async function settingsDialog() {
       const before = s.valores.puerto;
       AJ = (await api('/api/ajustes', values())).valores;
       d.close(); await loadSettings(); render();
-      flash('✓ Ajustes guardados' + (AJ.puerto !== before ? ' · el puerto se aplica al reabrir Atril' : ''));
+      flash('✓ Ajustes guardados' + (AJ.puerto !== before ? ' · el puerto se aplica al reabrir DeskLens' : ''));
     }), { className: 'primary' }),
     button('Cancelar', () => d.close()));
   refresh(); d.showModal(); find.focus();
@@ -2623,14 +2623,14 @@ const isDirty = e => e.text !== e.orig;
 // Pestaña de vista previa (como VS Code): un clic abre el archivo en una pestaña en cursiva que el siguiente
 // clic reemplaza. Se fija (deja de reemplazarse) con doble clic o en cuanto se modifica.
 let previewTab = null;
-try { ({ tabs, cur, previewTab = null } = JSON.parse(localStorage.getItem('atril.tabs')) || { tabs: [], cur: null }); } catch {}
+try { ({ tabs, cur, previewTab = null } = JSON.parse(localStorage.getItem('desklens.tabs')) || { tabs: [], cur: null }); } catch {}
 
 // ---------- vista dividida ----------
 // panes[i]: estado de cada lado. tabs/cur/previewTab (y editorCM, curFile, pdfCtl, findP) son siempre los del
 // lado activo: activatePane() los guarda en su pane y carga los del otro sin volver a dibujar ninguno.
 const panes = [{ el: paneEl }];
 let active = 0, savedSplit = null; // savedSplit: se lee antes de que el arranque vuelva a guardar las pestañas
-try { savedSplit = JSON.parse(localStorage.getItem('atril.split') || 'null'); } catch {}
+try { savedSplit = JSON.parse(localStorage.getItem('desklens.split') || 'null'); } catch {}
 const syncPane = () => {
   Object.assign(panes[active], { tabs, cur, previewTab });
   try { Object.assign(panes[active], { editorCM, curFile, pdfCtl, findP }); } catch {} // aún sin declarar mientras carga el script
@@ -2640,8 +2640,8 @@ const persist = () => {
   syncPane();
   const st = p => ({ tabs: p.tabs, cur: p.cur, previewTab: p.previewTab });
   try {
-    localStorage.setItem('atril.tabs', JSON.stringify(st(panes[0])));
-    localStorage.setItem('atril.split', panes[1] ? JSON.stringify({ ...st(panes[1]), active }) : '');
+    localStorage.setItem('desklens.tabs', JSON.stringify(st(panes[0])));
+    localStorage.setItem('desklens.split', panes[1] ? JSON.stringify({ ...st(panes[1]), active }) : '');
   } catch {}
 };
 // Cambia el lado activo de la vista dividida: guarda tabs/cur/previewTab y el estado de su vista en su
@@ -2677,15 +2677,15 @@ function newPaneEl() {
 function paneWire(el) {
   el.addEventListener('pointerdown', () => activatePane(panes.findIndex(p => p.el === el)), true);
   const T = el.querySelector('#tabs');
-  const from = e => e.dataTransfer.types.includes('text/atril-pane') && +e.dataTransfer.getData('text/atril-pane');
+  const from = e => e.dataTransfer.types.includes('text/desklens-pane') && +e.dataTransfer.getData('text/desklens-pane');
   T.addEventListener('dragover', e => {
-    if (!e.dataTransfer.types.includes('text/atril-pane')) return;
+    if (!e.dataTransfer.types.includes('text/desklens-pane')) return;
     e.preventDefault(); T.classList.add('dropin');
   });
   T.addEventListener('dragleave', () => T.classList.remove('dropin'));
   T.addEventListener('drop', e => {
     T.classList.remove('dropin');
-    const src = from(e), path = e.dataTransfer.getData('text/atril-path'), dst = panes.findIndex(p => p.el === el);
+    const src = from(e), path = e.dataTransfer.getData('text/desklens-path'), dst = panes.findIndex(p => p.el === el);
     if (src === false || src === dst || !path) return;
     e.preventDefault();
     moveTab(path, src, dst);
@@ -2756,11 +2756,11 @@ function gripWire(grip) {
     };
     grip.onpointerup = () => {
       grip.onpointermove = null; grip.classList.remove('drag');
-      LS('atril.splitL', P.style.getPropertyValue('--splitL'));
+      LS('desklens.splitL', P.style.getPropertyValue('--splitL'));
     };
   };
-  grip.ondblclick = () => { P.style.removeProperty('--splitL'); LS('atril.splitL', ''); };
-  const w = LS('atril.splitL'); if (w) P.style.setProperty('--splitL', w);
+  grip.ondblclick = () => { P.style.removeProperty('--splitL'); LS('desklens.splitL', ''); };
+  const w = LS('desklens.splitL'); if (w) P.style.setProperty('--splitL', w);
 }
 addEventListener('keydown', e => { // Ctrl+\: dividir o juntar
   if (e.ctrlKey && !e.altKey && e.key === '\\') { e.preventDefault(); setSplit(!panes[1]); }
@@ -2851,9 +2851,9 @@ function renderTabs() {
     // arrastrar: sobre otra pestaña = reordenar (la raya marca dónde cae) · al chat = adjuntar
     el.draggable = true;
     el.ondragstart = e => {
-      dragTab = p; e.dataTransfer.effectAllowed = 'copyMove'; e.dataTransfer.setData(isVirtual(p) ? 'text/plain' : 'text/atril-path', isVirtual(p) ? '' : p);
-      if (panes[1] && !isUntitled(p)) e.dataTransfer.setData('text/atril-pane', String(active));
-      if (isWeb(p) && panes[1]) e.dataTransfer.setData('text/atril-path', p); // una web también cambia de lado // soltar en el otro lado la mueve allí
+      dragTab = p; e.dataTransfer.effectAllowed = 'copyMove'; e.dataTransfer.setData(isVirtual(p) ? 'text/plain' : 'text/desklens-path', isVirtual(p) ? '' : p);
+      if (panes[1] && !isUntitled(p)) e.dataTransfer.setData('text/desklens-pane', String(active));
+      if (isWeb(p) && panes[1]) e.dataTransfer.setData('text/desklens-path', p); // una web también cambia de lado // soltar en el otro lado la mueve allí
     };
     el.ondragend = () => { dragTab = null; T.querySelectorAll('.dl,.dr').forEach(t => t.classList.remove('dl', 'dr')); };
     el.ondragover = e => {
@@ -2933,7 +2933,7 @@ function openMenu(anchor, items, { search } = {}) {
   m.style.top = Math.max(4, r.bottom + 4 + h > innerHeight ? r.top - h - 4 : r.bottom + 4) + 'px';
   if (r.right - m.offsetWidth < 4 || !anchor.getBoundingClientRect) m.style.left = Math.max(4, Math.min(r.left, innerWidth - m.offsetWidth - 4)) + 'px'; // a la izquierda no cabe: se abre hacia la derecha
   else m.style.right = Math.max(4, innerWidth - r.right) + 'px';
-  // Se cierra con un clic fuera, con Esc, o al pulsar dentro de un PDF/HTML (ese clic no llega a Atril: la ventana pierde el foco)
+  // Se cierra con un clic fuera, con Esc, o al pulsar dentro de un PDF/HTML (ese clic no llega a DeskLens: la ventana pierde el foco)
   menuOff = new AbortController();
   const opt = { signal: menuOff.signal };
   setTimeout(() => {
@@ -2942,7 +2942,7 @@ function openMenu(anchor, items, { search } = {}) {
     addEventListener('keydown', e => e.key === 'Escape' && closeMenu(), opt);
   });
 }
-addEventListener('keydown', e => { // Ctrl+P: la impresión de Atril (hoja, márgenes, ajuste de imágenes) en vez de la del navegador
+addEventListener('keydown', e => { // Ctrl+P: la impresión de DeskLens (hoja, márgenes, ajuste de imágenes) en vez de la del navegador
   if (e.ctrlKey && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'p' && cur && !modalOpen() && $('#exp').hidden) { e.preventDefault(); printDialog(cur); }
 });
 // Clic derecho: menú propio con lo básico en vez del del navegador (Mayús + clic derecho = el del navegador)
@@ -3090,7 +3090,7 @@ async function render() {
     menu.push(['Editar', () => imageEdit(path)]);
   } else if (k.ext === 'pdf') {
     B.append(iconBtn('pencil', 'Editar el PDF: añadir texto, resaltar, girar, mover y borrar páginas', () => pdfEdit(path)));
-    menu.push(['Editar', () => pdfEdit(path)], [edgePdf.has(path) ? 'Volver al visor de Atril' : 'Abrir con el visor de Edge (imprimir…)',
+    menu.push(['Editar', () => pdfEdit(path)], [edgePdf.has(path) ? 'Volver al visor de DeskLens' : 'Abrir con el visor de Edge (imprimir…)',
       () => { edgePdf.has(path) ? edgePdf.delete(path) : edgePdf.add(path); render(); }]);
   } else if (k.ext === 'docx' && !ed) {
     B.append(iconBtn('pencil', 'Editar el Word: texto, negrita, cursiva, subrayado y color', () => wordEdit(path)));
@@ -3155,7 +3155,7 @@ function textDesc(a, b) {
   const line = (y[i] ?? x[i] ?? '').trim();
   return `✎ Línea ${i + 1}` + (line ? `: ${line.slice(0, 60)}` : y.length < x.length ? ' (borrada)' : '');
 }
-// Editor CodeMirror del texto en edición: modo por extensión, buscar de Atril, copia de recuperación al
+// Editor CodeMirror del texto en edición: modo por extensión, buscar de DeskLens, copia de recuperación al
 // escribir y un paso del historial tras cada pausa.
 function editorView(V, ed, name, path) {
   V.className = 'flush';
@@ -3293,20 +3293,20 @@ function cmFind(cm) { // editor: marcas, rayas en la barra de scroll y reemplaza
   };
   return P;
 }
-CodeMirror.commands.atrilFind = cm => cm === editorCM ? findOpen(false) : cm.execCommand('find');
-CodeMirror.commands.atrilReplace = cm => cm === editorCM ? findOpen(true) : cm.execCommand('replace');
-CodeMirror.commands.atrilEsc = cm => {
+CodeMirror.commands.desklensFind = cm => cm === editorCM ? findOpen(false) : cm.execCommand('find');
+CodeMirror.commands.desklensReplace = cm => cm === editorCM ? findOpen(true) : cm.execCommand('replace');
+CodeMirror.commands.desklensEsc = cm => {
   if (cm.listSelections().length > 1) return cm.execCommand('singleSelection');
   if (cm === editorCM && !$('#find').hidden) return findClose();
   return CodeMirror.Pass;
 };
-Object.assign(CodeMirror.defaults.extraKeys ||= {}, { 'Ctrl-F': 'atrilFind', 'Ctrl-H': 'atrilReplace', Esc: 'atrilEsc', 'Alt-Z': () => toggleWrap() });
+Object.assign(CodeMirror.defaults.extraKeys ||= {}, { 'Ctrl-F': 'desklensFind', 'Ctrl-H': 'desklensReplace', Esc: 'desklensEsc', 'Alt-Z': () => toggleWrap() });
 
 // Ajuste de línea (Alt+Z, como VS Code): editor y comparador; se recuerda
-const wrapOn = () => LS('atril.wrap') === '1';
+const wrapOn = () => LS('desklens.wrap') === '1';
 let cmpWrap = null; // el comparador abierto se vuelve a dibujar con el ajuste nuevo
 function toggleWrap() {
-  const on = !wrapOn(); LS('atril.wrap', on ? '1' : '');
+  const on = !wrapOn(); LS('desklens.wrap', on ? '1' : '');
   editorCM?.setOption('lineWrapping', on); cmpWrap?.();
   flash(`Ajuste de línea ${on ? 'activado' : 'desactivado'} (Alt+Z)`);
 }
@@ -3518,7 +3518,7 @@ async function saveUntitled(path) {
   };
   d.showModal(); const i = $('#uName'); i.focus(); i.setSelectionRange(0, 5);
 }
-// Al abrir Atril: reabre lo que no se llegó a guardar
+// Al abrir DeskLens: reabre lo que no se llegó a guardar
 async function recoverAll() {
   const list = await api('/api/recup').catch(() => []), found = [];
   for (const e of list) {
@@ -3593,7 +3593,7 @@ function ask(title, msg, buttons, { danger, input, numeric } = {}) {
   });
 }
 
-// Guarda el texto en el archivo conservando codificación y saltos de línea. Si cambió fuera de Atril
+// Guarda el texto en el archivo conservando codificación y saltos de línea. Si cambió fuera de DeskLens
 // desde que se abrió (409), pregunta qué versión conservar. Marca el paso del historial como guardado.
 async function save(path, force = false) {
   const ed = edits.get(path); if (!ed) return;
@@ -3603,7 +3603,7 @@ async function save(path, force = false) {
     body: JSON.stringify({ ruta: path, texto: ed.text, codificacion: ed.f.codificacion, eol: ed.f.eol, mtime: ed.f.mtime, forzar: force }) });
   const d = await r.json();
   if (r.status === 409) {
-    const c = await ask('Conflicto', `"${ed.f.nombre}" cambió fuera de Atril a las ${new Date(d.fecha * 1000).toLocaleTimeString()}. ` +
+    const c = await ask('Conflicto', `"${ed.f.nombre}" cambió fuera de DeskLens a las ${new Date(d.fecha * 1000).toLocaleTimeString()}. ` +
       '¿Qué versión quieres conservar?', ['Recargar su versión', 'Sobrescribir', 'Cancelar']);
     if (c === 'Sobrescribir') return save(path, true);
     if (c === 'Recargar su versión') startEdit(path, await api('/api/abrir?ruta=' + encodeURIComponent(path)));
@@ -3632,8 +3632,8 @@ async function diskPoll() {
     if (dirty || AJ.recargar_preguntar) {
       const ok = dirty ? 'Recargar (perder mis cambios)' : 'Recargar';
       const t = await ask('Cambió en el disco', dirty
-        ? `«${name}» cambió fuera de Atril y aquí tienes cambios sin guardar.\nSi lo recargas, esos cambios se pierden.`
-        : `«${name}» cambió fuera de Atril. ¿Recargarlo?`, dirty ? ['Mantener mis cambios', ok] : [ok, 'Ahora no']);
+        ? `«${name}» cambió fuera de DeskLens y aquí tienes cambios sin guardar.\nSi lo recargas, esos cambios se pierden.`
+        : `«${name}» cambió fuera de DeskLens. ¿Recargarlo?`, dirty ? ['Mantener mis cambios', ok] : [ok, 'Ahora no']);
       if (t !== ok) { diskSkip.set(path, r.mtime); return; }
     }
     await reloadFromDisk(path);
@@ -3677,7 +3677,7 @@ async function leaveEdit(path) {
   dropBackup(path); edits.delete(path); preview = false; render();
 }
 function frame(src) {
-  // sandbox sin allow-same-origin: un HTML del usuario no puede tocar Atril
+  // sandbox sin allow-same-origin: un HTML del usuario no puede tocar DeskLens
   const f = document.createElement('iframe'); f.className = 'full'; f.src = src;
   if (!/\.pdf(#|$)/i.test(src)) f.sandbox = 'allow-scripts allow-forms allow-modals allow-popups';
   return f;
@@ -3875,7 +3875,7 @@ function docxDrop(box, path) {
     e.preventDefault(); e.stopPropagation();
     if (!p) return flash('Suelta la imagen sobre un párrafo del documento');
     const uri = e.dataTransfer.getData('text/uri-list'), own = uri.match(/^https?:\/\/[^/]+\/raw\/(.+)$/);
-    const ruta = e.dataTransfer.getData('text/atril-path') || (own ? rawPath(own[1]) : '');
+    const ruta = e.dataTransfer.getData('text/desklens-path') || (own ? rawPath(own[1]) : '');
     const file = !ruta && e.dataTransfer.files[0], nombre = ruta ? ruta.split(/[\\/]/).pop() : file?.name || '';
     if (!/\.(png|jpe?g|gif|bmp)$/i.test(nombre)) return ask('Insertar imagen', nombre
       ? `«${nombre}» no es una imagen que Word admita: suelta un .png, .jpg, .gif o .bmp.` : 'Suelta un archivo de imagen (.png, .jpg, .gif o .bmp).', ['Entendido']);
@@ -4027,13 +4027,13 @@ async function imageSave() {
     flash('✓ Imagen guardada' + (r.bak ? ' · respaldo: ' + r.bak.split(/[\\/]/).pop() : ''));
   } catch (e) { ask('No se guardó', e.message, ['Entendido']); }
 }
-// ---------- visor de PDF propio (pdf.js): Atril sabe en qué página estás; el visor de Edge no lo dice ----------
-const edgePdf = new Set(); // PDFs que se ven con el visor de Edge (⋮), hasta cerrar Atril
+// ---------- visor de PDF propio (pdf.js): DeskLens sabe en qué página estás; el visor de Edge no lo dice ----------
+const edgePdf = new Set(); // PDFs que se ven con el visor de Edge (⋮), hasta cerrar DeskLens
 let pdfAtMap = null;
 function pdfAt(path, n) { // última página vista de cada PDF (se recuerda entre sesiones)
-  pdfAtMap ||= (() => { try { return JSON.parse(LS('atril.pdfpag') || '{}'); } catch { return {}; } })();
+  pdfAtMap ||= (() => { try { return JSON.parse(LS('desklens.pdfpag') || '{}'); } catch { return {}; } })();
   if (n === undefined) return pdfAtMap[path] || 1;
-  if (pdfAtMap[path] !== n) { pdfAtMap[path] = n; LS('atril.pdfpag', JSON.stringify(pdfAtMap)); if (path === cur) iaRefresh(); } // la IA recibe la página que se ve
+  if (pdfAtMap[path] !== n) { pdfAtMap[path] = n; LS('desklens.pdfpag', JSON.stringify(pdfAtMap)); if (path === cur) iaRefresh(); } // la IA recibe la página que se ve
 }
 // Página que se ve (la que ocupa el centro de la vista): búsqueda binaria, sirve con miles
 function pdfTrack(V, getEls, path, onPage) { // getEls: las páginas cambian con el zoom o al mover páginas
@@ -4085,7 +4085,7 @@ async function pdfReadView(V, f) {
     <div class="pwrap"><nav class="pthumbs" hidden></nav><div class="ppages"></div></div></div>`);
   const T = V.querySelector('.itools'), P = V.querySelector('.ppages'), TH = V.querySelector('.pthumbs');
   const first = await doc.getPage(1);
-  let zoom = +(LS('atril.pdfzoom') || 1), rot = 0, els = [], lazy = null, thumbs = [], tlazy = null;
+  let zoom = +(LS('desklens.pdfzoom') || 1), rot = 0, els = [], lazy = null, thumbs = [], tlazy = null;
   const vpOf = (page, scale) => page.getViewport({ scale, rotation: (page.rotate + rot) % 360 });
   const baseW = () => Math.min(1000, P.clientWidth - 32);
   const goTo = n => { n = Math.min(N, Math.max(1, n | 0)); V.dataset.jump = 1; els[n - 1]?.scrollIntoView({ block: 'start' }); pdfAt(path, n); onPage(n); };
@@ -4177,7 +4177,7 @@ async function pdfReadView(V, f) {
     thumbs.forEach(tlazy.watch);
     onPage(pdfAt(path));
   }
-  const setZoom = z => { zoom = Math.min(4, Math.max(.25, Math.round(z * 100) / 100)); LS('atril.pdfzoom', zoom); layout(); };
+  const setZoom = z => { zoom = Math.min(4, Math.max(.25, Math.round(z * 100) / 100)); LS('desklens.pdfzoom', zoom); layout(); };
   const fitPage = () => { const v1 = vpOf(first, 1); setZoom((V.clientHeight - T.offsetHeight - 36) * v1.width / v1.height / baseW()); };
   const fitWidth = () => setZoom((P.clientWidth - 32) / baseW());
   T.onclick = e => {
@@ -4185,13 +4185,13 @@ async function pdfReadView(V, f) {
     if (a === 'zo') setZoom(zoom - .1); if (a === 'zi') setZoom(zoom + .1); if (a === 'fit') fitWidth(); if (a === 'page') fitPage();
     if (a === 'prev') goTo(n - 1); if (a === 'next') goTo(n + 1);
     if (a === 'rot') { rot = (rot + 270) % 360; layout(); if (!TH.hidden) drawThumbs(); }
-    if (a === 'thumbs') { TH.hidden = !TH.hidden; LS('atril.pdfthumbs', TH.hidden ? '' : '1'); e.target.classList.toggle('on', !TH.hidden); drawThumbs(); layout(); }
+    if (a === 'thumbs') { TH.hidden = !TH.hidden; LS('desklens.pdfthumbs', TH.hidden ? '' : '1'); e.target.classList.toggle('on', !TH.hidden); drawThumbs(); layout(); }
   };
   $('#rzoom').onchange = e => { const v = e.target.value; v === 'ancho' ? fitWidth() : v === 'pagina' ? fitPage() : setZoom(v / 100); };
   $('#rpg').onchange = e => goTo(+e.target.value);
   V.onwheel = e => { if (!e.ctrlKey) return; e.preventDefault(); setZoom(zoom + (e.deltaY < 0 ? .1 : -.1)); };
   pdfCtl = { goTo, at: () => pdfAt(path), N, zoomBy: d => setZoom(d ? zoom + d : 1) };
-  if (LS('atril.pdfthumbs')) { TH.hidden = false; T.querySelector('[data-a=thumbs]').classList.add('on'); }
+  if (LS('desklens.pdfthumbs')) { TH.hidden = false; T.querySelector('[data-a=thumbs]').classList.add('on'); }
   layout(); drawThumbs();
   pdfTrack(V, () => els, path, onPage);
   findAttach(provider);
@@ -4358,7 +4358,7 @@ async function pdfSave() {
     const bytes = await (await fetch(pedit.baseId ? histUrl(pedit.path, pedit.baseId, 'base') : raw(pedit.path), { cache: 'no-store' })).arrayBuffer();
     let doc;
     try { doc = await L.PDFDocument.load(bytes); }
-    catch (e) { throw new Error(/encrypt/i.test(e.message) ? 'Este PDF está protegido (cifrado): Atril no puede modificarlo.' : e.message); }
+    catch (e) { throw new Error(/encrypt/i.test(e.message) ? 'Este PDF está protegido (cifrado): DeskLens no puede modificarlo.' : e.message); }
     const font = await doc.embedFont(L.StandardFonts.Helvetica), pages = doc.getPages();
     const rgb = h => L.rgb(...[0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16) / 255));
     for (const [src, list] of Object.entries(pedit.notes)) for (const n of list) {
@@ -4592,16 +4592,16 @@ function fontView(V, f) {
     V.insertAdjacentHTML('beforeend', `<div class="page font" style="font-family:${fam}">ABCDEFGHIJKLMNÑOPQRSTUVWXYZ<br>abcdefghijklmnñopqrstuvwxyz<br>0123456789 ¿?¡! áéíóú<br><span style="font-size:18px">El veloz murciélago hindú comía feliz cardillo y kiwi.</span></div>`);
   }).catch(() => card(V, f));
 }
-// Ficha de un archivo que Atril no sabe mostrar: tamaño, fecha y la sugerencia de abrirlo con su programa.
+// Ficha de un archivo que DeskLens no sabe mostrar: tamaño, fecha y la sugerencia de abrirlo con su programa.
 function card(V, f) {
   V.insertAdjacentHTML('beforeend', `<div class="card"><b></b><dl><dt>Tamaño</dt><dd>${fmtSize(f.tam)}</dd>
-    <dt>Modificado</dt><dd>${new Date(f.fecha * 1000).toLocaleString()}</dd><dt>Tipo</dt><dd>Binario · sin vista previa en Atril</dd></dl>
+    <dt>Modificado</dt><dd>${new Date(f.fecha * 1000).toLocaleString()}</dd><dt>Tipo</dt><dd>Binario · sin vista previa en DeskLens</dd></dl>
     <p class="ok">Usa "Mostrar en carpeta" para abrirlo con su programa.</p></div>`);
   V.querySelector('.card b').textContent = f.nombre;
 }
 
 // ---------- consola: ejecutar archivos y pruebas ----------
-const noAsk = new Set(); // "no volver a preguntar" (hasta cerrar Atril)
+const noAsk = new Set(); // "no volver a preguntar" (hasta cerrar DeskLens)
 const runsUI = [];
 let curRun = null;
 const fmtDur = s => s.toFixed(1).replace('.', ',') + ' s';
@@ -4611,7 +4611,7 @@ function runDialog(title, comando, carpeta, editable, note = '') {
   const d = $('#dlg');
   d.innerHTML = `<b></b><label class="fld">Comando <input id="rCmd" spellcheck="false"></label><p class="ok"></p>
     <p class="warn">⚠ Un script puede modificar o borrar archivos.</p>
-    <label class="frow"><input type="checkbox" id="rSkip"> No volver a preguntar (hasta cerrar Atril)</label>
+    <label class="frow"><input type="checkbox" id="rSkip"> No volver a preguntar (hasta cerrar DeskLens)</label>
     <div class="exp-actions"><button class="primary" id="rOk">Ejecutar</button><button id="rNo">Cancelar</button></div>`;
   d.className = 'wide'; d.oninput = d.onchange = null;
   d.querySelector('b').textContent = title;
@@ -4743,7 +4743,7 @@ $('#grip').onmousedown = e => {
   addEventListener('mouseup', () => { removeEventListener('mousemove', mv); document.body.classList.remove('dragging'); }, { once: true });
 };
 
-// ---------- IA: un solo chat. Atril prepara el contexto con Python, sin gastar tokens ----------
+// ---------- IA: un solo chat. DeskLens prepara el contexto con Python, sin gastar tokens ----------
 let iaState = { ias: [], pref: { limite: 2000, carga: {} } }, rulesInfo = null, sel = null, curFile = null, editorCM = null;
 let conv = null, ctx = [], manual = [], consoleCtx = null;
 let dropped = []; // soltados desde el Explorador de Windows: solo su contenido (sin ruta, solo lectura)
@@ -4764,7 +4764,7 @@ function actions(card, list) {
 
 function setIA(on) {
   document.body.classList.toggle('ia', on);
-  LS('atril.ia', on ? '1' : '');
+  LS('desklens.ia', on ? '1' : '');
   if (on) iaOnFile();
   renderTabs(); editorCM?.refresh();
 }
@@ -4930,7 +4930,7 @@ const loadPdfJs = () => pdfjsReady ||= new Promise((ok, fail) => {
 async function pdfPages(ruta, a, b) {
   return pdfText(await (await loadPdfJs()).getDocument(raw(ruta)).promise, a, b);
 }
-async function pdfText(doc, a, b) { // doc: PDF ya abierto (de una ruta de Atril o de un archivo soltado)
+async function pdfText(doc, a, b) { // doc: PDF ya abierto (de una ruta de DeskLens o de un archivo soltado)
   if (a > doc.numPages) throw new Error(`El PDF solo tiene ${doc.numPages} páginas`);
   let out = '';
   for (let i = a; i <= Math.min(b, doc.numPages); i++) {
@@ -4944,12 +4944,12 @@ async function pdfText(doc, a, b) { // doc: PDF ya abierto (de una ruta de Atril
 // ---------- conversación (se guarda en disco; con Claude continúa su sesión) ----------
 // 🔗 Chat vinculado a la pestaña (predeterminado): cada archivo tiene su conversación, que reaparece al volver.
 // Apagado: un chat general que no cambia con la pestaña. El estado se recuerda.
-let linked = LS('atril.vincular') !== '0', convTab;
-const convMap = () => { try { return JSON.parse(LS('atril.convPorPestana') || '{}'); } catch { return {}; } };
+let linked = LS('desklens.vincular') !== '0', convTab;
+const convMap = () => { try { return JSON.parse(LS('desklens.convPorPestana') || '{}'); } catch { return {}; } };
 // '' = el usuario pidió un chat nuevo (vacío) para esa pestaña; sin entrada = se usa la conversación más reciente
-const setConvMap = (tab, id) => { const m = convMap(); m[tab] = id || ''; LS('atril.convPorPestana', JSON.stringify(m)); };
+const setConvMap = (tab, id) => { const m = convMap(); m[tab] = id || ''; LS('desklens.convPorPestana', JSON.stringify(m)); };
 const sameTab = (a, b) => (a || '').toLowerCase() === (b || '').toLowerCase();
-const draftKey = () => linked && cur ? 'atril.borrador:' + recKey(cur) : 'atril.borrador'; // borrador por pestaña
+const draftKey = () => linked && cur ? 'desklens.borrador:' + recKey(cur) : 'desklens.borrador'; // borrador por pestaña
 
 // Selector de conversaciones: con 🔗, las de la pestaña actual; si no, todas. Elige la indicada o la más reciente.
 async function loadConvList(selectId) {
@@ -4968,7 +4968,7 @@ async function loadConvList(selectId) {
 // Abre una conversación (o ninguna = chat nuevo) y recuerda cuál es la de esta pestaña o la general.
 async function openConv(id) {
   conv = id ? await api('/api/conv?id=' + id).catch(() => null) : null;
-  if (!linked) LS('atril.conv', conv?.id || '');
+  if (!linked) LS('desklens.conv', conv?.id || '');
   else if (cur) setConvMap(cur, conv?.id || '');
   drawConv(); buildContext();
 }
@@ -4988,9 +4988,9 @@ function drawLink() {
     : 'Chat general: no cambia con la pestaña. Clic: vincular a la pestaña';
 }
 $('#convLink').onclick = async () => {
-  linked = !linked; LS('atril.vincular', linked ? '1' : '0'); convTab = undefined;
+  linked = !linked; LS('desklens.vincular', linked ? '1' : '0'); convTab = undefined;
   $('#convQ').value = LS(draftKey()) || '';
-  await loadConvList(linked ? (cur ? convMap()[cur] : '') : LS('atril.conv'));
+  await loadConvList(linked ? (cur ? convMap()[cur] : '') : LS('desklens.conv'));
   if (linked) convTab = cur;
 };
 $('#convSel').onchange = () => openConv($('#convSel').value);
@@ -5004,7 +5004,7 @@ $('#convDel').onclick = async () => {
 // La conversación: mensajes del usuario y respuestas de la IA con sus acciones (aplicar, deshacer, crear archivo…).
 function drawConv() {
   const L = $('#convLog'); L.innerHTML = '';
-  if (!conv) L.innerHTML = '<p class="ok" style="padding:4px">Escribe lo que necesitas. Si nombras un archivo del proyecto o unas páginas del PDF abierto, Atril los adjunta solo (míralo en «Se enviará»). La conversación se recuerda.</p>';
+  if (!conv) L.innerHTML = '<p class="ok" style="padding:4px">Escribe lo que necesitas. Si nombras un archivo del proyecto o unas páginas del PDF abierto, DeskLens los adjunta solo (míralo en «Se enviará»). La conversación se recuerda.</p>';
   let abierto = '';
   (conv?.mensajes || []).forEach((m, i) => {
     if (m.rol === 'tu') { abierto = m.abierto || ''; L.append(userMsg(m.texto, m.adjuntos)); }
@@ -5130,7 +5130,7 @@ async function makeFile(f, auto) {
   let name = base;
   for (let i = 2; i < 50; i++) {
     try {
-      // .docx y .pdf: se envía también el HTML del Markdown; Atril los genera sin IA
+      // .docx y .pdf: se envía también el HTML del Markdown; DeskLens los genera sin IA
       const conv2 = /\.(docx|pdf)$/i.test(name) ? DOMPurify.sanitize(marked.parse(f.texto)) : undefined;
       const r = await api('/api/crear', { carpeta: folder, nombre: name, texto: f.texto, html: conv2 });
       await loadSide(); openTab(r.ruta, true);
@@ -5227,7 +5227,7 @@ async function convSend() {
     conv = await api('/api/conv/enviar', { id: conv?.id || null, ia, mensaje: msg, adjuntos, vinculo: linked ? cur || '' : '',
       ruta: curFile?.ruta || conv?.proyecto || '', abierto: curFile?.ruta || '' }); // se guarda en disco antes de responder
     manual = []; dropped = []; consoleCtx = null; removed.clear(); seeImg.clear();
-    if (linked && cur) setConvMap(cur, conv.id); else LS('atril.conv', conv.id);
+    if (linked && cur) setConvMap(cur, conv.id); else LS('desklens.conv', conv.id);
     await loadConvList(conv.id);
     for (const f of replyFiles(conv.mensajes.at(-1).texto)) await makeFile(f, true); // "muéstramelo en un .md"
     await autoApply(conv.mensajes.length - 1);
@@ -5237,8 +5237,8 @@ async function convSend() {
 }
 
 // Sin «Pedir confirmación» (⚙ Ajustes, predeterminado), los cambios de la IA se aplican al llegar; queda «Deshacer»
-const applied = () => { try { return JSON.parse(LS('atril.aplicados') || '{}'); } catch { return {}; } };
-const markApplied = (key, v) => { const a = applied(); a[key] = v; LS('atril.aplicados', JSON.stringify(a)); };
+const applied = () => { try { return JSON.parse(LS('desklens.aplicados') || '{}'); } catch { return {}; } };
+const markApplied = (key, v) => { const a = applied(); a[key] = v; LS('desklens.aplicados', JSON.stringify(a)); };
 // Sin «Pedir confirmación» (Ajustes), aplica al llegar lo que propone la respuesta i: cambios de Word o de texto.
 async function autoApply(i) {
   if (AJ.ia_confirmar_aplicar || !conv) return;
@@ -5273,7 +5273,7 @@ function askPages(nombre, total) {
   });
 }
 const sensitiveBlocked = nombre => kind(nombre).lock && AJ.ia_permitir_sensibles === false;
-// Adjuntar al chat un archivo de Atril (arrastrado del árbol o de una pestaña); de un PDF pregunta qué páginas.
+// Adjuntar al chat un archivo de DeskLens (arrastrado del árbol o de una pestaña); de un PDF pregunta qué páginas.
 async function dropPath(path) {
   if (isWeb(path)) return ask('Adjuntar', 'Una pestaña web no se puede adjuntar: copia el texto de la página y pégalo en el mensaje.', ['Entendido']);
   const nombre = path.split(/[\\/]/).pop();
@@ -5332,7 +5332,7 @@ async function dropExternal(file) {
   drawCtx();
 }
 {
-  const P = $('#ia'), carries = e => [...e.dataTransfer.types].some(t => ['text/atril-path', 'Files', 'text/uri-list'].includes(t));
+  const P = $('#ia'), carries = e => [...e.dataTransfer.types].some(t => ['text/desklens-path', 'Files', 'text/uri-list'].includes(t));
   P.addEventListener('dragover', e => {
     if (!carries(e)) return;
     e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'copy'; P.classList.add('dropping');
@@ -5341,11 +5341,11 @@ async function dropExternal(file) {
   P.addEventListener('drop', async e => {
     e.preventDefault(); e.stopPropagation(); P.classList.remove('dropping');
     const uri = e.dataTransfer.getData('text/uri-list'), own = uri.match(/^https?:\/\/[^/]+\/raw\/(.+)$/); // p. ej. una imagen del visor
-    const path = e.dataTransfer.getData('text/atril-path') || (own ? rawPath(own[1]) : '');
+    const path = e.dataTransfer.getData('text/desklens-path') || (own ? rawPath(own[1]) : '');
     if (path) return dropPath(path);
     const entries = [...e.dataTransfer.items].map(i => i.webkitGetAsEntry?.());
     if (entries.some(x => x?.isDirectory)) return ask('Adjuntar', 'Arrastra archivos, no carpetas (para no enviar cientos de archivos sin querer).', ['Entendido']);
-    if (!e.dataTransfer.files.length) return ask('Adjuntar', 'Eso no se puede adjuntar: arrastra un archivo desde el explorador de Atril, una pestaña o el Explorador de Windows.', ['Entendido']);
+    if (!e.dataTransfer.files.length) return ask('Adjuntar', 'Eso no se puede adjuntar: arrastra un archivo desde el explorador de DeskLens, una pestaña o el Explorador de Windows.', ['Entendido']);
     for (const f of [...e.dataTransfer.files]) await dropExternal(f);
   });
 }
@@ -5400,7 +5400,7 @@ async function connectDialog(refresh = false) {
   try { await loadIA(refresh); } catch (e) { return ask('Conectar IA', e.message, ['Entendido']); }
   const d = $('#dlg');
   d.className = 'wide'; d.oninput = d.onchange = null; d.onclose = null;
-  d.innerHTML = `<b>Conectar IA</b><p class="ok">Atril usa los programas oficiales de cada IA con tu propia sesión. No guarda contraseñas ni claves.</p>
+  d.innerHTML = `<b>Conectar IA</b><p class="ok">DeskLens usa los programas oficiales de cada IA con tu propia sesión. No guarda contraseñas ni claves.</p>
     <div id="cRows"></div><div id="cHelp" class="ok"></div>
     <div class="frow">IA predeterminada <select id="cDef"></select> · Límite por petición
       <input id="cLim" type="number" min="100" step="100" style="width:90px;font:inherit;padding:3px 6px"> tokens</div>
@@ -5414,7 +5414,7 @@ async function connectDialog(refresh = false) {
     row.children[1].innerHTML = esc(a.instalada ? (a.sesion ? 'conectada' : 'sin sesión') : 'no instalada') +
       `<small>${esc(a.version)}${carga ? ' · carga fija medida ≈ ' + carga + ' tokens' : ''}</small>`;
     const acts = [];
-    if (!a.instalada) acts.push(button('Cómo instalar', () => help('Ejecuta en una terminal (Atril no instala nada por su cuenta):\n', a.instalar)));
+    if (!a.instalada) acts.push(button('Cómo instalar', () => help('Ejecuta en una terminal (DeskLens no instala nada por su cuenta):\n', a.instalar)));
     else if (!a.sesion) acts.push(button('Iniciar sesión', () => { api('/api/ia/login', { ia: a.id }); help('Completa el inicio de sesión en la consola que se abrió y pulsa "Comprobar".'); }));
     // "Probar" también sin sesión detectada: el CLI puede estar autenticado de otra forma (p. ej. clave API)
     if (a.instalada) acts.push(button('Probar', async () => {
@@ -5492,7 +5492,7 @@ function rulesDialog() {
 const WIDTH = { min: 180, max: 600, doc: 300 }; // límites en px; el documento nunca baja de 300
 function setWidth(v, px) {
   document.documentElement.style.setProperty(v, px + 'px');
-  try { localStorage.setItem('atril' + v, px); } catch {}
+  try { localStorage.setItem('desklens' + v, px); } catch {}
 }
 for (const h of document.querySelectorAll('.rs')) {
   const v = h.dataset.var, sign = v === '--iaW' ? -1 : 1; // la IA crece hacia la izquierda
@@ -5507,7 +5507,7 @@ for (const h of document.querySelectorAll('.rs')) {
     addEventListener('mouseup', () => { removeEventListener('mousemove', mv); h.classList.remove('drag'); document.body.classList.remove('dragging'); editorCM?.refresh(); }, { once: true });
   };
   h.ondblclick = () => { setWidth(v, +h.dataset.def); editorCM?.refresh(); };
-  try { const w = localStorage.getItem('atril' + v); if (w) document.documentElement.style.setProperty(v, w + 'px'); } catch {}
+  try { const w = localStorage.getItem('desklens' + v); if (w) document.documentElement.style.setProperty(v, w + 'px'); } catch {}
 }
 
 // ⤢ amplía una zona (doc, ia, con) a toda la ventana; ⤡ o Esc vuelve a como estaba justo antes
@@ -5538,8 +5538,8 @@ addEventListener('keydown', e => {
 // ---------- arrastrar archivos ----------
 // Desde fuera (Explorador de Windows, Finder): se abren en pestañas. El navegador no da su ruta real; el servidor
 // la busca por nombre, tamaño y fecha. Excepciones: sobre el panel de IA se adjuntan y sobre un Word en edición se insertan.
-// Del Explorador solo llega 'Files'; una imagen arrastrada desde el visor de Atril trae también uri-list/html
-const fromOutside = e => { const t = e.dataTransfer.types; return t.includes('Files') && !['text/atril-path', 'text/uri-list', 'text/html'].some(x => t.includes(x)); };
+// Del Explorador solo llega 'Files'; una imagen arrastrada desde el visor de DeskLens trae también uri-list/html
+const fromOutside = e => { const t = e.dataTransfer.types; return t.includes('Files') && !['text/desklens-path', 'text/uri-list', 'text/html'].some(x => t.includes(x)); };
 document.ondragover = e => e.preventDefault();
 document.ondrop = e => {
   e.preventDefault();
@@ -5563,7 +5563,7 @@ async function openDropped(dt) {
 // cinta de iconos y herramientas de la barra lateral
 const toggleSide = () => {
   document.body.classList.toggle('noside');
-  try { localStorage.setItem('atril.noside', document.body.classList.contains('noside') ? '1' : ''); } catch {}
+  try { localStorage.setItem('desklens.noside', document.body.classList.contains('noside') ? '1' : ''); } catch {}
   renderTabs(); editorCM?.refresh();
 };
 addEventListener('keydown', e => { // Ctrl+B: barra lateral · Ctrl+Alt+B: panel de IA
@@ -5596,8 +5596,8 @@ async function goToLine() {
   mark.className = 'linemark'; mark.style.top = y + 'px'; mark.style.height = lh + 'px';
   code.append(mark); setTimeout(() => mark.remove(), 1500);
 }
-try { if (localStorage.getItem('atril.noside')) document.body.classList.add('noside'); } catch {}
-if (LS('atril.bak')) document.body.classList.add('showbak');
+try { if (localStorage.getItem('desklens.noside')) document.body.classList.add('noside'); } catch {}
+if (LS('desklens.bak')) document.body.classList.add('showbak');
 $('#ribbon').append(
   ...[['e', 'folder', 'Explorador (otro clic: ocultar la barra)'], ['b', 'search', 'Buscar en nombres y contenido · Ctrl+Shift+F (otro clic: ocultar la barra)'],
     ['g', 'git', 'Git: cambios, commit, ramas, pull y push · Ctrl+Shift+G (otro clic: ocultar la barra)']]
@@ -5618,8 +5618,8 @@ $('#sbtns').append(
   }), { id: 'searchFold' }),
   iconBtn('refresh', 'Repetir la búsqueda', sideSearch),
   iconBtn('x', 'Limpiar la búsqueda', () => { $('#sideQ').value = ''; sideSearch(); $('#sideQ').focus(); }));
-if (LS('atril.vista') === 'b') document.body.classList.add('vsearch');
-if (LS('atril.vista') === 'g') { document.body.classList.add('vgit'); setTimeout(gitLoad, 600); } // tras cargar el árbol (side)
+if (LS('desklens.vista') === 'b') document.body.classList.add('vsearch');
+if (LS('desklens.vista') === 'g') { document.body.classList.add('vgit'); setTimeout(gitLoad, 600); } // tras cargar el árbol (side)
 drawResults();
 $('#sidetools').append(
   iconBtn('filePlus', 'Nuevo archivo (en la carpeta elegida) · Ctrl+N: "nuevo 1" sin guardar', () => newInline('archivo')),
@@ -5627,7 +5627,7 @@ $('#sidetools').append(
   iconBtn('plus', 'Añadir proyecto o archivos sueltos', openExplorer),
   Object.assign(iconBtn('collapse', 'Plegar todo', () => treeOpen() ? (tree.clear(), loadSide()) : treeExpandAll()), { id: 'treeFold' }),
   (b => { b.className = 'ic bakbtn'; b.textContent = '.bak'; return b; })(iconBtn('', 'Mostrar u ocultar las copias de seguridad (.bak)', () => {
-    LS('atril.bak', document.body.classList.toggle('showbak') ? '1' : '');
+    LS('desklens.bak', document.body.classList.toggle('showbak') ? '1' : '');
   })));
 addEventListener('keydown', e => {
   if (e.altKey && e.key === 'ArrowLeft') { e.preventDefault(); nav(-1); }
@@ -5637,7 +5637,7 @@ addEventListener('keydown', e => {
 const abrir = new URLSearchParams(location.search).get('abrir');
 if (abrir) { abrir.split('|').forEach(p => tabs.includes(p) || tabs.push(p)); cur = abrir.split('|')[0]; persist(); history.replaceState(null, '', '/'); }
 if (cur) { hist.push(cur); hi = 0; }
-try { if (localStorage.getItem('atril.ia')) document.body.classList.add('ia'); } catch {}
+try { if (localStorage.getItem('desklens.ia')) document.body.classList.add('ia'); } catch {}
 // render después: las migas necesitan los proyectos; antes, ajustes y lo que haya que recuperar
 loadSide().finally(async () => {
   await loadSettings(); await recoverAll(); await render();
@@ -5653,27 +5653,27 @@ loadSide().finally(async () => {
     activatePane(sp.active === 1 ? 1 : 0);
   }
 });
-if (!linked && !$('#convQ').value) $('#convQ').value = LS('atril.borrador') || ''; // lo que se escribía en el chat
+if (!linked && !$('#convQ').value) $('#convQ').value = LS('desklens.borrador') || ''; // lo que se escribía en el chat
 $('#convQ').addEventListener('input', () => LS(draftKey(), $('#convQ').value));
 $('#convLink').insertAdjacentHTML('afterbegin', svg('link'));
 $('#convDel').innerHTML = svg('trash');
 idxPoll(); pdfWorker();
-loadIA().catch(() => {}).finally(() => linked ? syncConvToTab(true) : loadConvList(LS('atril.conv')));
+loadIA().catch(() => {}).finally(() => linked ? syncConvToTab(true) : loadConvList(LS('desklens.conv')));
 setInterval(() => fetch('/api/ping', { method: 'POST' }), 20000); fetch('/api/ping', { method: 'POST' });
 addEventListener('pagehide', () => navigator.sendBeacon('/api/adios'));
 
 // Posición y tamaño de la ventana: se guardan al cambiar (el navegador no avisa al mover, así que se comprueba cada 2 s)
-// y Atril abre la siguiente vez con ellos (--window-position / --window-size).
+// y DeskLens abre la siguiente vez con ellos (--window-position / --window-size).
 const bounds = () => ({ x: screenX, y: screenY, w: outerWidth, h: outerHeight });
 let lastBounds = JSON.stringify(bounds());
 setInterval(() => {
   const b = bounds(), s = JSON.stringify(b);
   if (s === lastBounds || b.w < 400 || b.h < 300) return; // minimizada u oculta: no se guarda
-  lastBounds = s; LS('atril.ventana', s);
+  lastBounds = s; LS('desklens.ventana', s);
   api('/api/ventana', b).catch(() => {});
 }, 2000);
 try { // por si Edge ignoró las opciones al abrir (pasa si ya había otra ventana de Edge)
-  const saved = JSON.parse(LS('atril.ventana') || 'null'), b = bounds();
+  const saved = JSON.parse(LS('desklens.ventana') || 'null'), b = bounds();
   if (saved && (Math.abs(saved.w - b.w) > 30 || Math.abs(saved.h - b.h) > 30)) resizeTo(saved.w, saved.h);
   if (saved && (Math.abs(saved.x - b.x) > 30 || Math.abs(saved.y - b.y) > 30)) moveTo(saved.x, saved.y);
 } catch {}

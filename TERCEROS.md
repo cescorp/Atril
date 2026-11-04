@@ -1,6 +1,6 @@
 # Software de terceros
 
-Atril no incluye copias de estas bibliotecas: la ventana las carga desde una CDN (cdnjs.cloudflare.com, cdn.jsdelivr.net) la primera vez que hacen falta. El servidor (`atril.pyw`) solo usa la biblioteca estándar de Python.
+DeskLens no incluye copias de estas bibliotecas: la ventana las carga desde una CDN (cdnjs.cloudflare.com, cdn.jsdelivr.net) la primera vez que hacen falta. El servidor (`desklens.pyw`) solo usa la biblioteca estándar de Python.
 
 | Biblioteca | Versión | Para qué | Licencia |
 |---|---|---|---|
@@ -16,4 +16,4 @@ Atril no incluye copias de estas bibliotecas: la ventana las carga desde una CDN
 | [DOMPurify](https://github.com/cure53/DOMPurify) | 3.1.6 | Limpiar el HTML que se muestra | Apache 2.0 o MPL 2.0 |
 | [Source Serif 4](https://fonts.google.com/specimen/Source+Serif+4), [Inter](https://fonts.google.com/specimen/Inter) | Google Fonts | Letra de lectura e interfaz | SIL Open Font License 1.1 |
 
-Las IA (Claude Code, Codex, Gemini CLI) no forman parte de Atril: son programas aparte que cada usuario instala y conecta con su propia cuenta.
+Las IA (Claude Code, Codex, Gemini CLI) no forman parte de DeskLens: son programas aparte que cada usuario instala y conecta con su propia cuenta.
