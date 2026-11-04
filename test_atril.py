@@ -543,6 +543,26 @@ assert.deepStrictEqual(findRefs('Ver 1 Samuel 4:4 y 1 Samuel 8:5, 20; Deuteronom
     except PermissionError:
         pass
 
+    # soltado desde el Explorador: se halla por nombre + tamaño + fecha y queda como suelto; otro tamaño no vale
+    suelto = fuera / "soltado.txt"
+    suelto.write_text("hola")
+    st, real_sel = suelto.stat(), atril.shell_selection
+    atril.shell_selection = lambda: ([], [str(fuera)])  # la carpeta abierta en el Explorador
+    try:
+        r = atril.locate_dropped([{"nombre": "soltado.txt", "tam": st.st_size, "fecha": st.st_mtime * 1000},
+                                  {"nombre": "soltado.txt", "tam": 99, "fecha": st.st_mtime * 1000}])
+    finally:
+        atril.shell_selection = real_sel
+    assert r[0]["ruta"] == str(suelto.resolve()) and r[1]["ruta"] is None and atril.allowed(suelto)
+    # «Eliminar»: nunca la carpeta de un proyecto ni algo que ya no existe (el envío real a la papelera no se prueba
+    # aquí: llenaría la papelera del usuario en cada pasada)
+    for bad, exc in ((proj, PermissionError), (proj / "no-existe.txt", FileNotFoundError)):
+        try:
+            atril.to_trash(bad)
+            raise AssertionError("debió fallar: " + str(bad))
+        except exc:
+            pass
+
     # recuperación: copia atómica de lo no guardado, se lista y se borra
     atril.RECOVERY_DIR = tmp / "recuperacion"
     atril.recovery_save({"clave": "nuevo-1", "ruta": None, "titulo": "nuevo 1", "texto": "hola ñ"})

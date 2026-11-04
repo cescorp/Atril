@@ -740,7 +740,13 @@ const $ = s => paneEl.querySelector(s) || document.querySelector(s);
 const H = { 'X-Atril': '1' };
 const api = (url, body) => fetch(url, body === undefined ? { headers: H } :
   { method: 'POST', headers: { ...H, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-  .then(async r => { const d = await r.json(); if (!r.ok) throw new Error(d.error); return d; });
+  .then(async r => {
+    const d = await r.json();
+    // ruta que el servidor no conoce: la ventana es más nueva que el servidor que sigue en marcha
+    if (r.status === 404 && d.error === 'no existe' && url.startsWith('/api/')) throw new Error(RESTART);
+    if (!r.ok) throw new Error(d.error); return d;
+  });
+const RESTART = 'Atril se actualizó y el servidor que sigue en marcha es el anterior. Cierra todas las ventanas de Atril, espera unos segundos y vuelve a abrirlo.';
 const sepOf = p => /^[A-Za-z]:|^\\\\/.test(p) ? '\\' : '/'; // C:\… o \\servidor → \ ; /home/… → /
 const pjoin = (dir, name) => dir.replace(/[\\/]+$/, '') + sepOf(dir) + name;
 const under = (path, dir) => { // ¿path está dentro de dir (o es dir)? sin distinguir mayúsculas ni separador
@@ -823,12 +829,14 @@ function kind(name) {
 }
 
 // ---------- barra lateral ----------
-const tree = new Map(); // ruta → ¿abierta?
+// ruta → ¿abierta? Se recuerda entre sesiones (syncFold la guarda tras cada cambio): Atril se abre tal cual se dejó.
+const tree = new Map((() => { try { return JSON.parse(localStorage.getItem('atril.arbol') || '[]').map(r => [r, true]); } catch { return []; } })());
 let side = { proyectos: [], sueltos: [] };
 // Árbol de la barra lateral: proyectos (con sus avisos: sin reglas, sin bitácora…) y archivos sueltos.
 // Las carpetas que estaban abiertas (mapa `tree`) se vuelven a desplegar antes de marcar el archivo actual.
 async function loadSide() {
   const st = side = await api('/api/estado');
+  if (st.reiniciar && !loadSide.warned) { loadSide.warned = true; ask('Hay que reiniciar Atril', RESTART, ['Entendido']); } // una vez por sesión
   const P = $('#projects'); P.innerHTML = '';
   if (!st.proyectos.length) P.innerHTML = '<p class="ok" style="margin:0 8px">Pulsa + para añadir una carpeta.</p>';
   const pending = [];
@@ -895,6 +903,7 @@ function nodeEl(name, path, isDir, removable, git) {
         sortRow('Fecha modificación', 'fecha', o, setSort, 'desc', [['asc', '↑', 'Ascendente: lo más antiguo primero'], ['desc', '↓', 'Descendente: lo más reciente primero']])]);
     }
     if (isDir) { selDir = path; markActive(); return toggle(el); } // la carpeta elegida recibe lo nuevo
+    selDir = null; // elegido un archivo: lo nuevo va en su carpeta (targetDir), no en la última carpeta pulsada
     openTab(path);
   };
   if (!isDir) {
@@ -918,8 +927,10 @@ function nodeMenu(anchor, path, isDir, git, extra = []) {
     ['⧉  Copiar ruta', () => copyText(path, 'Ruta copiada'), { title: path }],
     ['⧉  Copiar ruta relativa', () => copyText(rel, 'Ruta relativa copiada'), { title: rel }],
     ['📁  Mostrar en carpeta', () => api('/api/mostrar', { ruta: path }).catch(e => ask('Mostrar en carpeta', e.message, ['Entendido'])), { title: 'Abrir el explorador de archivos con el archivo marcado' }]];
+  const trash = ['🗑  Eliminar (a la papelera)', () => trashPath(path, isDir), { title: 'Enviar a la papelera de reciclaje: se puede recuperar desde allí' }];
   if (isDir) return openMenu(anchor, [{ head: name }, ['ⓘ  Información…', () => infoDialog(path)], '-',
-    ['＋  Nuevo archivo aquí', () => newInline('archivo', path)], ['＋  Nueva carpeta aquí', () => newInline('carpeta', path)], '-', ...copy]);
+    ['＋  Nuevo archivo aquí', () => newInline('archivo', path)], ['＋  Nueva carpeta aquí', () => newInline('carpeta', path)], '-', ...copy,
+    ...(side.proyectos.some(p => p.ruta === path) ? [] : ['-', trash])]); // la carpeta de un proyecto se quita con «Quitar de Atril»
   openMenu(anchor, [{ head: g ? `${name} · ${GIT_TXT[g]}` : name }, ...extra,
     ['ⓘ  Información…', () => infoDialog(path)],
     ['⇆  Comparar versiones (git)…', () => compareDialog(path), g === 'sin_git' ? { disabled: true, title: 'Sin git: este archivo no está en un repositorio' } : { title: 'Ver y comparar sus commits en 2 o 3 columnas' }],
@@ -930,7 +941,17 @@ function nodeMenu(anchor, path, isDir, git, extra = []) {
     ['✎  Editar', () => editPath(path)],
     ['📎  Adjuntar al chat', () => { setIA(true); dropPath(path); }, { title: 'Lo mismo que arrastrarlo al panel de IA' }],
     ['🖨  Imprimir…', () => printDialog(path), canPrint(path) ? { key: 'Ctrl+P' } : { disabled: true, title: 'Audio, vídeo y fuentes no se imprimen' }],
-    '-', ...copy]);
+    '-', ...copy, '-', trash]);
+}
+// «Eliminar»: pregunta, cierra sus pestañas (si hay cambios sin guardar, pregunta antes) y lo envía a la papelera.
+async function trashPath(path, isDir) {
+  const name = path.split(/[\\/]/).pop();
+  if (await ask('Eliminar', `¿Enviar «${name}» a la papelera de reciclaje?` + (isDir ? ' Va la carpeta con todo lo que contiene.' : '') +
+    ' Se puede recuperar desde la papelera.', ['Enviar a la papelera', 'Cancelar'], { danger: true }) !== 'Enviar a la papelera') return;
+  for (const t of tabs.filter(t => under(t, path))) { await closeTab(t); if (tabs.includes(t)) return; } // canceló al guardar
+  try { await api('/api/papelera', { ruta: path }); } catch (e) { return ask('No se pudo eliminar', e.message, ['Entendido']); }
+  if (selDir && under(selDir, path)) selDir = null;
+  await loadSide(); flash(`🗑 «${name}» está en la papelera`);
 }
 // ---------- pestaña web ----------
 // Un <iframe> con sandbox sin allow-top-navigation: la web no puede sacar a Atril de su página.
@@ -1770,7 +1791,10 @@ function setFoldBtn(b, open) {
 const treeOpen = () => [...tree.values()].some(Boolean);
 const searchFolds = () => [...document.querySelectorAll('#results .sfile')].filter(f => f.querySelector('.shits'));
 const searchOpen = () => searchFolds().some(f => !f.classList.contains('fold'));
-function syncFold() { setFoldBtn($('#treeFold'), treeOpen()); setFoldBtn($('#searchFold'), searchOpen()); }
+function syncFold() {
+  setFoldBtn($('#treeFold'), treeOpen()); setFoldBtn($('#searchFold'), searchOpen());
+  LS('atril.arbol', JSON.stringify([...tree].filter(([, v]) => v).map(([r]) => r))); // carpetas abiertas, para la próxima vez
+}
 // Desplegar todo en el explorador: cada proyecto y sus carpetas de primer nivel (no más hondo: proyectos grandes).
 async function treeExpandAll() {
   for (const p of side.proyectos) {
@@ -1794,10 +1818,12 @@ async function newInline(type, dir = targetDir()) {
   const kids = node && kidsOf(node);
   if (!kids) return ask('Nuevo', 'Esa carpeta no está dentro de un proyecto de Atril.', ['Entendido']);
   const row = document.createElement('div'); row.className = 'node newrow';
-  const input = Object.assign(document.createElement('input'), { value: type === 'archivo' ? 'nuevo.md' : 'nueva carpeta', spellcheck: false });
+  const def = type === 'archivo' ? 'nuevo' : 'nueva carpeta';
+  const input = Object.assign(document.createElement('input'), { value: def, spellcheck: false });
   row.append(Object.assign(document.createElement('span'), { className: 'chev', textContent: type === 'archivo' ? '+' : '›' }), input);
-  kids.prepend(row); row.scrollIntoView({ block: 'nearest' });
-  input.focus(); input.setSelectionRange(0, type === 'archivo' ? input.value.lastIndexOf('.') : input.value.length);
+  const sel = [...kids.children].find(n => n.dataset.path === cur); // el archivo elegido: lo nuevo aparece justo encima
+  sel ? sel.before(row) : kids.prepend(row); row.scrollIntoView({ block: 'nearest' });
+  input.focus(); input.select();
   let done = false;
   const finish = async ok => {
     if (done) return; done = true;
@@ -1817,7 +1843,7 @@ async function newInline(type, dir = targetDir()) {
     } catch (e) { ask('No se pudo crear', e.message, ['Entendido']); }
   };
   input.onkeydown = e => { if (e.key === 'Enter') finish(true); if (e.key === 'Escape') finish(false); };
-  input.onblur = () => finish(true);
+  input.onblur = () => finish(input.value.trim() !== def); // clic fuera sin cambiar el nombre: no se crea nada
 }
 // El archivo de la pestaña actual siempre a la vista: despliega sus carpetas y se desplaza hasta él
 async function reveal(path) {
@@ -3660,13 +3686,15 @@ function docxDrop(box, path) {
   const target = e => e.target.closest?.('section.docx p:not(header p):not(footer p)');
   const mark = (p, after) => { box.querySelectorAll('.pdrop-a,.pdrop-d').forEach(x => x.classList.remove('pdrop-a', 'pdrop-d')); p?.classList.add(after ? 'pdrop-d' : 'pdrop-a'); };
   const half = (p, e) => { const r = p.getBoundingClientRect(); return e.clientY > r.top + r.height / 2; };
+  const skip = e => fromOutside(e) && wedit?.path !== path; // desde fuera solo se inserta en edición; si no, se abre en pestaña
   box.addEventListener('dragover', e => {
-    const p = target(e); if (!p) return;
+    const p = target(e); if (!p || skip(e)) return;
     e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'copy'; mark(p, half(p, e));
   });
   box.addEventListener('dragleave', e => { if (!box.contains(e.relatedTarget)) mark(null); });
   box.addEventListener('drop', async e => {
     const p = target(e); mark(null);
+    if (skip(e)) return; // sigue hasta document.ondrop: se abre en pestaña
     e.preventDefault(); e.stopPropagation();
     if (!p) return flash('Suelta la imagen sobre un párrafo del documento');
     const uri = e.dataTransfer.getData('text/uri-list'), own = uri.match(/^https?:\/\/[^/]+\/raw\/(.+)$/);
@@ -5331,14 +5359,28 @@ addEventListener('keydown', e => {
 });
 
 // ---------- arrastrar archivos ----------
-// El navegador no da la ruta real de un archivo arrastrado, y sin ruta no se puede editar el original.
+// Desde fuera (Explorador de Windows, Finder): se abren en pestañas. El navegador no da su ruta real; el servidor
+// la busca por nombre, tamaño y fecha. Excepciones: sobre el panel de IA se adjuntan y sobre un Word en edición se insertan.
+// Del Explorador solo llega 'Files'; una imagen arrastrada desde el visor de Atril trae también uri-list/html
+const fromOutside = e => { const t = e.dataTransfer.types; return t.includes('Files') && !['text/atril-path', 'text/uri-list', 'text/html'].some(x => t.includes(x)); };
 document.ondragover = e => e.preventDefault();
 document.ondrop = e => {
   e.preventDefault();
   if (dragTab) return; // una pestaña soltada fuera de la barra: no pasa nada
-  ask('Soltar aquí no hace nada', 'Para meter una imagen en un Word, suéltala sobre un párrafo del documento. Para adjuntar algo a la IA, suéltalo sobre el panel de IA. ' +
-    'Para abrir archivos sueltos usa el botón + de «Sueltos» o arrástralos sobre el icono de atril.pyw.', ['Entendido']);
+  if (fromOutside(e)) return openDropped(e.dataTransfer);
+  ask('Soltar aquí no hace nada', 'Para meter una imagen en un Word, ponlo en edición y suéltala sobre un párrafo. Para adjuntar algo a la IA, suéltalo sobre el panel de IA.', ['Entendido']);
 };
+async function openDropped(dt) {
+  const files = [...dt.files].filter((f, i) => !dt.items[i]?.webkitGetAsEntry?.()?.isDirectory); // las carpetas no se abren
+  if (!files.length) return ask('Abrir', 'Suelta archivos, no carpetas: para añadir una carpeta usa + «Añadir proyecto».', ['Entendido']);
+  let r;
+  try { r = await api('/api/soltados', { archivos: files.map(f => ({ nombre: f.name, tam: f.size, fecha: f.lastModified })) }); }
+  catch (e) { return ask('No se pudieron abrir', e.message, ['Entendido']); }
+  const ok = r.filter(x => x.ruta), miss = r.filter(x => !x.ruta);
+  if (ok.length) { await loadSide(); ok.forEach(x => openTab(x.ruta, true)); }
+  if (miss.length) ask('No encontré dónde está', `No pude saber la ruta de ${miss.map(x => `«${x.nombre}»`).join(', ')}. ` +
+    'Ábrelo con + de «Sueltos» o arrástralo desde una ventana del Explorador.', ['Entendido']);
+}
 
 // ---------- arranque ----------
 // cinta de iconos y herramientas de la barra lateral

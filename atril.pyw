@@ -341,10 +341,15 @@ def status(project):
     return avisos
 
 
+CODE_MTIME = Path(__file__).stat().st_mtime_ns  # atril.pyw al arrancar: si cambia, hay que reiniciar Atril
+
+
 def estado():
-    """Lo que dibuja la barra lateral: proyectos con sus avisos y archivos sueltos (con su estado de git)."""
+    """Lo que dibuja la barra lateral: proyectos con sus avisos y archivos sueltos (con su estado de git).
+    reiniciar: atril.pyw cambió desde que arrancó este servidor (index.html se lee nuevo; el servidor, no)."""
     cfg = load_config()
     return {
+        "reiniciar": Path(__file__).stat().st_mtime_ns != CODE_MTIME,
         "proyectos": [{"ruta": r, "nombre": Path(r).name or r, "avisos": status(r)} for r in cfg["proyectos"]],
         "sueltos": [{"ruta": s, "nombre": Path(s).name, "existe": Path(s).is_file(), "git": git_state(s)}
                     for s in cfg["sueltos"]],
@@ -1936,6 +1941,94 @@ def create_folder(folder, name):
     return str(p)
 
 
+def to_trash(path):
+    """«Eliminar»: a la papelera de reciclaje (Windows), la Papelera del Finder (macOS) o gio trash (Linux): se puede
+    recuperar. Nunca la carpeta de un proyecto (para eso, «Quitar de Atril»). Un suelto eliminado sale de la lista.
+    La ruta va por variable de entorno, no dentro del texto de la orden: un nombre con comillas no puede romperla."""
+    p = Path(path).resolve()
+    if not p.exists():
+        raise FileNotFoundError(f"Ya no existe: {p}")
+    if is_project(p):
+        raise PermissionError("Es la carpeta de un proyecto: quítalo con «Quitar de Atril»")
+    if WINDOWS:
+        kind = "DeleteDirectory" if p.is_dir() else "DeleteFile"
+        ps = ("Add-Type -AssemblyName Microsoft.VisualBasic; "
+              f"[Microsoft.VisualBasic.FileIO.FileSystem]::{kind}($env:ATRIL_RUTA, 'OnlyErrorDialogs', 'SendToRecycleBin')")
+        r = subprocess.run(["powershell", "-NoProfile", "-Command", ps], env={**os.environ, "ATRIL_RUTA": str(p)},
+                           capture_output=True, timeout=120, creationflags=NO_WINDOW)
+    elif MAC:  # ponytail: sin probar en macOS
+        r = subprocess.run(["osascript", "-e", "on run a", "-e", 'tell application "Finder" to delete (POSIX file (item 1 of a))',
+                            "-e", "end run", str(p)], capture_output=True, timeout=120)
+    else:
+        r = subprocess.run(["gio", "trash", str(p)], capture_output=True, timeout=120)
+    if p.exists():
+        raise OSError((r.stderr.decode("utf-8", "replace").strip() or "No se pudo enviar a la papelera")[-300:])
+    cfg = load_config()
+    if str(p) in cfg["sueltos"]:
+        cfg["sueltos"].remove(str(p))
+        save_config(cfg)
+
+
+# ---------- archivos soltados desde fuera: el navegador no da su ruta, se busca por nombre, tamaño y fecha ----------
+
+PS_SELECTION = ("[Console]::OutputEncoding = [Text.Encoding]::UTF8; "
+                "foreach ($w in (New-Object -ComObject Shell.Application).Windows()) { try { "
+                "$w.Document.SelectedItems() | ForEach-Object { $_.Path }; '>' + $w.Document.Folder.Self.Path } catch {} }")
+MAC_SELECTION = ['tell application "Finder"', 'set out to ""',
+                 'repeat with i in (get selection)', 'set out to out & POSIX path of (i as alias) & linefeed', 'end repeat',
+                 'try', 'repeat with w in Finder windows',
+                 'set out to out & ">" & POSIX path of (target of w as alias) & linefeed', 'end repeat', 'end try',
+                 'return out', 'end tell']
+
+
+def shell_selection():
+    """(seleccionados, carpetas abiertas) en las ventanas del Explorador de Windows o del Finder: de ahí suele venir
+    lo que se arrastra. En Linux no hay forma común de preguntarlo: ([], [])."""
+    try:
+        if WINDOWS:
+            r = subprocess.run(["powershell", "-NoProfile", "-Command", PS_SELECTION], capture_output=True, timeout=10,
+                               creationflags=NO_WINDOW)
+        elif MAC:  # ponytail: sin probar en macOS; si falla, quedan las carpetas habituales y los proyectos
+            r = subprocess.run(["osascript", *[a for line in MAC_SELECTION for a in ("-e", line)]], capture_output=True, timeout=10)
+        else:
+            return [], []
+    except (OSError, subprocess.TimeoutExpired):
+        return [], []
+    lines = [ln.strip() for ln in r.stdout.decode("utf-8", "replace").splitlines() if ln.strip()]
+    return [ln for ln in lines if not ln.startswith(">")], [ln[1:] for ln in lines if ln.startswith(">")]
+
+
+def locate_dropped(items):
+    """Ruta real de cada archivo soltado ({nombre, tam, fecha en ms}): solo vale uno con el mismo nombre, tamaño
+    y fecha (±2 s por FAT). Busca en lo seleccionado en el Explorador, sus carpetas abiertas, Escritorio, Descargas,
+    Documentos y el índice de los proyectos. Lo hallado fuera de lo añadido pasa a «Sueltos»."""
+    selected, folders = shell_selection()
+    home = Path.home()
+    places = folders + [str(b / n) for n in ("Desktop", "Downloads", "Documents") for b in (home, home / "OneDrive")]
+    c = idx_conn()
+    try:
+        out = []
+        for it in items:
+            name, size, ms = Path(str(it.get("nombre", ""))).name, it.get("tam"), it.get("fecha") or 0
+
+            def same(p):
+                try:
+                    st = p.stat()
+                except OSError:
+                    return False
+                return p.name == name and p.is_file() and st.st_size == size and abs(st.st_mtime * 1000 - ms) < 2000
+
+            indexed = [Path(r) for (r,) in c.execute("select path from files where name=? and size=?", (name, size))]
+            hit = next((p for p in [*map(Path, selected), *(Path(f) / name for f in places), *indexed] if same(p)), None)
+            out.append({"nombre": name, "ruta": str(hit.resolve()) if hit else None})
+    finally:
+        c.close()
+    new = [o["ruta"] for o in out if o["ruta"] and not allowed(o["ruta"])]
+    if new:
+        add_paths("sueltos", new)
+    return out
+
+
 # ---------- recuperación (como Notepad++): copia de lo NO guardado; el archivo original no se toca ----------
 # Sobrevive a cierres, cuelgues y reinicios. Va en historial/ (no en Temp: el liberador de Windows lo vacía).
 
@@ -2791,6 +2884,16 @@ class Handler(BaseHTTPRequestHandler):
             except (ValueError, KeyError, IndexError, zipfile.BadZipFile, ET.ParseError) as e:
                 return self.send_json(400, {"error": str(e)})
             return self.send_json(200, {"nombre": nombre, **r, "tokens": estimate_tokens(r["texto"])})
+        if url == "/api/papelera":
+            if self.denied(data.get("ruta", "")):
+                return
+            try:
+                to_trash(data["ruta"])
+            except PermissionError as e:
+                return self.send_json(403, {"error": str(e)})
+            return self.send_json(200, estado())
+        if url == "/api/soltados":  # archivos soltados desde el Explorador: su ruta real (y quedan como sueltos)
+            return self.send_json(200, locate_dropped([a for a in data.get("archivos", []) if isinstance(a, dict)]))
         if url == "/api/contexto":
             return self.send_json(200, find_mentioned(data.get("mensaje", ""), data.get("ruta", "")))
         if url == "/api/conv/enviar":
