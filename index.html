@@ -424,6 +424,7 @@ dialog#dlg.fcmp[open]{display:flex}
 .code{display:flex;background:var(--paper);min-height:100%;font:var(--codeFont,13px)/1.55 Consolas,"Cascadia Mono",monospace}
 .code pre{margin:0;padding:14px 12px}
 .code .nums{color:var(--muted);text-align:right;user-select:none;border-right:1px solid var(--line);opacity:.7}
+.code{position:relative}.code .linemark{position:absolute;left:0;right:0;pointer-events:none;background:color-mix(in srgb,var(--accent) 22%,transparent);transition:opacity .4s}
 .code code.hljs{padding:0;background:none}
 .grid{border-collapse:collapse;font-size:13px;background:var(--paper)}
 .grid th,.grid td{border:1px solid var(--line);padding:4px 8px;white-space:nowrap;max-width:420px;overflow:hidden;text-overflow:ellipsis}
@@ -2712,7 +2713,7 @@ function renderTabs() {
   if (first) T.prepend(iconBtn('panelLeft', (side ? 'Mostrar' : 'Ocultar') + ' barra lateral (Ctrl+B)', toggleSide));
   T.append(Object.assign(document.createElement('span'), { style: 'flex:1' }));
   if (last) T.append(iconBtn(panes[1] ? 'unsplit' : 'split', panes[1] ? 'Juntar en un solo lado (Ctrl+\\)' : 'Dividir: dos pestañas lado a lado (Ctrl+\\)',
-    () => setSplit(!panes[1])), iconBtn('panelRight', (ia ? 'Ocultar' : 'Mostrar') + ' panel de IA (Ctrl+G)', () => setIA(!ia)));
+    () => setSplit(!panes[1])), iconBtn('panelRight', (ia ? 'Ocultar' : 'Mostrar') + ' panel de IA (Ctrl+J)', () => setIA(!ia)));
 }
 
 // Migas: "proyecto / carpeta / archivo" (o "carpeta / archivo" para sueltos)
@@ -3400,7 +3401,8 @@ function flash(text) {
 // Va en su propio <dialog>, encima de cualquier otro. Devuelve el botón pulsado, o null con Esc.
 // { danger }: el primer botón borra o descarta (rojo) · { input: 'valor' }: pide un texto y devuelve ese texto (o null)
 const modalOpen = () => !!document.querySelector('dialog[open]');
-function ask(title, msg, buttons, { danger, input } = {}) {
+// numeric: el cuadro solo admite dígitos (lo demás se borra al escribirlo o pegarlo).
+function ask(title, msg, buttons, { danger, input, numeric } = {}) {
   const d = $('#ask');
   d.innerHTML = '<b></b><p></p>' + (input !== undefined ? '<input spellcheck="false">' : '') + '<div class="exp-actions"></div>';
   d.querySelector('b').textContent = title; d.querySelector('p').textContent = msg;
@@ -3411,8 +3413,16 @@ function ask(title, msg, buttons, { danger, input } = {}) {
     buttons.forEach((t, i) => acts.append(Object.assign(button(t, () => end(t)), { className: i ? '' : danger ? 'primary danger' : 'primary' })));
     d.oncancel = d.onclose = () => end(null); // Esc
     d.showModal();
-    if (inp) { inp.value = input; inp.onkeydown = e => e.key === 'Enter' && (e.preventDefault(), end(buttons[0])); inp.focus(); inp.select(); }
-    else acts.querySelector(danger ? 'button:not(.primary)' : '.primary')?.focus(); // borrar nunca queda a un Enter de distancia
+    if (inp) {
+      // con llaves: un on… que devuelve false anula la tecla (con «e.key === 'Enter' && …» no se podía escribir nada)
+      inp.value = input; inp.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); end(buttons[0]); } }; inp.focus(); inp.select();
+      if (numeric) { inp.inputMode = 'numeric'; inp.oninput = () => { inp.value = inp.value.replace(/\D/g, ''); }; }
+      // si algo le quita el foco al cuadro, lo que se escribe vuelve a él (y no se pierde)
+      d.onkeydown = e => { if (e.target !== inp && e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) inp.focus(); };
+    } else {
+      d.onkeydown = null;
+      acts.querySelector(danger ? 'button:not(.primary)' : '.primary')?.focus(); // borrar nunca queda a un Enter de distancia
+    }
   });
 }
 
@@ -5394,12 +5404,31 @@ addEventListener('keydown', e => { // Ctrl+B: barra lateral · Ctrl+Alt+B: panel
   e.preventDefault();
   e.altKey ? setIA(!document.body.classList.contains('ia')) : toggleSide();
 });
-// Ctrl+G: panel de IA. En captura: antes que el editor y que el «buscar siguiente» del navegador (ir a la línea sigue en Alt+G)
+// Ctrl+J: panel de IA (como el panel inferior de VS Code). Ctrl+G: ir a la línea. En captura: antes que el editor,
+// que las descargas del navegador (Ctrl+J) y que su «buscar siguiente» (Ctrl+G).
 addEventListener('keydown', e => {
-  if (!e.ctrlKey || e.altKey || e.shiftKey || e.key.toLowerCase() !== 'g' || maxZone || modalOpen()) return;
+  const k = e.key.toLowerCase();
+  if (!e.ctrlKey || e.altKey || e.shiftKey || (k !== 'j' && k !== 'g') || modalOpen()) return;
   e.preventDefault(); e.stopPropagation();
-  setIA(!document.body.classList.contains('ia'));
+  if (k === 'g') return goToLine();
+  if (!maxZone) setIA(!document.body.classList.contains('ia'));
 }, true);
+// Ir a la línea N: en el editor, con el cuadro de CodeMirror («línea» o «línea:columna»); en la vista de código
+// numerada, se pide el número y se desplaza hasta ella marcándola un momento. En otras vistas avisa.
+async function goToLine() {
+  if (editorCM) return editorCM.execCommand('jumpToLine');
+  const code = $('#view .code'), nums = code?.querySelector('.nums');
+  if (!nums) return flash('Ir a la línea: solo en archivos de texto con líneas numeradas');
+  const total = nums.textContent.split('\n').length;
+  const v = await ask('Ir a la línea', `Número de línea (1–${total}):`, ['Ir', 'Cancelar'], { input: '', numeric: true });
+  const n = Math.min(total, Math.max(1, parseInt(v, 10) || 0));
+  if (!v || !n) return;
+  const pad = parseFloat(getComputedStyle(nums).paddingTop), lh = (nums.offsetHeight - 2 * pad) / total;
+  const V = $('#view'), mark = document.createElement('div'), y = pad + (n - 1) * lh;
+  V.scrollTop = code.offsetTop + y - V.clientHeight / 3;
+  mark.className = 'linemark'; mark.style.top = y + 'px'; mark.style.height = lh + 'px';
+  code.append(mark); setTimeout(() => mark.remove(), 1500);
+}
 try { if (localStorage.getItem('atril.noside')) document.body.classList.add('noside'); } catch {}
 if (LS('atril.bak')) document.body.classList.add('showbak');
 $('#ribbon').append(

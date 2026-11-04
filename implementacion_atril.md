@@ -43,7 +43,7 @@ Atril es un visor local con pestañas para leer, editar y ejecutar archivos de m
 - **Árbol:** chevrons ›, líneas guía verticales, grises neutros, acento morado.
 - **Cabecera:** ← → historial (también Alt+← / Alt+→), migas proyecto / carpeta / archivo, ✎ Editar o 📖 volver a lectura, ⋮ menú (ver fuente, vista previa, descartar, mostrar en carpeta, copiar ruta).
 - **Columnas redimensionables** (2026-11-02): arrastrar el borde de la barra lateral o del panel de IA (180–600 px; el documento nunca baja de 300 px). Doble clic en el borde: ancho original. Los anchos se recuerdan. La consola cambia de altura desde su borde superior.
-- **Mostrar/ocultar paneles laterales:** ◧ al inicio y ◨ al final de la barra de pestañas (siempre visibles), o **Ctrl+B** (barra lateral) y **Ctrl+Alt+B** (panel de IA). También ◧ en las herramientas de la barra lateral, ◨ en la cabecera de la IA, y 📁 / ✦ en la cinta.
+- **Mostrar/ocultar paneles laterales:** ◧ al inicio y ◨ al final de la barra de pestañas (siempre visibles), o **Ctrl+B** (barra lateral) y **Ctrl+J** o **Ctrl+Alt+B** (panel de IA). También ◨ en la cabecera de la IA y 📁 / ✦ en la cinta. **Ctrl+G**: ir a la línea (editor y vista de código).
 - **⤢ Pantalla completa** en documento, IA y consola: esa zona ocupa toda la ventana. **⤡ o Esc** vuelve exactamente a como estaba justo antes (no al diseño original), porque al ampliar solo se ocultan las demás zonas sin cambiar su estado. Con un diálogo o menú abierto, Esc solo cierra el diálogo.
 - **Barra de estado** abajo: codificación, saltos de línea, tamaño, fecha y mensajes ("✓ Guardado").
 - Se mantiene la **letra de libro** (Source Serif) en los documentos.

@@ -8,6 +8,17 @@ Entradas nuevas arriba. Formato: `## AAAA-MM-DD · título` + 2–4 líneas (qu�
 - **Cómo trabaja el usuario:** escribe en español. **Antes de construir algo nuevo, dibujarlo en texto y esperar su «ok».** No instalar nada sin acuerdo. Ahorrar tokens. Prefiere lo simple: rechazó un panel de IA con modos (ver 2026-11-02).
 - **Para verificar sin tocar su Atril:** levantar `atril.Handler` en el puerto 8799 con `CONFIG`, `CONV_DIR`, `RECOVERY_DIR` e `INDEX_DB` en una carpeta temporal y hacer captura con Edge sin ventana (`--headless=new --screenshot`). Así se probó cada paso. Ojo: en Windows dos servidores pueden escuchar el mismo puerto sin error; si hay otra sesión probando, usa otro puerto.
 
+## 2026-11-04 · Ctrl+J para la IA, Ctrl+G ir a la línea
+Ctrl+J abre/cierra el panel de IA (antes Ctrl+G; sigue Ctrl+Alt+B). Ctrl+G va a la línea: en el editor, el cuadro de CodeMirror (`jumpToLine`, admite «línea:columna»); en la vista de código numerada, pide el número con `ask()` y la marca un momento. Ambos en captura, para ganar a las descargas (Ctrl+J) y al «buscar siguiente» (Ctrl+G) del navegador.
+
+## 2026-11-04 · Revisión técnica y mejoras de uso
+- Revisión: do_GET ya responde a ValueError/KeyError; la ventana usa `edge_path()` también en Windows; fuera `_image_size` duplicada; `backup_once`/`replace_atomic`, `denied`/`stale` y el 423 en `do_POST` quitan código repetido; la limpieza del historial pasa al hilo del índice.
+- Vista dividida: `.pane` con `grid-template-columns:minmax(0,1fr)` (un Word ancho tapaba el otro lado y ocultaba «Juntar»). Un solo botón para la barra lateral (el de las pestañas).
+- Buscador: «En:» elige proyectos (casillas, «solo», o el del archivo abierto); `search(raices=…)` filtra en SQL. Título de proyecto en banda.
+- Árbol: Plegar/Desplegar todo (un nivel), carpetas abiertas recordadas (`atril.arbol`), «nuevo» sin extensión en la carpeta del archivo elegido, «Eliminar (a la papelera)» (PowerShell/VisualBasic, ruta por variable de entorno).
+- Soltar desde el Explorador abre en pestañas: el navegador no da la ruta y `locate_dropped` la busca por nombre+tamaño+fecha (selección del Explorador por COM, carpetas abiertas, Escritorio/Descargas/Documentos, índice). Sobre un Word solo se inserta en edición.
+- Ojo al probar: una pestaña del navegador en el 8765 del usuario envía pings y mantiene vivo su servidor viejo. Ahora la ventana avisa si el servidor no conoce una ruta o si `atril.pyw` cambió desde el arranque.
+
 ## 2026-11-03 · Código comentado
 Barrido completo con la regla de reglas.md (técnico, para quien mantenga): 83 docstrings en atril.pyw (138 de 145 funciones comentadas; las 7 restantes son de una línea y evidentes) y 100 comentarios en index.html sobre las funciones de 5+ líneas que no tenían (las que quedan son de una línea o evidentes). Solo comentarios: se comprobó que el código sin ellos es idéntico al de antes, y las pruebas pasan en Windows y Linux.
 
