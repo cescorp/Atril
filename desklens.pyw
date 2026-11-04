@@ -29,6 +29,7 @@ import unicodedata
 import webbrowser
 import xml.etree.ElementTree as ET
 import zipfile
+from concurrent.futures import ThreadPoolExecutor
 from html.parser import HTMLParser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -2560,7 +2561,20 @@ def git_overview(path):
     """Estado del repositorio para la vista Git: rama, remota, commits por subir/bajar, ramas locales y los archivos
     preparados, con cambios y en conflicto (estado de una letra como VS Code: M, A, D, R, U = sin seguimiento)."""
     repo = repo_of(path)
-    out = git_do(repo, "-c", "core.quotePath=false", "status", "--porcelain=v1", "-z", "--branch", "--untracked-files=all")
+    # en Windows cada proceso de git cuesta ~40 ms: las consultas sueltas van en paralelo mientras corre el status
+    with ThreadPoolExecutor(8) as ex:
+        q = {k: ex.submit(git_run, repo, *a) for k, a in {
+            "ramas": ("branch", "--format=%(refname:short)"),
+            "remotas": ("branch", "-r", "--format=%(refname:short)"),
+            "head": ("rev-parse", "-q", "--verify", "HEAD"),
+            "up": ("rev-parse", "-q", "--verify", "@{u}"),
+            "remotos": ("remote",),
+            "stash": ("-c", "core.quotePath=false", "stash", "list", "--format=%gd\x1f%s\x1f%cr"),
+            "merge": ("rev-parse", "-q", "--verify", "MERGE_HEAD"),
+            "revert": ("rev-parse", "-q", "--verify", "REVERT_HEAD")}.items()}
+        fetched = ex.submit(git_fetch_time, repo)
+        out = git_do(repo, "-c", "core.quotePath=false", "status", "--porcelain=v1", "-z", "--branch", "--untracked-files=all")
+        q = {k: f.result() for k, f in q.items()}
     entries = out.split("\0")
     head = entries[0][3:] if entries and entries[0].startswith("## ") else ""
     # «main...origin/main [ahead 1, behind 2]» · «No commits yet on main» · «HEAD (no branch)»
@@ -2589,17 +2603,14 @@ def git_overview(path):
     git_cache.pop(repo, None)  # el punto de color del árbol se pone al día con lo que se acaba de ver
     return {"repositorio": str(repo), "nombre": repo.name, "rama": branch, "remota": upstream,
             "adelante": num("ahead"), "atras": num("behind"),
-            "ramas": git_run(repo, "branch", "--format=%(refname:short)").splitlines(),
-            "ramas_remotas": [b for b in git_run(repo, "branch", "-r", "--format=%(refname:short)").splitlines()
-                              if not b.endswith("/HEAD") and "/" in b],
-            "punta": git_run(repo, "rev-parse", "-q", "--verify", "HEAD") + ":" + git_run(repo, "rev-parse", "-q", "--verify", "@{u}"),
-            "remotos": git_run(repo, "remote").splitlines(),
+            "ramas": q["ramas"].splitlines(),
+            "ramas_remotas": [b for b in q["remotas"].splitlines() if not b.endswith("/HEAD") and "/" in b],
+            "punta": q["head"] + ":" + q["up"],
+            "remotos": q["remotos"].splitlines(),
             # cambios guardados aparte (stash): [{id: stash@{N}, mensaje, fecha}], el más reciente primero
-            "stashes": [dict(zip(("id", "mensaje", "fecha"), ln.split("\x1f"))) for ln in
-                        git_run(repo, "-c", "core.quotePath=false", "stash", "list", "--format=%gd\x1f%s\x1f%cr").splitlines() if ln],
-            "fusionando": bool(git_run(repo, "rev-parse", "-q", "--verify", "MERGE_HEAD")
-                               or git_run(repo, "rev-parse", "-q", "--verify", "REVERT_HEAD")),  # merge o revert a medias
-            "comprobado": git_fetch_time(repo),
+            "stashes": [dict(zip(("id", "mensaje", "fecha"), ln.split("\x1f"))) for ln in q["stash"].splitlines() if ln],
+            "fusionando": bool(q["merge"] or q["revert"]),  # merge o revert a medias
+            "comprobado": fetched.result(),
             "preparados": staged, "cambios": changes, "conflictos": conflicts}
 
 
@@ -2612,15 +2623,15 @@ def git_fetch_time(repo):
 
 def git_summary():
     """Estado de git de cada proyecto para el selector de la vista Git: rama, ↓↑ y número de cambios (None si no es git)."""
-    out = []
-    for r in load_config()["proyectos"]:
+    def one(r):
         try:
             ov = git_overview(r)
-            out.append({"ruta": r, "rama": ov["rama"], "remota": ov["remota"], "adelante": ov["adelante"],
-                        "atras": ov["atras"], "cambios": len(ov["cambios"]) + len(ov["preparados"]) + len(ov["conflictos"])})
+            return {"ruta": r, "rama": ov["rama"], "remota": ov["remota"], "adelante": ov["adelante"],
+                    "atras": ov["atras"], "cambios": len(ov["cambios"]) + len(ov["preparados"]) + len(ov["conflictos"])}
         except (ValueError, OSError, subprocess.TimeoutExpired):
-            out.append({"ruta": r, "rama": None})
-    return out
+            return {"ruta": r, "rama": None}
+    with ThreadPoolExecutor(4) as ex:  # los proyectos a la vez, no uno tras otro
+        return list(ex.map(one, load_config()["proyectos"]))
 
 
 def git_autofetch():

@@ -2132,6 +2132,7 @@ async function gitDo(accion, files = [], extra = {}) {
 // VS Code: llevar los cambios a la otra rama (stash → cambiar → recuperarlos) o guardarlos aparte en el stash.
 async function gitSwitch(rama, modo = '') {
   if (gbusy) return false; gbusy = true;
+  gitPending(rama);
   try {
     const r = await api('/api/git/accion', { ruta: gst.ruta, accion: 'cambiar_rama', rama, modo });
     gst = { ...r, ruta: gst.ruta }; gitDraw(); loadSide();
@@ -2146,8 +2147,20 @@ async function gitSwitch(rama, modo = '') {
       `· Guardarlos aparte: cambias con la rama limpia; los recuperas luego en ⎇ › «Recuperar cambios guardados».\n` +
       `· Llevarlos: cambias y tus cambios siguen contigo (si chocan con «${rama}», quedan en conflicto para resolverlos).`,
       [apartar, llevar, 'Cancelar']); // como «Stash & Checkout» de VS Code: lo más seguro primero
-    return c === llevar ? gitSwitch(rama, 'llevar') : c === apartar ? gitSwitch(rama, 'apartar') : false;
+    if (c !== llevar && c !== apartar) { gitDraw(); return false; } // cancelado: vuelve a como estaba
+    return gitSwitch(rama, c === llevar ? 'llevar' : 'apartar');
   } finally { gbusy = false; }
+}
+// Respuesta inmediata al clic (regla de reglas.md): la rama elegida se marca con ⏳ y el grafo se atenúa mientras git
+// trabaja; gitDraw/gitGraphDraw lo dejan como corresponde al llegar la respuesta.
+function gitPending(rama) {
+  $('#gBranch').textContent = '⏳ ' + rama;
+  for (const n of document.querySelectorAll('#gfBr .node, #gfRem .node')) {
+    const name = n.textContent.replace(/^[✓ ⏳ ]+/, ''), hit = name === rama || name.split('/').slice(1).join('/') === rama;
+    n.classList.toggle('on', hit && n.parentNode.id === 'gfBr');
+    if (hit) n.textContent = '⏳ ' + name;
+  }
+  const g = $('#gfGraph'); if (g) g.style.opacity = '.45';
 }
 async function gitDiscard(files) {
   const nuevos = files.filter(f => f.estado === 'U').length;
@@ -2280,10 +2293,10 @@ async function gitFullDraw() {
   api('/api/git/resumen').then(sum => { gfSum = sum; gitFullProjects(); }).catch(() => {});
   gitFullProjects();
   const todas = $('#gfAll').checked, key = `${gst.ruta}|${gst.punta}|${todas}`;
-  if (key === gfKey) return;
+  if (key === gfKey) { $('#gfGraph').style.opacity = ''; return; }
   gfKey = key;
   try { gfGraph = await api(`/api/git/grafo?ruta=${encodeURIComponent(gst.ruta)}&todas=${todas ? 1 : 0}`); }
-  catch (e) { $('#gfGraph').innerHTML = `<p class="gfmore">${esc(e.message)}</p>`; return; }
+  catch (e) { $('#gfGraph').innerHTML = `<p class="gfmore">${esc(e.message)}</p>`; $('#gfGraph').style.opacity = ''; return; }
   gitGraphDraw();
 }
 function gitFullProjects() {
@@ -2319,7 +2332,7 @@ function gitLanes(commits) {
 }
 const LANE_COLORS = ['#7c5cdb', '#2f7fd8', '#2e8b57', '#c08a00', '#d0508a', '#1aa3a3', '#d35400'];
 function gitGraphDraw() {
-  const G = $('#gfGraph'), cs = gfGraph.commits; G.innerHTML = '';
+  const G = $('#gfGraph'), cs = gfGraph.commits; G.innerHTML = ''; G.style.opacity = '';
   if (!cs.length) return G.innerHTML = '<p class="gfmore">Este repositorio aún no tiene commits.</p>';
   const rows = gitLanes(cs), width = Math.max(...rows.map(r => Math.max(r.before.length, r.after.length, r.i + 1))), W = 14, H = 28, m = H / 2;
   const x = j => 8 + j * W, col = j => LANE_COLORS[j % LANE_COLORS.length];
