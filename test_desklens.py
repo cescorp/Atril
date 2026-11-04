@@ -734,6 +734,18 @@ assert.deepStrictEqual(findRefs('Ver 1 Samuel 4:4 y 1 Samuel 8:5, 20; Deuteronom
     assert r["orden"] == "git pull --no-rebase && git push" and wait_run(r["id"])["codigo"] == 0
     ov = json.loads(get(port, "/api/git/estado?ruta=" + urllib.request.quote(str(rep)))[1])
     assert (ov["atras"], ov["adelante"]) == (0, 0) and (rep / "c.md").exists()
+    # grafo de la pantalla completa: entrantes y salientes, padres de un merge y +/− líneas por archivo
+    (rep / "e.md").write_text("uno\ndos\n"); post("/api/git/accion", {"ruta": str(rep), "accion": "commit", "mensaje": "e", "todo": True})
+    git(otro, "pull", "-q", "--no-rebase")  # el otro clon se pone al día con lo sincronizado arriba
+    (otro / "f.md").write_text("f\n"); git(otro, "add", "-A"); git(otro, "commit", "-q", "-m", "f"); git(otro, "push", "-q")
+    wait_run(post("/api/git/accion", {"ruta": str(rep), "accion": "fetch"})[1]["id"])
+    g = json.loads(get(port, "/api/git/grafo?ruta=" + urllib.request.quote(str(rep)))[1])
+    lados = {c["mensaje"]: c["lado"] for c in g["commits"]}
+    assert lados["e"] == "saliente" and lados["f"] == "entrante" and lados["d"] == "" and g["remota"] == "origin/main"
+    assert any(len(c["padres"]) == 2 for c in g["commits"])  # el merge de sincronizar
+    e = next(c for c in g["commits"] if c["mensaje"] == "e")
+    code, d = get(port, f"/api/git/archivos?ruta={urllib.request.quote(str(rep))}&hash={e['hash']}")
+    assert [(f["rel"], f["mas"], f["menos"]) for f in json.loads(d)["archivos"]] == [("e.md", 2, 0)]
     resumen = json.loads(get(port, "/api/git/resumen")[1])
     assert any(x["ruta"] == str(proj) for x in resumen)  # un proyecto por fila (sin git: rama None)
     srv.shutdown()

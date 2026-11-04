@@ -2362,8 +2362,10 @@ def git_log(path):
 
 
 def git_files(path, commit):
-    """Archivos que tocó un commit: [{estado: M/A/D/R…, ruta (absoluta), rel, antes}]; en un merge, frente al 1.er padre."""
-    repo = git_root(Path(path).resolve().parent)
+    """Archivos que tocó un commit: [{estado: M/A/D/R…, ruta (absoluta), rel, antes, mas, menos}]; en un merge, frente
+    al 1.er padre. path: un archivo del repositorio o la carpeta del repositorio. mas/menos: líneas (None si es binario)."""
+    p = Path(path).resolve()
+    repo = git_root(p if p.is_dir() else p.parent)
     if not repo or not re.fullmatch(r"[0-9a-f]{4,40}", commit):
         raise ValueError("commit no válido")
     q = ("-c", "core.quotePath=false")  # rutas con tildes tal cual, sin "\303\255"
@@ -2376,8 +2378,42 @@ def git_files(path, commit):
             continue
         rel = parts[-1]
         files.append({"estado": parts[0][:1], "rel": rel, "antes": parts[1] if len(parts) > 2 else None,
-                      "ruta": str(repo / Path(rel))})
+                      "ruta": str(repo / Path(rel)), "mas": None, "menos": None})
+    stat = git_run(repo, *q, "show", "--format=", "--numstat", "-M", "--diff-merges=first-parent", commit)
+    nums = {}
+    for ln in stat.splitlines():  # «12\t3\truta» («-\t-» si es binario; renombrado: «viejo => nuevo»)
+        a, d, *rest = ln.split("\t") + ["", ""]
+        rel = rest[0]
+        rel = re.sub(r"\{[^{}]* => ([^{}]*)\}", r"\1", rel).replace("//", "/") if "=>" in rel else rel
+        rel = rel.split(" => ")[-1]
+        nums[rel] = (int(a) if a.isdigit() else None, int(d) if d.isdigit() else None)
+    for f in files:
+        f["mas"], f["menos"] = nums.get(f["rel"], (None, None))
     return {"repositorio": str(repo), "archivos": files}
+
+
+def git_graph(path, todas=False, limit=300):
+    """Historial para la pantalla completa de Git: la rama actual y su remota (o todas las ramas), del más nuevo al más
+    viejo, con padres (para dibujar el grafo), etiquetas de ramas y si cada commit es entrante (está en el remoto y aún
+    no se ha traído) o saliente (es tuyo y aún no se ha subido), como el grafo de VS Code."""
+    repo = repo_of(path)
+    if not git_run(repo, "rev-parse", "-q", "--verify", "HEAD"):
+        return {"commits": [], "remota": None, "mas": False}
+    up = git_run(repo, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}")
+    refs = ["--branches", "--remotes", "--tags", "HEAD"] if todas else ["HEAD", *([up] if up else [])]
+    out = git_do(repo, "-c", "core.quotePath=false", "log", "--date-order", f"-n{limit}", "--date=format:%d/%m/%Y %H:%M",
+                 "--format=%x1e%H%x1f%P%x1f%h%x1f%an%x1f%ad%x1f%s%x1f%D", *refs, "--")
+    incoming = set(git_run(repo, "rev-list", f"HEAD..{up}").split()) if up else set()
+    outgoing = set(git_run(repo, "rev-list", f"{up}..HEAD").split()) if up else set()
+    commits = []
+    for rec in out.split("\x1e"):
+        if not rec.strip():
+            continue
+        h, parents, short, author, date, subject, deco = (rec.strip("\n").split("\x1f") + [""] * 7)[:7]
+        commits.append({"hash": h, "padres": parents.split(), "corto": short, "autor": author, "fecha": date,
+                        "mensaje": subject, "refs": [r.strip() for r in deco.split(",") if r.strip()],
+                        "lado": "entrante" if h in incoming else "saliente" if h in outgoing else ""})
+    return {"commits": commits, "remota": up or None, "mas": len(commits) >= limit}
 
 
 def git_version(path, commit, rel):
@@ -2516,6 +2552,9 @@ def git_overview(path):
     return {"repositorio": str(repo), "nombre": repo.name, "rama": branch, "remota": upstream,
             "adelante": num("ahead"), "atras": num("behind"),
             "ramas": git_run(repo, "branch", "--format=%(refname:short)").splitlines(),
+            "ramas_remotas": [b for b in git_run(repo, "branch", "-r", "--format=%(refname:short)").splitlines()
+                              if not b.endswith("/HEAD") and "/" in b],
+            "punta": git_run(repo, "rev-parse", "-q", "--verify", "HEAD") + ":" + git_run(repo, "rev-parse", "-q", "--verify", "@{u}"),
             "remotos": git_run(repo, "remote").splitlines(),
             "fusionando": bool(git_run(repo, "rev-parse", "-q", "--verify", "MERGE_HEAD")),
             "comprobado": git_fetch_time(repo),
@@ -2919,6 +2958,11 @@ class Handler(BaseHTTPRequestHandler):
             if url.path == "/api/git/estado":
                 try:
                     return self.send_json(200, git_overview(ruta))
+                except (ValueError, subprocess.TimeoutExpired) as e:
+                    return self.send_json(400, {"error": str(e)})
+            if url.path == "/api/git/grafo":
+                try:
+                    return self.send_json(200, git_graph(ruta, q.get("todas") == "1"))
                 except (ValueError, subprocess.TimeoutExpired) as e:
                     return self.send_json(400, {"error": str(e)})
             if url.path == "/api/git/archivos":

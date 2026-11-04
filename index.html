@@ -185,11 +185,44 @@ body:not(.noside):not(.vsearch):not(.vgit) #ribbon [data-v=e],body.vsearch:not(.
 /* Sincronizar: en color si hay commits por traer o subir (como «Sync Changes» de VS Code) */
 #gSyncBtn{width:100%;font-weight:500}
 #gSyncBtn.pending{color:var(--accent);border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent)}
+/* Git a pantalla completa: proyectos y ramas · grafo y detalle del commit · cambios y commit (#gitv se muda aquí).
+   Ocupa la fila de las pestañas (la consola sigue visible para pull/push); la barra lateral y la IA se ocultan. */
+#gitfull{display:none}
+body.gitfull{grid-template-columns:44px minmax(0,1fr)!important}
+body.gitfull :is(aside,#ia,#panes){display:none!important}
+body.gitfull #gitfull{grid-row:1;display:grid;grid-template-rows:auto minmax(0,1fr);min-height:0;background:var(--bg)}
+.gfbar{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--line);background:var(--side)}
+.gfbar b{font-size:13px}.gfbar .gft{font-size:12.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gfbar .sp{flex:1}.gfbar label{display:flex;align-items:center;gap:4px;font-size:12px;color:var(--muted)}
+.gfbody{display:grid;grid-template-columns:220px minmax(0,1fr) 330px;min-height:0}
+.gfside,.gfright{overflow:auto;background:var(--side);min-height:0}.gfside{border-right:1px solid var(--line);padding:6px 6px 12px}
+.gfright{border-left:1px solid var(--line);padding-top:6px}.gfright #gitv{display:flex}
+.gfside h4,.gfgraph h4{margin:10px 6px 4px;font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.gfside .node{font-size:12.5px}.gfside .node.on{font-weight:600;color:var(--ink)}
+.gfside .gfp{flex-direction:column;align-items:flex-start;gap:1px}.gfside .gfp .gfpi{font-size:11px}
+.gfmain{display:grid;grid-template-rows:minmax(0,1fr) auto;grid-template-columns:minmax(0,1fr);min-width:0;min-height:0} /* sin la columna explícita, el grafo ensancha la central */
+body.gitfull #gitv .shead{display:none} /* la barra de arriba ya dice «Git» */
+.gfgraph{overflow:auto;min-height:0}
+.gfrow{display:flex;align-items:center;gap:8px;height:28px;padding-right:10px;cursor:pointer;font-size:12.5px;white-space:nowrap;border-left:3px solid transparent}
+.gfrow:hover{background:var(--hover)}.gfrow.on{background:var(--active)}
+.gfrow[data-lado=entrante]{border-left-color:#2f7fd8}.gfrow[data-lado=saliente]{border-left-color:var(--accent)}
+.gfrow svg{flex:none;overflow:visible}.gfrow .gh{font:11.5px Consolas,monospace;color:var(--muted);flex:none}
+.gfrow .gm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}.gfrow .ga,.gfrow .gfdate{color:var(--muted);font-size:11.5px;flex:none}
+.gfrow .gl{flex:none;font-size:11px;font-weight:600}.gfrow[data-lado=entrante] .gl{color:#2f7fd8}.gfrow[data-lado=saliente] .gl{color:var(--accent)}
+.gref{flex:none;font-size:10.5px;padding:0 6px;border-radius:8px;border:1px solid var(--line);color:var(--muted)}
+.gref.head{border-color:var(--accent);color:var(--accent)}.gref.rem{border-style:dashed}
+.gfdetail{border-top:1px solid var(--line);max-height:40vh;overflow:auto;padding:8px 12px;background:var(--side)}
+.gfdetail:empty{display:none}.gfdetail .gdh{font-size:13px;margin-bottom:6px}.gfdetail .gdh small{color:var(--muted);font-size:11.5px;margin-left:6px}
+.gfdetail .gdf{display:flex;align-items:center;gap:8px;font-size:12.5px;padding:3px 0}
+.gfdetail .gdf .gst{width:14px;font:600 11px Consolas,monospace;text-align:center}.gfdetail .gdf .rb{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gfdetail .gdn{font:11.5px Consolas,monospace}.gfdetail .gdn i{font-style:normal;color:#2e8b57}.gfdetail .gdn em{font-style:normal;color:#d33;margin-left:4px}
+.gfmore{padding:8px 12px;font-size:12px;color:var(--muted)}
 /* selector de repositorio: cada dato con su color */
+.gfpi>span:first-child{margin-left:0!important}
 .menu .mr-mark{display:inline-block;width:1.1em;color:var(--accent)}.menu .mr-name{font-weight:600;color:var(--ink);margin-right:4px}
-.menu :is(.mr-br,.mr-down,.mr-up,.mr-ok,.mr-ch,.mr-off){font-size:11.5px;margin-left:8px}
-.menu .mr-br{color:var(--muted)}.menu .mr-down{color:#2f7fd8;font-weight:600}.menu .mr-up{color:var(--accent);font-weight:600}
-.menu .mr-ok{color:#2e8b57}.menu .mr-ch{color:#b07800}.menu .mr-off{color:var(--faint);font-style:italic}
+:is(.menu,.gfpi) :is(.mr-br,.mr-down,.mr-up,.mr-ok,.mr-ch,.mr-off){font-size:11.5px;margin-left:8px}
+:is(.menu,.gfpi) .mr-br{color:var(--muted)}:is(.menu,.gfpi) .mr-down{color:#2f7fd8;font-weight:600}:is(.menu,.gfpi) .mr-up{color:var(--accent);font-weight:600}
+:is(.menu,.gfpi) .mr-ok{color:#2e8b57}:is(.menu,.gfpi) .mr-ch{color:#b07800}:is(.menu,.gfpi) .mr-off{color:var(--faint);font-style:italic}
 #gChecked{margin-top:-2px;font-size:11px;color:var(--faint);text-align:center}
 #gMsg{width:100%;box-sizing:border-box;resize:vertical;font:13px Inter,sans-serif;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--paper);color:var(--ink)}
 #gMsg:focus{outline:none;border-color:var(--accent)}
@@ -739,6 +772,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 </aside>
 <main>
   <div id="panes"><div class="pane on"><div id="tabs"></div><div id="bar"></div><div id="view"></div></div></div>
+  <div id="gitfull"></div>
   <section id="panel" hidden>
     <div id="grip" title="Arrastra para cambiar el tamaño"></div>
     <div class="ph"><div id="runtabs"></div><span id="phTools"></span></div>
@@ -1975,6 +2009,7 @@ $('#sideQ').onkeydown = e => {
 };
 // 📁 Explorador · 🔍 Buscar · ⎇ Git; clic en la vista que ya se ve = ocultar la barra (como VS Code)
 function sideView(v, keep) {
+  if (gitFullOn()) { gitFullClose(); if (v === 'g') return; } // desde la pantalla completa de Git: volver a la barra
   const B = document.body.classList, hidden = B.contains('noside'), now = B.contains('vsearch') ? 'b' : B.contains('vgit') ? 'g' : 'e';
   if (!hidden && v === now && !keep) return toggleSide();
   if (hidden) toggleSide();
@@ -1988,7 +2023,7 @@ function sideView(v, keep) {
 // El servidor hace el trabajo (git_action); pull, push, fetch y merge salen en la consola con su salida en vivo.
 let gst = null, gbusy = false; // último estado del repositorio que se ve · una acción en curso
 const gfold = new Set(); // secciones plegadas
-const gitOn = () => document.body.classList.contains('vgit') && !document.body.classList.contains('noside');
+const gitOn = () => document.body.classList.contains('vgit') && (!document.body.classList.contains('noside') || gitFullOn());
 // Repositorio que se ve: el elegido (se recuerda), el proyecto del archivo abierto o el primero
 function gitRepoPath() {
   const ps = side?.proyectos || [], saved = LS('desklens.git.repo');
@@ -2038,6 +2073,7 @@ function gitDraw() {
   sec('conflictos', 'Conflictos', gst.conflictos, [['+', 'Marcar como resuelto (preparar)', fs => gitDo('preparar', fs)]]);
   sec('preparados', 'Preparados', gst.preparados, [['−', 'Quitar de preparados', fs => gitDo('quitar', fs)]]);
   sec('cambios', 'Cambios', gst.cambios, [['↶', 'Descartar los cambios', gitDiscard], ['+', 'Preparar para el commit', fs => gitDo('preparar', fs)]]);
+  if (gitFullOn()) gitFullDraw();
 }
 // Botón Sincronizar: «⟳ Sincronizar ↓2 ↑13» en color si hay algo pendiente, «⇡ Publicar rama» si no tiene remota,
 // «✓ Al día» si no (un clic comprueba). Debajo, cuándo se miró el remoto (fetch automático cada N min, ⚙ Ajustes).
@@ -2123,20 +2159,164 @@ function gitBranchMenu(anchor) {
         ['Deshacer commit', 'Cancelar'], { danger: true }) === 'Deshacer commit') gitDo('deshacer_commit');
     }]]);
 }
+// Estado de un proyecto en HTML: rama en gris · ↓ por traer en azul · ↑ por subir en morado · al día en verde ·
+// cambios en ámbar · «sin git» atenuado (selector de repositorio y lista de proyectos a pantalla completa)
+function repoInfoHtml(g) {
+  if (!g) return ''; if (!g.rama) return '<span class="mr-off">sin git</span>';
+  return `<span class="mr-br">⎇ ${esc(g.rama)}</span>` + (g.remota && g.atras ? `<span class="mr-down">↓${g.atras}</span>` : '')
+    + (g.remota && g.adelante ? `<span class="mr-up">↑${g.adelante}</span>` : '') + (g.remota && !g.atras && !g.adelante ? '<span class="mr-ok">al día</span>' : '')
+    + (g.cambios ? `<span class="mr-ch">${g.cambios} cambio${g.cambios === 1 ? '' : 's'}</span>` : '');
+}
 // Selector de repositorio con el estado de cada proyecto: rama, ↓ por traer, ↑ por subir y cambios sin commit
 async function gitRepoMenu(anchor) {
   let sum = [];
   try { sum = await api('/api/git/resumen'); } catch {}
-  // nombre en negrita · rama en gris · ↓ por traer en azul · ↑ por subir en morado · al día en verde · cambios en ámbar
-  const st = r => { const g = sum.find(x => x.ruta === r); if (!g) return ''; if (!g.rama) return '<span class="mr-off">sin git</span>';
-    return `<span class="mr-br">⎇ ${esc(g.rama)}</span>` + (g.remota && g.atras ? `<span class="mr-down">↓${g.atras}</span>` : '')
-      + (g.remota && g.adelante ? `<span class="mr-up">↑${g.adelante}</span>` : '') + (g.remota && !g.atras && !g.adelante ? '<span class="mr-ok">al día</span>' : '')
-      + (g.cambios ? `<span class="mr-ch">${g.cambios} cambio${g.cambios === 1 ? '' : 's'}</span>` : ''); };
+  const st = r => repoInfoHtml(sum.find(x => x.ruta === r));
   openMenu(anchor, [{ head: 'Repositorio' }, ...(side?.proyectos || []).map(p => {
     const mark = p.ruta === gst?.ruta ? '✓' : '\u2003', info = st(p.ruta);
     return [mark + ' ' + p.nombre + ' ' + info.replace(/<[^>]+>/g, ' '), () => { LS('desklens.git.repo', p.ruta); gitLoad(); },
       { title: p.ruta, html: `<span class="mr-mark">${mark}</span><b class="mr-name">${esc(p.nombre)}</b>${info}` }];
   })]);
+}
+// ---------- Git a pantalla completa (⤢): proyectos y ramas · grafo con entrantes y salientes · detalle · cambios ----------
+// La columna derecha es la propia vista Git (#gitv), que se muda aquí mientras dura y vuelve a la barra al salir.
+const gitFullOn = () => document.body.classList.contains('gitfull');
+let gfGraph = null, gfKey = '', gfSel = null, gfSum = [], gitvHome = null;
+function gitFullOpen() {
+  if (!gst || gst.error) return flash('Elige primero un repositorio git');
+  const G = $('#gitfull');
+  G.innerHTML = `<div class="gfbar"><b>Git</b><span class="gft" id="gfTitle"></span><span class="sp"></span>
+      <label title="Ver también las demás ramas locales y remotas"><input type="checkbox" id="gfAll"> Todas las ramas</label>
+      <button class="small" id="gfPull" title="git pull">⇣ Pull</button><button class="small" id="gfPush" title="git push">⇡ Push</button>
+      <button class="small" id="gfFetch" title="Ver si hay novedades en el remoto">⟳ Fetch</button></div>
+    <div class="gfbody"><div class="gfside"><h4>Proyectos</h4><div id="gfProj"></div><h4>Ramas</h4><div id="gfBr"></div><div id="gfRem"></div></div>
+      <div class="gfmain"><div class="gfgraph" id="gfGraph"></div><div class="gfdetail" id="gfDetail"></div></div><div class="gfright"></div></div>`;
+  G.querySelector('.gfbar').append(Object.assign(iconBtn('min', 'Salir de la pantalla completa (Esc)', gitFullClose), { id: 'gfClose' }));
+  gitvHome ||= { parent: $('#gitv').parentNode, next: $('#gitv').nextSibling };
+  G.querySelector('.gfright').append($('#gitv'));
+  $('#gfAll').checked = LS('desklens.git.todas') === '1';
+  $('#gfAll').onchange = e => { LS('desklens.git.todas', e.target.checked ? '1' : ''); gfKey = ''; gitFullDraw(); };
+  $('#gfPull').onclick = () => gitLong('pull'); $('#gfPush').onclick = gitPush; $('#gfFetch').onclick = () => gitLong('fetch');
+  document.body.classList.add('gitfull', 'vgit');
+  gfKey = ''; gfSel = null; gitFullDraw();
+}
+function gitFullClose() {
+  if (gitvHome) gitvHome.parent.insertBefore($('#gitv'), gitvHome.next);
+  document.body.classList.remove('gitfull'); $('#gitfull').innerHTML = '';
+}
+// Dibuja título, proyectos, ramas y (si cambió la punta de la rama o de su remota) el grafo
+async function gitFullDraw() {
+  if (!gitFullOn() || !gst || gst.error) return;
+  $('#gfTitle').textContent = `${gst.nombre} · ⎇ ${gst.rama}` + (gst.remota ? ` ↔ ${gst.remota}` : ' (sin remota)');
+  $('#gfPull').disabled = !gst.remota; $('#gfPush').disabled = $('#gfFetch').disabled = !gst.remotos.length;
+  const B = $('#gfBr'); B.innerHTML = '';
+  for (const b of gst.ramas) {
+    const n = Object.assign(document.createElement('div'), { className: 'node' + (b === gst.rama ? ' on' : ''), title: b === gst.rama ? 'Rama actual' : 'Cambiar a esta rama' });
+    n.textContent = (b === gst.rama ? '✓ ' : '\u2003 ') + b;
+    n.onclick = () => b !== gst.rama && gitDo('cambiar_rama', [], { rama: b }).then(ok => ok && loadSide());
+    B.append(n);
+  }
+  const R = $('#gfRem'); R.innerHTML = gst.ramas_remotas.length ? '<h4>Remotas</h4>' : '';
+  for (const b of gst.ramas_remotas) {
+    const local = b.split('/').slice(1).join('/'), n = Object.assign(document.createElement('div'), { className: 'node',
+      title: gst.ramas.includes(local) ? `Cambiar a «${local}»` : `Crear «${local}» siguiendo a ${b} y cambiar a ella` });
+    n.textContent = '\u2003 ' + b;
+    n.onclick = () => local !== gst.rama && gitDo('cambiar_rama', [], { rama: local }).then(ok => ok && loadSide());
+    R.append(n);
+  }
+  api('/api/git/resumen').then(sum => { gfSum = sum; gitFullProjects(); }).catch(() => {});
+  gitFullProjects();
+  const todas = $('#gfAll').checked, key = `${gst.ruta}|${gst.punta}|${todas}`;
+  if (key === gfKey) return;
+  gfKey = key;
+  try { gfGraph = await api(`/api/git/grafo?ruta=${encodeURIComponent(gst.ruta)}&todas=${todas ? 1 : 0}`); }
+  catch (e) { $('#gfGraph').innerHTML = `<p class="gfmore">${esc(e.message)}</p>`; return; }
+  gitGraphDraw();
+}
+function gitFullProjects() {
+  const P = $('#gfProj'); if (!P) return; P.innerHTML = '';
+  for (const p of side?.proyectos || []) {
+    const n = Object.assign(document.createElement('div'), { className: 'node gfp' + (p.ruta === gst?.ruta ? ' on' : ''), title: p.ruta });
+    n.innerHTML = `<span>${esc(p.nombre)}</span><span class="gfpi">${repoInfoHtml(gfSum.find(x => x.ruta === p.ruta))}</span>`;
+    n.onclick = () => { LS('desklens.git.repo', p.ruta); gfSel = null; gitLoad(); };
+    P.append(n);
+  }
+}
+// Carriles del grafo: cada commit va en el carril que lo esperaba (el de su hijo); su 1.er padre sigue en ese carril y
+// los demás padres (merge) abren o reusan otro. ponytail: algoritmo simple de carriles; con cientos de ramas vivas se ensancha
+function gitLanes(commits) {
+  let lanes = []; const rows = [];
+  for (const c of commits) {
+    const had = lanes.includes(c.hash);
+    let i = lanes.indexOf(c.hash);
+    if (i < 0) { i = lanes.indexOf(null); if (i < 0) i = lanes.length; lanes[i] = c.hash; }
+    const before = lanes.slice(), merging = [];
+    before.forEach((h, j) => { if (h === c.hash && j !== i) merging.push(j); });
+    const after = before.map(h => (h === c.hash ? null : h)), parents = [];
+    c.padres.forEach((p, k) => {
+      let j = after.indexOf(p);
+      if (j < 0) { if (k === 0) j = i; else { j = after.indexOf(null); if (j < 0) j = after.length; } after[j] = p; }
+      parents.push(j);
+    });
+    while (after.length && after.at(-1) === null) after.pop();
+    rows.push({ i, had, before, after, merging, parents });
+    lanes = after;
+  }
+  return rows;
+}
+const LANE_COLORS = ['#7c5cdb', '#2f7fd8', '#2e8b57', '#c08a00', '#d0508a', '#1aa3a3', '#d35400'];
+function gitGraphDraw() {
+  const G = $('#gfGraph'), cs = gfGraph.commits; G.innerHTML = '';
+  if (!cs.length) return G.innerHTML = '<p class="gfmore">Este repositorio aún no tiene commits.</p>';
+  const rows = gitLanes(cs), width = Math.max(...rows.map(r => Math.max(r.before.length, r.after.length, r.i + 1))), W = 14, H = 28, m = H / 2;
+  const x = j => 8 + j * W, col = j => LANE_COLORS[j % LANE_COLORS.length];
+  const nIn = cs.filter(c => c.lado === 'entrante').length, nOut = cs.filter(c => c.lado === 'saliente').length;
+  G.insertAdjacentHTML('beforeend', `<h4>Historial${gfGraph.remota ? ` · <span style="color:#2f7fd8">↓ ${nIn} por traer</span> · <span style="color:var(--accent)">↑ ${nOut} por subir</span>` : ''}</h4>`);
+  cs.forEach((c, k) => {
+    const r = rows[k];
+    let svg = '';
+    r.before.forEach((h, j) => { if (h && h !== c.hash) { const t = r.after.indexOf(h); if (t >= 0) svg += `<path d="M${x(j)} 0 L${x(t)} ${H}" stroke="${col(j)}"/>`; } });
+    if (r.had) svg += `<path d="M${x(r.i)} 0 L${x(r.i)} ${m}" stroke="${col(r.i)}"/>`;
+    r.merging.forEach(j => { svg += `<path d="M${x(j)} 0 L${x(r.i)} ${m}" stroke="${col(j)}"/>`; });
+    r.parents.forEach(j => { svg += `<path d="M${x(r.i)} ${m} L${x(j)} ${H}" stroke="${col(j)}"/>`; });
+    const head = c.refs.some(f => f.startsWith('HEAD'));
+    svg += `<circle cx="${x(r.i)}" cy="${m}" r="${head ? 5 : 4}" fill="${c.lado === 'entrante' ? '#2f7fd8' : head ? 'var(--bg)' : col(r.i)}" stroke="${col(r.i)}" stroke-width="${head ? 2.5 : 1}"/>`;
+    const refs = c.refs.map(f => { const h = f.startsWith('HEAD -> '), n = h ? f.slice(8) : f;
+      return `<span class="gref${h ? ' head' : ''}${n.includes('/') && !h ? ' rem' : ''}">${esc(n.replace(/^tag: /, '🏷 '))}</span>`; }).join('');
+    const row = Object.assign(document.createElement('div'), { className: 'gfrow' + (gfSel === c.hash ? ' on' : ''), title: `${c.hash}\n${c.mensaje}` });
+    row.dataset.lado = c.lado;
+    row.innerHTML = `<svg width="${8 + width * W}" height="${H}" fill="none" stroke-width="2">${svg}</svg>`
+      + `<span class="gl">${c.lado === 'entrante' ? '↓' : c.lado === 'saliente' ? '↑' : ''}</span><span class="gh">${esc(c.corto)}</span>${refs}`
+      + `<span class="gm">${esc(c.mensaje)}</span><span class="ga">${esc(c.autor)}</span><span class="gfdate">${esc(c.fecha)}</span>`;
+    row.onclick = () => { gfSel = c.hash; G.querySelectorAll('.gfrow.on').forEach(e => e.classList.remove('on')); row.classList.add('on'); gitCommitDetail(c); };
+    G.append(row);
+  });
+  if (gfGraph.mas) G.insertAdjacentHTML('beforeend', '<p class="gfmore">Se muestran los 300 commits más recientes.</p>');
+  const sel = gfSel && cs.find(c => c.hash === gfSel); if (sel) gitCommitDetail(sel); else $('#gfDetail').innerHTML = '';
+}
+// Detalle de un commit: sus archivos con +/− líneas; «ver cambios» abre el comparador con el commit anterior y este
+async function gitCommitDetail(c) {
+  const D = $('#gfDetail');
+  D.innerHTML = `<div class="gdh"><b>${esc(c.mensaje)}</b><small>${esc(c.corto)} · ${esc(c.autor)} · ${esc(c.fecha)}${c.padres.length > 1 ? ' · merge' : ''}${c.lado ? ` · ${c.lado === 'entrante' ? '↓ por traer' : '↑ por subir'}` : ''}</small></div><p class="gfmore">Cargando archivos…</p>`;
+  let r;
+  try { r = await api(`/api/git/archivos?ruta=${encodeURIComponent(gst.ruta)}&hash=${c.hash}`); } catch (e) { D.lastChild.textContent = e.message; return; }
+  if (gfSel !== c.hash) return;
+  D.lastChild.remove();
+  const before = c.padres[0];
+  for (const f of r.archivos) {
+    const row = Object.assign(document.createElement('div'), { className: 'gdf', title: f.ruta + (f.antes ? `\n(antes: ${f.antes})` : '') });
+    row.innerHTML = `<span class="gst" data-s="${esc(f.estado)}">${esc(f.estado)}</span><span class="rb">${esc(f.rel)}</span>`
+      + `<span class="gdn">${f.mas == null ? 'binario' : `<i>+${f.mas}</i><em>−${f.menos}</em>`}</span>`;
+    const ver = button('Ver cambios', () => compareDialog(f.ruta, { cols: 2, picks: [
+      before ? { id: before, label: `${before.slice(0, 7)} · antes de este commit`, title: before } : { id: 'disco', label: 'Disco', title: '' },
+      { id: c.hash, label: `${c.corto} · ${c.mensaje}`, title: c.hash }] }));
+    ver.className = 'small';
+    const abrir = button('Abrir', () => { gitFullClose(); openTab(f.ruta, true); });
+    abrir.className = 'small'; abrir.disabled = f.estado === 'D' || c.lado === 'entrante'; // entrante: aún no está en tu disco
+    abrir.title = abrir.disabled ? 'No está en tu disco (borrado o aún sin traer)' : 'Abrir el archivo tal como está ahora';
+    row.append(ver, abrir); D.append(row);
+  }
+  if (!r.archivos.length) D.insertAdjacentHTML('beforeend', '<p class="gfmore">Este commit no cambia archivos.</p>');
 }
 // Botones y avisos de la vista Git (se llama al arrancar, cuando ya existen button/iconBtn)
 function gitInit() {
@@ -2145,7 +2325,8 @@ function gitInit() {
   $('#gSyncBtn').onclick = gitSync;
   $('#gCommit').onclick = gitCommit;
   $('#gMsg').onkeydown = e => { if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); gitCommit(); } };
-  $('#gbtns').append(iconBtn('refresh', 'Actualizar', () => gitLoad()));
+  $('#gbtns').append(iconBtn('refresh', 'Actualizar', () => gitLoad()), iconBtn('max', 'Git a pantalla completa: historial, ramas y proyectos', gitFullOpen));
+  addEventListener('keydown', e => { if (e.key === 'Escape' && gitFullOn() && !modalOpen() && !$('#menu')) { e.preventDefault(); gitFullClose(); } });
   // al volver a la ventana y cada 5 s con la vista visible (no durante una acción, un menú o una pregunta)
   addEventListener('focus', () => gitOn() && gitLoad());
   setInterval(() => { if (gitOn() && !document.hidden && !gbusy && !$('#menu') && !modalOpen()) gitLoad(); }, 5000);
@@ -2815,6 +2996,7 @@ let hi = -1;
 // Abre (o enseña) una pestaña en el lado activo. Sin fijar, reemplaza a la de vista previa (como VS Code);
 // fijada, se queda. fromHist: viene de ← →, no se añade al historial de navegación.
 function openTab(path, pin = false, fromHist = false) {
+  if (gitFullOn()) gitFullClose(); // la pantalla completa de Git tapa las pestañas: se sale para ver el archivo
   const usePreview = AJ.pestanas_vista_previa !== false;
   if (!tabs.includes(path)) {
     const i = usePreview ? tabs.indexOf(previewTab) : -1;
