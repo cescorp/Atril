@@ -185,7 +185,15 @@ body:not(.noside):not(.vsearch) #ribbon [data-v=e],body.vsearch:not(.noside) #ri
 .schips button.on{color:var(--accent);border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent)}
 .schips b{font-weight:600;margin-left:4px;opacity:.7}
 .sempty{color:var(--faint);font-size:12px;margin:10px 8px;line-height:1.5}
-.sproj>.node{font-size:11px;font-weight:600;color:var(--muted);margin-top:6px}
+/* proyecto: banda con raya de color y mayúsculas pequeñas; sus archivos van con sangría debajo */
+.sproj>.node{font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink);margin-top:10px;
+  background:color-mix(in srgb,var(--accent) 8%,var(--side));box-shadow:inset 3px 0 var(--accent)}
+.sproj>.spk{margin-left:10px}
+.sscope{display:flex;align-items:center;gap:6px;margin:4px 8px 2px;font-size:11px;color:var(--faint)}
+.sscope button{min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:500 11px Inter,sans-serif;padding:1px 8px;
+  border:1px solid var(--line);border-radius:10px;background:none;color:var(--muted);cursor:pointer}
+.sscope button:hover{color:var(--ink);background:var(--hover)}
+.sscope button.on{color:var(--accent);border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent)}
 .sproj.fold>.spk,.sfile.fold>.shits{display:none}
 .sproj:not(.fold)>.node .chev,.sfile:not(.fold)>.node .chev{transform:rotate(90deg)}
 .cnt{flex:none;font:600 10.5px/16px Inter,sans-serif;min-width:18px;text-align:center;padding:0 5px;border-radius:8px;background:var(--hover);color:var(--muted)}
@@ -679,6 +687,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
     <div class="stop" id="stop">
       <div class="shead"><h2>Buscar</h2><span id="sbtns"></span></div>
       <div class="sidesearch"><input id="sideQ" placeholder="Buscar…" autocomplete="off" spellcheck="false"><span class="stog" id="stog"></span></div>
+      <div class="sscope">En: <button id="sScope" title="Proyectos donde se busca"></button></div>
       <div class="sinfo" id="sinfo"></div><div class="schips" id="schips"></div>
     </div>
     <div id="results"></div>
@@ -1745,7 +1754,12 @@ function markActive() {
     n.classList.toggle('tab-pre', p === previewTab);
     n.classList.toggle('seldir', p === selDir);
   });
-  syncFold();
+  syncFold(); scopeFollow();
+}
+// «En: Archivo abierto»: al pasar a un archivo de otro proyecto, la búsqueda se repite allí.
+function scopeFollow() {
+  drawScope();
+  if (sscope.modo === 'actual' && sres && sres.scope !== JSON.stringify(scopeRoots())) sideSearch();
 }
 // Botones «Plegar todo / Desplegar todo» del explorador y de Buscar: si queda algo abierto pliegan; si no, despliegan.
 function setFoldBtn(b, open) {
@@ -1844,6 +1858,51 @@ function drawSearchToggles() {
     Object.assign(tog('contenido', '', 'Buscar dentro de los archivos', 'nombre'), { innerHTML: svg('lines') }));
   $('#sideQ').placeholder = sopt.nombre && sopt.contenido ? 'Buscar…' : sopt.nombre ? 'Nombre…' : 'Contenido…';
 }
+// «En:» dónde busca: en todos los proyectos, en los marcados o en el del archivo abierto (se recuerda).
+const sscope = (() => { try { return { modo: 'todos', lista: [], ...JSON.parse(LS('atril.buscar.en') || '{}') }; } catch { return { modo: 'todos', lista: [] }; } })();
+const scopeAll = () => [...(side?.proyectos || []).map(p => [p.ruta, p.nombre]), ['sueltos', 'Archivos sueltos']];
+const scopeName = r => scopeAll().find(a => a[0] === r)?.[1] || r;
+// Raíces que se envían al servidor; null = en todo. Un proyecto quitado de Atril deja de contar.
+function scopeRoots() {
+  if (sscope.modo === 'actual') return !cur || isVirtual(cur) ? null : [side?.proyectos.find(p => under(cur, p.ruta))?.ruta || 'sueltos'];
+  const ok = sscope.lista.filter(r => scopeAll().some(a => a[0] === r));
+  return sscope.modo === 'lista' && ok.length ? ok : null;
+}
+function drawScope() {
+  const B = $('#sScope'), r = scopeRoots();
+  B.textContent = sscope.modo === 'actual' ? 'Archivo abierto' + (r ? ' · ' + scopeName(r[0]) : '')
+    : !r ? 'Todos los proyectos' : r.length === 1 ? scopeName(r[0]) : `${r.length} proyectos`;
+  B.classList.toggle('on', !!r); B.title = 'Dónde se busca: ' + B.textContent;
+}
+function setScope(modo, lista = []) {
+  if (modo === 'lista' && lista.length === scopeAll().length) modo = 'todos'; // marcados todos = «Todos»
+  Object.assign(sscope, { modo, lista: modo === 'lista' ? lista : [] });
+  LS('atril.buscar.en', JSON.stringify(sscope)); drawScope(); sideSearch();
+}
+// Menú de «En:»: casillas por proyecto (el menú sigue abierto), «solo» deja ese, y las dos opciones de arriba y abajo.
+function scopeMenu(anchor) {
+  const all = scopeAll(), rows = [];
+  const marked = () => new Set(scopeRoots() || all.map(a => a[0]));
+  const refresh = () => { const m = marked(); rows.forEach(([r, b]) => b.textContent = (m.has(r) ? '☑ ' : '☐ ') + scopeName(r)); };
+  const items = all.map(([r]) => {
+    const el = document.createElement('div'); el.className = 'vrow';
+    const b = button('', () => {
+      const m = marked(); m.has(r) ? m.delete(r) : m.add(r);
+      if (!m.size) return; // siempre queda al menos uno
+      setScope('lista', [...m]); refresh();
+    });
+    b.title = 'Marcar o desmarcar';
+    const solo = button('solo', () => { closeMenu(); setScope('lista', [r]); });
+    solo.className = 'vexp'; solo.title = 'Buscar solo aquí';
+    el.append(b, solo); rows.push([r, b]);
+    return { el, btn: b };
+  });
+  openMenu(anchor, [['☑ Todos los proyectos', () => setScope('todos')], '-', ...items, '-',
+    [(sscope.modo === 'actual' ? '◉ ' : '○ ') + 'Solo el proyecto del archivo abierto', () => setScope('actual'),
+      { title: 'La búsqueda sigue al archivo que tengas abierto' }]]);
+  refresh();
+}
+$('#sScope').onclick = e => { e.stopPropagation(); scopeMenu(e.currentTarget); };
 $('#sideQ').onkeydown = e => {
   if (e.key === 'Escape') { $('#sideQ').value = ''; sideSearch(); }
   if (e.key === 'ArrowDown') { e.preventDefault(); $('#results .sr')?.focus(); }
@@ -1865,14 +1924,16 @@ let sres = null, sfilt = '', sfold = new Set();
 async function sideSearch() {
   const q = $('#sideQ').value.trim();
   if (!q) { sres = null; return drawResults(); }
-  const qs = `q=${encodeURIComponent(q)}&nombre=${+sopt.nombre}&contenido=${+sopt.contenido}&exacto=${+sopt.exacto}`;
+  const roots = scopeRoots(), scope = JSON.stringify(roots);
+  const qs = `q=${encodeURIComponent(q)}&nombre=${+sopt.nombre}&contenido=${+sopt.contenido}&exacto=${+sopt.exacto}`
+    + (roots ? '&raices=' + encodeURIComponent(roots.join('|')) : '');
   const r = await api('/api/buscar?' + qs).catch(e => ({ nombres: [], contenido: [], error: e.message }));
-  if (q !== $('#sideQ').value.trim()) return; // ya se escribió otra cosa
+  if (q !== $('#sideQ').value.trim() || scope !== JSON.stringify(scopeRoots())) return; // ya se escribió o se eligió otra cosa
   const files = new Map(), get = x => files.get(x.ruta) || files.set(x.ruta, { ...x, hits: [], byName: false }).get(x.ruta);
   r.nombres.forEach(x => get(x).byName = true);
   r.contenido.forEach(x => get(x).hits.push(x));
   if (sres?.q !== q) sfold = new Set();
-  sres = { q, files: [...files.values()], error: r.error };
+  sres = { q, scope, files: [...files.values()], error: r.error };
   if (!sres.files.some(f => kind(f.nombre).ext === sfilt)) sfilt = '';
   drawResults();
 }

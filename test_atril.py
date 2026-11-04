@@ -479,6 +479,9 @@ assert.deepStrictEqual(findRefs('Ver 1 Samuel 4:4 y 1 Samuel 8:5, 20; Deuteronom
     assert atril.search("Jehová", exacto=True)["contenido"] and not atril.search("jehova", exacto=True)["contenido"]
     assert atril.search("jehova")["contenido"]  # sin Aa: da igual
     assert not atril.search("ARCA", exacto=True)["nombres"] and atril.search("arca", exacto=True)["nombres"]
+    # «En:» solo en los proyectos elegidos (raíz tal como está en config.json); lista vacía: nada
+    assert atril.search("arca", raices=[str(proj)])["nombres"] and atril.search("jehova", raices=[str(proj)])["contenido"]
+    assert not atril.search("arca", raices=[str(tmp / "otro")])["nombres"] and not atril.search("arca", raices=[])["contenido"]
     nxt = atril.idx_pdf_next()
     assert nxt["ruta"].endswith("libro.pdf")  # el más pequeño primero
     atril.idx_pdf_save(nxt["ruta"], nxt["mtime"], [{"n": 3, "texto": "Samuel ungió a David"}])

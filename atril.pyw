@@ -2147,21 +2147,35 @@ def idx_pdf_save(ruta, mtime, paginas, error=None):
         c.close()
 
 
-def search(q, limit=60, nombre=True, contenido=True, exacto=False):
+def search_scope(raices):
+    """Filtro SQL (texto, argumentos) para buscar solo en esos proyectos; «sueltos» = los archivos sueltos.
+    None = en todo lo añadido."""
+    if raices is None:
+        return "1", []
+    roots = [str(Path(r)) for r in raices if r != "sueltos"]
+    loose = [str(Path(s)) for s in load_config()["sueltos"]] if "sueltos" in raices else []
+    conds = ([f"files.root in ({','.join('?' * len(roots))})"] if roots else []) + \
+            ([f"files.path in ({','.join('?' * len(loose))})"] if loose else [])
+    return "(" + " or ".join(conds) + ")" if conds else "0", roots + loose
+
+
+def search(q, limit=60, nombre=True, contenido=True, exacto=False, raices=None):
     """Por nombre (todas las palabras) y/o por contenido (FTS5; "frases" entre comillas).
-    Sin «exacto», da igual mayúsculas y tildes; con «exacto» (Aa) cada palabra debe aparecer tal cual se escribió."""
+    Sin «exacto», da igual mayúsculas y tildes; con «exacto» (Aa) cada palabra debe aparecer tal cual se escribió.
+    raices: proyectos donde buscar (y «sueltos»); None = en todos."""
     phrases = [p for p in re.findall(r'"([^"]+)"', q) if plain_words(p)]
     rest = re.sub(r'"[^"]*"', " ", q)
     words = plain_words(rest)
     literal = phrases + rest.split()  # para «exacto»: las palabras tal cual se escribieron
+    scope, scope_args = search_scope(raices)
     c = idx_conn()
     try:
         names = []
         name_words = words + [w for p in phrases for w in plain_words(p)]
         if nombre and name_words:
             where = " and ".join("plain like ?" for _ in name_words)
-            names = c.execute(f"select path, name, root from files where {where} order by length(name) limit ?",
-                              [f"%{w}%" for w in name_words] + [limit * 4]).fetchall()
+            names = c.execute(f"select path, name, root from files where {where} and {scope} order by length(name) limit ?",
+                              [f"%{w}%" for w in name_words] + scope_args + [limit * 4]).fetchall()
             if exacto:  # mayúsculas y tildes tal cual (el filtro de arriba es amplio a propósito)
                 names = [n for n in names if all(w.lstrip(".") in n[1] for w in literal)]
             names = names[:limit]
@@ -2172,9 +2186,9 @@ def search(q, limit=60, nombre=True, contenido=True, exacto=False):
             try:
                 content = c.execute(
                     "select docs.path, docs.page, snippet(docs, 2, '[[', ']]', '…', 14), files.name, files.root "
-                    "from docs join files on files.path = docs.path where docs match ? "
+                    f"from docs join files on files.path = docs.path where docs match ? and {scope} "
                     + (f"and {exact} " if exact else "") + "order by rank limit ?",
-                    [" ".join(terms), *(literal if exacto else []), limit]).fetchall()
+                    [" ".join(terms), *scope_args, *(literal if exacto else []), limit]).fetchall()
             except sqlite3.OperationalError:
                 content = []
     finally:
@@ -2524,8 +2538,10 @@ class Handler(BaseHTTPRequestHandler):
             if url.path == "/api/recup":
                 return self.send_json(200, recovery_list())
             if url.path == "/api/buscar":
+                raices = [r for r in q["raices"].split("|") if r] if "raices" in q else None  # | no cabe en una ruta
                 return self.send_json(200, search(q.get("q", ""), nombre=q.get("nombre") != "0",
-                                                  contenido=q.get("contenido") != "0", exacto=q.get("exacto") == "1"))
+                                                  contenido=q.get("contenido") != "0", exacto=q.get("exacto") == "1",
+                                                  raices=raices))
             if url.path == "/api/indice":
                 return self.send_json(200, idx_status())
             if url.path == "/api/indice/pdf":
