@@ -8,6 +8,12 @@ Entradas nuevas arriba. Formato: `## AAAA-MM-DD · título` + 2–4 líneas (qu�
 - **Cómo trabaja el usuario:** escribe en español. **Antes de construir algo nuevo, dibujarlo en texto y esperar su «ok».** No instalar nada sin acuerdo. Ahorrar tokens. Prefiere lo simple: rechazó un panel de IA con modos (ver 2026-11-02).
 - **Para verificar sin tocar su Atril:** levantar `atril.Handler` en el puerto 8799 con `CONFIG`, `CONV_DIR`, `RECOVERY_DIR` e `INDEX_DB` en una carpeta temporal y hacer captura con Edge sin ventana (`--headless=new --screenshot`). Así se probó cada paso. Ojo: en Windows dos servidores pueden escuchar el mismo puerto sin error; si hay otra sesión probando, usa otro puerto.
 
+## 2026-11-04 · Elegir el navegador de la ventana
+⚙ Ajustes › General › «Navegador de la ventana de Atril»: Automático (Edge › Chrome › Brave › Chromium), cada uno de los instalados o el navegador predeterminado (pestaña normal, sin modo aplicación). `browsers()` los detecta una vez al arrancar (registro App Paths y carpetas en Windows, /Applications en macOS, PATH en Linux); `edge_path(elegido)` cae al primero instalado si el elegido ya no está. Los PDF siempre usan un Chromium. Se aplica al reabrir Atril.
+
+## 2026-11-04 · Vista Git (commit, ramas, pull, push y merge)
+Tercera vista de la barra lateral, como el control de código de VS Code (diseño dibujado y aprobado antes). Las acciones rápidas (preparar, quitar, descartar, commit, ramas, deshacer commit) devuelven el estado; pull/push/fetch/merge van a la consola con `launch` y al terminar refrescan vista y árbol. Push sin seguimiento hace `push -u origin <rama>`. Sin editor de fusión de 3 paneles, rebase, stash ni etiquetas (pendiente si hacen falta). Probado con un repo y remoto temporales (test_atril.py) y en la ventana con un conflicto real resuelto. Nombre público pensado: «DocGit» (60 repos en GitHub, todos pequeños), pendiente de aplicar al final.
+
 ## 2026-11-04 · Ctrl+J para la IA, Ctrl+G ir a la línea
 Ctrl+J abre/cierra el panel de IA (antes Ctrl+G; sigue Ctrl+Alt+B). Ctrl+G va a la línea: en el editor, el cuadro de CodeMirror (`jumpToLine`, admite «línea:columna»); en la vista de código numerada, pide el número con `ask()` y la marca un momento. Ambos en captura, para ganar a las descargas (Ctrl+J) y al «buscar siguiente» (Ctrl+G) del navegador.
 

@@ -175,8 +175,27 @@ aside h2{font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppe
 .stog svg{width:14px;height:14px}
 .stog button.on{color:var(--accent);border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent)}
 /* dos vistas en la barra lateral, como en VS Code: 📁 Explorador · 🔍 Buscar (cada una guarda lo suyo) */
-body:not(.vsearch) :is(#stop,#results),body.vsearch :is(#sidetools,.sidescroll>h2,#projects,#loose){display:none}
-body:not(.noside):not(.vsearch) #ribbon [data-v=e],body.vsearch:not(.noside) #ribbon [data-v=b]{color:var(--accent);box-shadow:inset 2px 0 var(--accent)}
+body:not(.vsearch) :is(#stop,#results),body:not(.vgit) #gitv,body:is(.vsearch,.vgit) :is(#sidetools,.sidescroll>h2,#projects,#loose){display:none}
+body:not(.noside):not(.vsearch):not(.vgit) #ribbon [data-v=e],body.vsearch:not(.noside) #ribbon [data-v=b],body.vgit:not(.noside) #ribbon [data-v=g]{color:var(--accent);box-shadow:inset 2px 0 var(--accent)}
+/* vista Git (como el control de código de VS Code): repo, rama, mensaje, commit y listas de archivos */
+#gitv{display:flex;flex-direction:column;gap:6px;padding:0 8px 8px}
+#gitv .shead{padding-left:0}#gitv .shead h2{margin-left:0}
+.gline{display:flex;align-items:center;gap:6px;min-width:0}
+.gline>button:not(.small){min-width:0;flex:1;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12.5px;padding:3px 8px}
+#gSync{font-size:11px;color:var(--muted);white-space:nowrap}
+.gsync>button{flex:1}
+#gMsg{width:100%;box-sizing:border-box;resize:vertical;font:13px Inter,sans-serif;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--paper);color:var(--ink)}
+#gMsg:focus{outline:none;border-color:var(--accent)}
+#gCommit{width:100%}
+.gsec{margin-top:6px}.gsec>.node{font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.gsec.fold>.gitems{display:none}.gsec:not(.fold)>.node .chev{transform:rotate(90deg)}
+.grow{padding-left:14px}.grow .gst{flex:none;width:14px;font:600 11px Consolas,monospace;text-align:center}
+.grow .gst[data-s=M]{color:#c08a00}.grow .gst[data-s=A],.grow .gst[data-s=U]{color:#2e8b57}.grow .gst[data-s=D]{color:#d33}.grow .gst[data-s="!"]{color:#d33}
+.grow .rb{display:flex;flex-direction:column;min-width:0;flex:1}.grow small{color:var(--faint);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.grow .gact,.gsec>.node .gact{display:none;gap:2px}.grow:hover .gact,.gsec>.node:hover .gact{display:flex}
+.gact button{border:0;background:none;color:var(--muted);width:20px;height:20px;padding:0;border-radius:4px;font-size:13px;cursor:pointer}
+.gact button:hover{background:var(--hover);color:var(--ink)}
+.gnote{font-size:12px;color:var(--muted);line-height:1.5}
 .stop{position:sticky;top:0;background:var(--side);z-index:1;padding-bottom:4px}
 .shead{display:flex;align-items:center;padding:6px 0 4px}.shead h2{flex:1;margin:0 8px}
 .shead button.ic{width:24px;height:24px}.shead button.ic svg{width:15px;height:15px}
@@ -694,6 +713,16 @@ button:disabled{opacity:.45;cursor:not-allowed}
       <div class="sinfo" id="sinfo"></div><div class="schips" id="schips"></div>
     </div>
     <div id="results"></div>
+    <div id="gitv">
+      <div class="shead"><h2>Git</h2><span id="gbtns"></span></div>
+      <div class="gline"><button id="gRepo" title="Repositorio (proyecto)"></button></div>
+      <div class="gline"><button id="gBranch" title="Rama: cambiar, crear o fusionar"></button><span id="gSync"></span></div>
+      <div class="gline gsync"><button id="gPull" class="small" title="Traer los commits del remoto (git pull)">⇣ Pull</button>
+        <button id="gPush" class="small" title="Subir tus commits al remoto (git push)">⇡ Push</button></div>
+      <textarea id="gMsg" rows="2" placeholder="Mensaje del commit (Ctrl+Enter)" spellcheck="true"></textarea>
+      <button id="gCommit" class="primary">✓ Commit</button>
+      <div id="glist"></div>
+    </div>
     <h2>Proyectos</h2>
     <div id="projects"></div>
     <h2>📌 Sueltos</h2>
@@ -766,6 +795,7 @@ const I = {
   folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
   search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
   terminal: '<path d="m5 7 5 5-5 5"/><path d="M12 19h7"/>',
+  git: '<circle cx="6" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="7" r="2"/><path d="M6 7v10M18 9c0 5-6 4-11 8"/>',
   sparkles: '<path d="M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7-4.7-1.8 4.7-1.8z"/><path d="M19 15l.8 2.2 2.2.8-2.2.8L19 21l-.8-2.2-2.2-.8 2.2-.8z"/>',
   settings: '<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>',
   folderPlus: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 10v6M9 13h6"/>',
@@ -1815,7 +1845,7 @@ const targetDir = () => selDir || (cur && !isVirtual(cur) ? cur.replace(/[\\/][^
 async function newInline(type, dir = targetDir()) {
   if (!dir) return ask('Nuevo', 'Añade primero un proyecto: lo nuevo se crea dentro de él.', ['Entendido']);
   if (document.body.classList.contains('noside')) toggleSide();
-  document.body.classList.remove('vsearch'); LS('atril.vista', '');
+  document.body.classList.remove('vsearch', 'vgit'); LS('atril.vista', '');
   tree.set(dir, true); await loadSide();
   const node = [...document.querySelectorAll('aside .node')].find(n => n.dataset.path === dir);
   const kids = node && kidsOf(node);
@@ -1850,7 +1880,7 @@ async function newInline(type, dir = targetDir()) {
 }
 // El archivo de la pestaña actual siempre a la vista: despliega sus carpetas y se desplaza hasta él
 async function reveal(path) {
-  if (!path || isVirtual(path) || AJ.revelar_en_arbol === false || document.body.classList.contains('vsearch')) return;
+  if (!path || isVirtual(path) || AJ.revelar_en_arbol === false || document.body.matches('.vsearch, .vgit')) return;
   const low = path.toLowerCase();
   const p = side.proyectos.find(x => under(low, x.ruta));
   if (p) {
@@ -1936,16 +1966,151 @@ $('#sideQ').onkeydown = e => {
   if (e.key === 'Escape') { $('#sideQ').value = ''; sideSearch(); }
   if (e.key === 'ArrowDown') { e.preventDefault(); $('#results .sr')?.focus(); }
 };
-// 📁 Explorador · 🔍 Buscar; clic en la vista que ya se ve = ocultar la barra (como VS Code)
+// 📁 Explorador · 🔍 Buscar · ⎇ Git; clic en la vista que ya se ve = ocultar la barra (como VS Code)
 function sideView(v, keep) {
-  const hidden = document.body.classList.contains('noside'), now = document.body.classList.contains('vsearch') ? 'b' : 'e';
+  const B = document.body.classList, hidden = B.contains('noside'), now = B.contains('vsearch') ? 'b' : B.contains('vgit') ? 'g' : 'e';
   if (!hidden && v === now && !keep) return toggleSide();
   if (hidden) toggleSide();
-  document.body.classList.toggle('vsearch', v === 'b'); LS('atril.vista', v === 'b' ? 'b' : '');
-  if (v === 'b') { $('#sideQ').focus(); $('#sideQ').select(); if (!sres) sideSearch(); } else reveal(cur);
+  B.toggle('vsearch', v === 'b'); B.toggle('vgit', v === 'g'); LS('atril.vista', v === 'e' ? '' : v);
+  if (v === 'b') { $('#sideQ').focus(); $('#sideQ').select(); if (!sres) sideSearch(); }
+  else if (v === 'g') gitLoad();
+  else reveal(cur);
 }
-addEventListener('keydown', e => { // Ctrl+Shift+F: vista Buscar
+
+// ---------- vista Git: cambios, preparar (+), quitar (−), descartar (↶), commit, ramas, pull, push y merge ----------
+// El servidor hace el trabajo (git_action); pull, push, fetch y merge salen en la consola con su salida en vivo.
+let gst = null, gbusy = false; // último estado del repositorio que se ve · una acción en curso
+const gfold = new Set(); // secciones plegadas
+const gitOn = () => document.body.classList.contains('vgit') && !document.body.classList.contains('noside');
+// Repositorio que se ve: el elegido (se recuerda), el proyecto del archivo abierto o el primero
+function gitRepoPath() {
+  const ps = side?.proyectos || [], saved = LS('atril.git.repo');
+  return (ps.find(p => p.ruta === saved) || ps.find(p => cur && under(cur, p.ruta)) || ps[0])?.ruta || null;
+}
+async function gitLoad() {
+  const ruta = gitRepoPath();
+  $('#gRepo').textContent = ruta ? '▾ ' + (side.proyectos.find(p => p.ruta === ruta)?.nombre || ruta) : 'Añade un proyecto';
+  if (!ruta) { gst = null; return gitDraw(); }
+  try { gst = await api('/api/git/estado?ruta=' + encodeURIComponent(ruta)); gst.ruta = ruta; }
+  catch (e) { gst = { error: e.message, ruta }; }
+  gitDraw();
+}
+const GST_TXT = { M: 'Modificado', A: 'Añadido', D: 'Borrado', R: 'Renombrado', C: 'Copiado', U: 'Nuevo, sin seguimiento', T: 'Cambió de tipo', '!': 'En conflicto' };
+// Dibuja rama, ↓↑ y las listas Conflictos · Preparados · Cambios; cada fila y cada título llevan sus botones
+function gitDraw() {
+  const L = $('#glist'), ok = gst && !gst.error;
+  for (const id of ['#gBranch', '#gPull', '#gPush', '#gCommit', '#gMsg']) $(id).disabled = !ok;
+  $('#gBranch').textContent = ok ? '⎇ ' + gst.rama + ' ▾' : '⎇';
+  $('#gSync').textContent = ok && gst.remota ? `↓${gst.atras} ↑${gst.adelante}` : ok ? 'sin remoto' : '';
+  $('#gSync').title = ok && gst.remota ? `${gst.atras} commit(s) por traer y ${gst.adelante} por subir (${gst.remota})` : '';
+  L.innerHTML = '';
+  if (!gst) return;
+  if (gst.error) return L.innerHTML = `<p class="gnote">${esc(gst.error)}.<br>Elige otro proyecto arriba.</p>`;
+  if (gst.fusionando) L.insertAdjacentHTML('beforeend', '<p class="gnote">⚠ Fusión en curso: resuelve los conflictos, márcalos con + y haz commit.</p>');
+  const sec = (key, title, list, acts) => {
+    if (!list.length && key !== 'cambios') return;
+    const S = document.createElement('div'); S.className = 'gsec' + (gfold.has(key) ? ' fold' : '');
+    const h = document.createElement('div'); h.className = 'node';
+    h.innerHTML = `<span class="chev">›</span><span class="n"></span><span class="gact"></span><span class="cnt">${list.length}</span>`;
+    h.querySelector('.n').textContent = title;
+    if (list.length) for (const [t, tip, fn] of acts) h.querySelector('.gact').append(Object.assign(button(t, e => { e.stopPropagation(); fn(list); }), { title: tip + ' (todos)' }));
+    h.onclick = () => { S.classList.toggle('fold'); gfold.has(key) ? gfold.delete(key) : gfold.add(key); };
+    const K = document.createElement('div'); K.className = 'gitems';
+    for (const f of list) {
+      const r = document.createElement('div'); r.className = 'node grow'; r.title = f.ruta + '\n' + (GST_TXT[f.estado] || f.estado);
+      const name = f.rel.split('/').pop(), dir = f.rel.slice(0, -name.length - 1);
+      r.innerHTML = `<span class="gst" data-s="${esc(f.estado)}">${esc(f.estado)}</span><div class="rb"><span class="n"></span>${dir ? `<small>${esc(dir)}</small>` : ''}</div><span class="gact"></span>`;
+      r.querySelector('.n').textContent = name;
+      for (const [t, tip, fn] of acts) r.querySelector('.gact').append(Object.assign(button(t, e => { e.stopPropagation(); fn([f]); }), { title: tip }));
+      // modificado o borrado: último commit ↔ disco en el comparador; nuevo o en conflicto: se abre el archivo
+      r.onclick = () => ['U', 'A', '!'].includes(f.estado) ? openTab(f.ruta, true) : compareDialog(f.ruta);
+      K.append(r);
+    }
+    if (!list.length) K.innerHTML = '<p class="gnote" style="margin:4px 14px">Sin cambios.</p>';
+    S.append(h, K); L.append(S);
+  };
+  sec('conflictos', 'Conflictos', gst.conflictos, [['+', 'Marcar como resuelto (preparar)', fs => gitDo('preparar', fs)]]);
+  sec('preparados', 'Preparados', gst.preparados, [['−', 'Quitar de preparados', fs => gitDo('quitar', fs)]]);
+  sec('cambios', 'Cambios', gst.cambios, [['↶', 'Descartar los cambios', gitDiscard], ['+', 'Preparar para el commit', fs => gitDo('preparar', fs)]]);
+}
+// Acción rápida: el servidor la hace y devuelve el estado nuevo. Los archivos van por su ruta relativa al repositorio.
+async function gitDo(accion, files = [], extra = {}) {
+  if (gbusy) return false; gbusy = true;
+  try { const r = await api('/api/git/accion', { ruta: gst.ruta, accion, archivos: files.map(f => f.rel), ...extra }); gst = { ...r, ruta: gst.ruta }; gitDraw(); return true; }
+  catch (e) { ask('Git', e.message, ['Entendido']); return false; }
+  finally { gbusy = false; }
+}
+async function gitDiscard(files) {
+  const nuevos = files.filter(f => f.estado === 'U').length;
+  const what = files.length === 1 ? `«${files[0].rel}»` : `${files.length} archivos`;
+  if (await ask('Descartar cambios', `¿Descartar los cambios de ${what}? Vuelven a como están en el último commit.` +
+    (nuevos ? ` ${nuevos === 1 ? 'Uno es nuevo: se envía' : `${nuevos} son nuevos: se envían`} a la papelera.` : ''),
+    ['Descartar', 'Cancelar'], { danger: true }) !== 'Descartar') return;
+  for (const f of files) if (tabs.includes(f.ruta) && !await askUnsaved(f.ruta)) return;
+  if (await gitDo('descartar', files)) files.forEach(f => tabs.includes(f.ruta) && reloadFromDisk(f.ruta).catch(() => {}));
+}
+async function gitCommit() {
+  const mensaje = $('#gMsg').value.trim();
+  if (!mensaje) { $('#gMsg').focus(); return flash('Escribe el mensaje del commit'); }
+  let todo = false;
+  if (!gst.preparados.length) {
+    if (!gst.cambios.length) return flash('No hay cambios para el commit');
+    if (await ask('Commit', 'No hay cambios preparados. ¿Preparar todos los cambios y hacer el commit?', ['Preparar todo y hacer commit', 'Cancelar']) !== 'Preparar todo y hacer commit') return;
+    todo = true;
+  }
+  if (await gitDo('commit', [], { mensaje, todo })) { $('#gMsg').value = ''; flash('✓ Commit hecho'); loadSide(); }
+}
+// pull, push, fetch y merge: en la consola (su salida en vivo); al terminar, la vista y el árbol se ponen al día
+function gitLong(accion, extra = {}) {
+  const ruta = gst.ruta;
+  const cmd = { pull: 'git pull --no-rebase', push: 'git push', fetch: 'git fetch --prune', fusionar: 'git merge --no-edit ' + extra.rama }[accion];
+  launch(() => api('/api/git/accion', { ruta, accion, ...extra }), `git ${accion} · ${gst.nombre}`, cmd,
+    gst.repositorio, ruta, () => { gitLoad(); loadSide(); });
+}
+async function gitPush() {
+  const n = gst.adelante;
+  if (gst.remota && !n) return flash('No hay commits por subir');
+  const what = gst.remota ? `${n} commit${n === 1 ? '' : 's'} de «${gst.rama}» a ${gst.remota}` : `la rama «${gst.rama}» al remoto (queda enlazada)`;
+  if (await ask('Push', `¿Subir ${what}?`, ['Subir', 'Cancelar']) === 'Subir') gitLong('push');
+}
+// Menú de la rama: cambiar, crear, fusionar otra en esta, fetch y deshacer el último commit (si no está subido)
+function gitBranchMenu(anchor) {
+  const others = gst.ramas.filter(b => b !== gst.rama);
+  openMenu(anchor, [{ head: 'Cambiar de rama' },
+    ...gst.ramas.map(b => [(b === gst.rama ? '✓ ' : '\u2003 ') + b, () => b !== gst.rama && gitDo('cambiar_rama', [], { rama: b }).then(ok => ok && loadSide())]),
+    '-', ['＋  Nueva rama…', async () => {
+      const rama = await ask('Nueva rama', `Se crea desde «${gst.rama}» y pasas a ella:`, ['Crear', 'Cancelar'], { input: '' });
+      if (rama?.trim()) gitDo('nueva_rama', [], { rama: rama.trim() });
+    }],
+    ['⤵  Fusionar otra rama en esta…', () => openMenu(anchor, [{ head: `Fusionar en «${gst.rama}»` }, ...others.map(b => [b, async () => {
+      if (await ask('Fusionar', `¿Fusionar «${b}» en «${gst.rama}»? Si hay conflictos, aparecen en la lista para resolverlos.`, ['Fusionar', 'Cancelar']) === 'Fusionar') gitLong('fusionar', { rama: b });
+    }])]), others.length ? {} : { disabled: true, title: 'No hay otras ramas' }],
+    ['⟳  Fetch (ver novedades del remoto)', () => gitLong('fetch'), gst.remotos.length ? {} : { disabled: true, title: 'Sin remoto' }],
+    '-', ['↶  Deshacer el último commit', async () => {
+      if (await ask('Deshacer el último commit', 'El commit se quita y sus cambios vuelven a «Preparados». Solo se puede si aún no lo has subido.',
+        ['Deshacer commit', 'Cancelar'], { danger: true }) === 'Deshacer commit') gitDo('deshacer_commit');
+    }]]);
+}
+function gitRepoMenu(anchor) {
+  openMenu(anchor, [{ head: 'Repositorio' }, ...(side?.proyectos || []).map(p =>
+    [(p.ruta === gst?.ruta ? '✓ ' : '\u2003 ') + p.nombre, () => { LS('atril.git.repo', p.ruta); gitLoad(); }, { title: p.ruta }])]);
+}
+// Botones y avisos de la vista Git (se llama al arrancar, cuando ya existen button/iconBtn)
+function gitInit() {
+  $('#gRepo').onclick = e => { e.stopPropagation(); gitRepoMenu(e.currentTarget); };
+  $('#gBranch').onclick = e => { e.stopPropagation(); gitBranchMenu(e.currentTarget); };
+  $('#gPull').onclick = () => gitLong('pull');
+  $('#gPush').onclick = gitPush;
+  $('#gCommit').onclick = gitCommit;
+  $('#gMsg').onkeydown = e => { if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); gitCommit(); } };
+  $('#gbtns').append(iconBtn('refresh', 'Actualizar', () => gitLoad()));
+  // al volver a la ventana y cada 5 s con la vista visible (no durante una acción, un menú o una pregunta)
+  addEventListener('focus', () => gitOn() && gitLoad());
+  setInterval(() => { if (gitOn() && !document.hidden && !gbusy && !$('#menu') && !modalOpen()) gitLoad(); }, 5000);
+}
+addEventListener('keydown', e => { // Ctrl+Shift+F: vista Buscar · Ctrl+Shift+G: vista Git
   if (e.ctrlKey && e.shiftKey && !e.altKey && e.key.toLowerCase() === 'f') { e.preventDefault(); sideView('b', true); }
+  if (e.ctrlKey && e.shiftKey && !e.altKey && e.key.toLowerCase() === 'g') { e.preventDefault(); sideView('g', true); }
 });
 // Resultados: proyecto › archivo › fragmentos. Un archivo sale una vez aunque coincida por nombre y por contenido.
 let sres = null, sfilt = '', sfold = new Set();
@@ -5434,7 +5599,8 @@ async function goToLine() {
 try { if (localStorage.getItem('atril.noside')) document.body.classList.add('noside'); } catch {}
 if (LS('atril.bak')) document.body.classList.add('showbak');
 $('#ribbon').append(
-  ...[['e', 'folder', 'Explorador (otro clic: ocultar la barra)'], ['b', 'search', 'Buscar en nombres y contenido · Ctrl+Shift+F (otro clic: ocultar la barra)']]
+  ...[['e', 'folder', 'Explorador (otro clic: ocultar la barra)'], ['b', 'search', 'Buscar en nombres y contenido · Ctrl+Shift+F (otro clic: ocultar la barra)'],
+    ['g', 'git', 'Git: cambios, commit, ramas, pull y push · Ctrl+Shift+G (otro clic: ocultar la barra)']]
     .map(([v, ic, t]) => { const b = iconBtn(ic, t, () => sideView(v)); b.dataset.v = v; return b; }),
   iconBtn('terminal', 'Mostrar u ocultar consola', () => showPanel($('#panel').hidden)),
   (b => { b.dataset.st = 'off'; return b; })(iconBtn('sparkles', 'Panel de IA', () => setIA(!document.body.classList.contains('ia')))),
@@ -5443,6 +5609,7 @@ $('#ribbon').append(
 $('#phTools').append(maxBtn('con'), iconBtn('down', 'Ocultar consola', () => showPanel(false)));
 $('#ia > header').append(maxBtn('ia'), iconBtn('panelRight', 'Ocultar panel de IA (✦ en la cinta lo vuelve a mostrar)', () => { setMax(null); setIA(false); }));
 drawSearchToggles();
+gitInit();
 $('#sbtns').append(
   Object.assign(iconBtn('collapse', 'Plegar todo', () => {
     const fs = searchFolds(), fold = searchOpen();
@@ -5452,6 +5619,7 @@ $('#sbtns').append(
   iconBtn('refresh', 'Repetir la búsqueda', sideSearch),
   iconBtn('x', 'Limpiar la búsqueda', () => { $('#sideQ').value = ''; sideSearch(); $('#sideQ').focus(); }));
 if (LS('atril.vista') === 'b') document.body.classList.add('vsearch');
+if (LS('atril.vista') === 'g') { document.body.classList.add('vgit'); setTimeout(gitLoad, 600); } // tras cargar el árbol (side)
 drawResults();
 $('#sidetools').append(
   iconBtn('filePlus', 'Nuevo archivo (en la carpeta elegida) · Ctrl+N: "nuevo 1" sin guardar', () => newInline('archivo')),

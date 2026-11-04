@@ -551,13 +551,13 @@ runs_lock = threading.Lock()
 class Run:
     """Un proceso en ejecución; su salida se guarda en trozos que la interfaz va pidiendo."""
 
-    def __init__(self, args, cwd, encoding, label):
+    def __init__(self, args, cwd, encoding, label, env=None):
         """Lanza el proceso con su salida y su error por tuberías; dos hilos los leen sin bloquear y un tercero
-        espera al final para guardar el código de salida y la duración."""
+        espera al final para guardar el código de salida y la duración. env: variables extra (p. ej. para git)."""
         self.args, self.cwd, self.label, self.encoding = args, cwd, label, encoding  # args: lista, o texto para cmd /c
         self.chunks, self.code, self.start, self.end = [], None, time.time(), None
         self.lock = threading.Lock()
-        env = {**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUNBUFFERED": "1"}
+        env = {**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUNBUFFERED": "1", **(env or {})}
         self.proc = subprocess.Popen(args, cwd=cwd, env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                      stderr=subprocess.PIPE, creationflags=NO_WINDOW,
                                      start_new_session=not WINDOWS)  # macOS/Linux: su propio grupo, para detener también los hijos
@@ -609,9 +609,9 @@ class Run:
                 pass
 
 
-def start_run(args, cwd, encoding, label):
+def start_run(args, cwd, encoding, label, env=None):
     """Arranca un proceso y lo registra en `runs` con un id para que la consola pida su salida."""
-    r = Run(args, cwd, encoding, label)
+    r = Run(args, cwd, encoding, label, env)
     with runs_lock:
         rid = str(len(runs) + 1)
         runs[rid] = r
@@ -1334,33 +1334,65 @@ img {{ max-width: 100%; }}
 </style></head><body>{body}</body></html>"""
 
 
-def edge_path():
-    """Un navegador Chromium para la ventana de Atril y para crear PDF: Edge, Chrome, Chromium o Brave."""
-    if MAC:
-        apps = ("Microsoft Edge", "Google Chrome", "Chromium", "Brave Browser")
-        return next((str(p) for a in apps if (p := Path("/Applications") / f"{a}.app" / "Contents" / "MacOS" / a).exists()), None)
-    if not WINDOWS:
-        names = ("microsoft-edge", "microsoft-edge-stable", "google-chrome", "google-chrome-stable", "chromium",
-                 "chromium-browser", "brave-browser")
-        return next((p for n in names if (p := shutil.which(n))), None)
-    try:  # Windows: primero el registro (App Paths), luego las rutas habituales
-        import winreg
-        for hive in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):
+# Navegadores Chromium (modo aplicación --app y PDF): id, nombre, ejecutable en Windows (App Paths y carpeta),
+# app de macOS y órdenes de Linux. El orden es el de «Automático».
+BROWSERS = [("edge", "Microsoft Edge", "msedge.exe", ("Microsoft", "Edge", "Application"), "Microsoft Edge",
+             ("microsoft-edge", "microsoft-edge-stable")),
+            ("chrome", "Google Chrome", "chrome.exe", ("Google", "Chrome", "Application"), "Google Chrome",
+             ("google-chrome", "google-chrome-stable")),
+            ("brave", "Brave", "brave.exe", ("BraveSoftware", "Brave-Browser", "Application"), "Brave Browser",
+             ("brave-browser", "brave")),
+            ("chromium", "Chromium", "chrome.exe", ("Chromium", "Application"), "Chromium", ("chromium", "chromium-browser"))]
+_browsers = None
+
+
+def browsers():
+    """{id: ejecutable} de los navegadores Chromium instalados, en el orden de BROWSERS (se busca una vez)."""
+    global _browsers
+    if _browsers is not None:
+        return _browsers
+    found = {}
+    for bid, _, exe, sub, app, names in BROWSERS:
+        if MAC:
+            p = Path("/Applications") / f"{app}.app" / "Contents" / "MacOS" / app
+            cands = [str(p)] if p.exists() else []
+        elif not WINDOWS:
+            cands = [p for n in names if (p := shutil.which(n))]
+        else:  # Windows: primero el registro (App Paths; Chromium no se registra), luego las carpetas habituales
+            cands = []
             try:
-                with winreg.OpenKey(hive, r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\msedge.exe") as k:
-                    p = winreg.QueryValue(k, None)
-                    if p and Path(p).exists():
-                        return p
-            except OSError:
+                import winreg
+                for hive in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):
+                    try:
+                        if bid != "chromium":
+                            with winreg.OpenKey(hive, rf"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\{exe}") as k:
+                                cands.append(winreg.QueryValue(k, None))
+                    except OSError:
+                        pass
+            except ImportError:
                 pass
-    except ImportError:
-        pass
-    for base in (os.environ.get("ProgramFiles(x86)", ""), os.environ.get("ProgramFiles", ""), os.environ.get("LOCALAPPDATA", "")):
-        for sub in (("Microsoft", "Edge", "Application", "msedge.exe"), ("Google", "Chrome", "Application", "chrome.exe")):
-            p = Path(base, *sub)
-            if base and p.exists():
-                return str(p)
-    return None
+            cands += [str(Path(b, *sub, exe)) for b in (os.environ.get("ProgramFiles(x86)", ""), os.environ.get("ProgramFiles", ""),
+                                                         os.environ.get("LOCALAPPDATA", "")) if b]
+            # Chrome y Chromium se llaman chrome.exe: cada uno solo cuenta en su propia carpeta
+            cands = [c for c in cands if c and Path(c).is_file() and (bid != "chrome" or "Chromium" not in c)]
+        if cands:
+            found[bid] = cands[0]
+    _browsers = found
+    return found
+
+
+def edge_path(choice=None):
+    """El navegador Chromium elegido en ⚙ Ajustes (o el primero instalado) para la ventana y para crear PDF."""
+    found = browsers()
+    return found.get(choice) or next(iter(found.values()), None)
+
+
+# ⚙ Ajustes › General: con qué se abre Atril. Solo se ofrecen los navegadores instalados (se miran al arrancar).
+SETTINGS.insert(1, ("navegador", "General", "Navegador de la ventana de Atril (se aplica al reabrir Atril)", "auto",
+                    [("auto", "Automático (" + " › ".join(n for b, n, *_ in BROWSERS if b in browsers()) + ")" if browsers()
+                      else "Automático"),
+                     *[(b, n) for b, n, *_ in BROWSERS if b in browsers()],
+                     ("predeterminado", "Navegador predeterminado del sistema (pestaña normal)")], None))
 
 
 def html_to_pdf(html, title=""):
@@ -2422,6 +2454,152 @@ def git_status_map(repo):
     return files, dirs
 
 
+# ---------- vista Git: cambios, preparar, commit, ramas, pull/push/merge (como el control de código de VS Code) ----------
+# Las órdenes rápidas se ejecutan aquí y devuelven el estado nuevo; pull, push, fetch y merge van a la consola de Atril
+# (pueden tardar y su salida interesa). Las credenciales son las de git del usuario (Git Credential Manager): Atril no
+# las ve. GIT_TERMINAL_PROMPT=0: git nunca se queda esperando una contraseña por la terminal (no hay ninguna).
+
+GIT_ENV = {"GIT_TERMINAL_PROMPT": "0"}
+GIT_CONFLICT = {"DD", "AU", "UD", "UA", "DU", "AA", "UU"}
+
+
+def repo_of(path):
+    """Raíz del repositorio git de un proyecto o archivo añadido; ValueError si no está en git."""
+    p = Path(path).resolve()
+    repo = git_root(p if p.is_dir() else p.parent)
+    if not repo:
+        raise ValueError("No está en un repositorio git")
+    return repo
+
+
+def git_do(repo, *args, timeout=60, stdin=None):
+    """Ejecuta git en el repositorio; ValueError con lo que dijo git si falla (para mostrarlo tal cual)."""
+    r = subprocess.run(["git", "-C", str(repo), *args], input=stdin, capture_output=True, timeout=timeout,
+                       creationflags=NO_WINDOW, env={**os.environ, **GIT_ENV})
+    if r.returncode:
+        raise ValueError((r.stderr or r.stdout).decode("utf-8", "replace").strip()[-800:] or "git falló")
+    return r.stdout.decode("utf-8", "replace")
+
+
+def git_overview(path):
+    """Estado del repositorio para la vista Git: rama, remota, commits por subir/bajar, ramas locales y los archivos
+    preparados, con cambios y en conflicto (estado de una letra como VS Code: M, A, D, R, U = sin seguimiento)."""
+    repo = repo_of(path)
+    out = git_do(repo, "-c", "core.quotePath=false", "status", "--porcelain=v1", "-z", "--branch", "--untracked-files=all")
+    entries = out.split("\0")
+    head = entries[0][3:] if entries and entries[0].startswith("## ") else ""
+    # «main...origin/main [ahead 1, behind 2]» · «No commits yet on main» · «HEAD (no branch)»
+    m = re.match(r"(?:No commits yet on |Initial commit on )?(.+?)(?:\.\.\.(\S+))?(?: \[(.*)\])?$", head)
+    branch, upstream, info = m.groups() if m else (head, None, "")
+    num = lambda k: int(x.group(1)) if (x := re.search(k + r" (\d+)", info or "")) else 0
+    staged, changes, conflicts, i = [], [], [], 1
+    while i < len(entries):
+        e = entries[i]
+        i += 1
+        if len(e) < 4:
+            continue
+        xy, rel = e[:2], e[3:]
+        if xy[0] in "RC":
+            i += 1  # renombrado/copiado: después viene la ruta original
+        item = lambda st: {"estado": st, "rel": rel, "ruta": str(repo / rel)}
+        if xy in GIT_CONFLICT:
+            conflicts.append(item("!"))
+        elif xy == "??":
+            changes.append(item("U"))
+        else:
+            if xy[0] not in " ?!":
+                staged.append(item(xy[0]))
+            if xy[1] not in " ?!":
+                changes.append(item(xy[1]))
+    git_cache.pop(repo, None)  # el punto de color del árbol se pone al día con lo que se acaba de ver
+    return {"repositorio": str(repo), "nombre": repo.name, "rama": branch, "remota": upstream,
+            "adelante": num("ahead"), "atras": num("behind"),
+            "ramas": git_run(repo, "branch", "--format=%(refname:short)").splitlines(),
+            "remotos": git_run(repo, "remote").splitlines(),
+            "fusionando": bool(git_run(repo, "rev-parse", "-q", "--verify", "MERGE_HEAD")),
+            "preparados": staged, "cambios": changes, "conflictos": conflicts}
+
+
+def git_rel(repo, rels):
+    """Rutas relativas pedidas por la ventana, comprobando que no salen del repositorio."""
+    out = []
+    for r in rels:
+        p = (repo / str(r)).resolve()
+        if not p.is_relative_to(repo):
+            raise ValueError(f"Ruta fuera del repositorio: {r}")
+        out.append(str(p.relative_to(repo)).replace("\\", "/"))
+    return out
+
+
+def git_branch_name(repo, name):
+    """Nombre de rama válido para git (git check-ref-format), o ValueError."""
+    name = str(name or "").strip()
+    if not name or name.startswith("-"):
+        raise ValueError("Nombre de rama no válido")
+    git_do(repo, "check-ref-format", "--branch", name)
+    return name
+
+
+def git_action(path, accion, archivos=(), mensaje="", rama="", todo=False):
+    """Una acción de la vista Git. Las rápidas devuelven el estado nuevo; pull, push, fetch y merge arrancan en la
+    consola y devuelven {"id"} para seguir su salida. «descartar» envía a la papelera lo que no tiene seguimiento."""
+    repo = repo_of(path)
+    files = git_rel(repo, archivos)
+    no_head = not git_run(repo, "rev-parse", "-q", "--verify", "HEAD")
+    if accion == "preparar":
+        git_do(repo, "add", "-A", "--", *(files or ["."]))
+    elif accion == "quitar":  # sacar de preparados (sin commits todavía no hay HEAD al que volver)
+        if no_head:
+            git_do(repo, "rm", "-r", "--cached", "-q", "--", *(files or ["."]))
+        else:
+            git_do(repo, "restore", "--staged", "--", *(files or ["."]))
+    elif accion == "descartar":
+        untracked = set(git_do(repo, "ls-files", "--others", "--exclude-standard", "-z", "--", *files).split("\0")) - {""}
+        tracked = [f for f in files if f not in untracked]
+        if tracked:
+            git_do(repo, "restore", "--", *tracked)
+        for f in untracked:
+            if not allowed(repo / f):  # repo más grande que el proyecto añadido: fuera de él no se borra nada
+                raise PermissionError(f"«{f}» está fuera de lo añadido a Atril")
+            to_trash(repo / f)
+    elif accion == "commit":
+        if not mensaje.strip():
+            raise ValueError("Escribe el mensaje del commit")
+        if todo:
+            git_do(repo, "add", "-A")
+        git_do(repo, "commit", "-F", "-", stdin=mensaje.strip().encode("utf-8"))
+    elif accion == "cambiar_rama":
+        git_do(repo, "switch", git_branch_name(repo, rama))
+    elif accion == "nueva_rama":
+        git_do(repo, "switch", "-c", git_branch_name(repo, rama))
+    elif accion == "deshacer_commit":  # solo un commit que aún no se ha subido (sigue en la rama, en preparados)
+        ov = git_overview(repo)
+        if ov["remota"] and not ov["adelante"]:
+            raise ValueError("El último commit ya está subido: deshacerlo aquí no lo quita del remoto")
+        if not git_run(repo, "rev-parse", "-q", "--verify", "HEAD~1"):
+            raise ValueError("Es el primer commit del repositorio: no hay uno anterior al que volver")
+        git_do(repo, "reset", "--soft", "HEAD~1")
+    elif accion in ("pull", "push", "fetch", "fusionar"):
+        ov = git_overview(repo)
+        if accion == "pull":
+            args = ["pull", "--no-rebase"]
+        elif accion == "fetch":
+            args = ["fetch", "--prune"]
+        elif accion == "fusionar":
+            args = ["merge", "--no-edit", git_branch_name(repo, rama)]
+        elif ov["remota"]:
+            args = ["push"]
+        elif ov["remotos"]:  # rama sin seguimiento: se sube al primer remoto (origin) y queda enlazada
+            args = ["push", "-u", "origin" if "origin" in ov["remotos"] else ov["remotos"][0], ov["rama"]]
+        else:
+            raise ValueError("Este repositorio no tiene remoto: añade uno (git remote add origin <url>)")
+        return {"id": start_run(["git", *args], str(repo), "utf-8", f"git {accion} · {repo.name}", GIT_ENV),
+                "orden": "git " + " ".join(args)}
+    else:
+        raise ValueError(f"Acción de git desconocida: {accion}")
+    return git_overview(repo)
+
+
 GIT_TEXT = {"limpio": "Git: sin cambios", "modificado": "Git: modificado", "nuevo": "Git: nuevo (sin commit)",
             "conflicto": "Git: conflicto", "ignorado": "Git: ignorado (.gitignore)", "sin_git": "No está en git"}
 
@@ -2688,6 +2866,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json(200, {"mtime": str(p.stat().st_mtime_ns)} if p.is_file() else {"mtime": None})
             if url.path == "/api/git/log":
                 return self.send_json(200, git_log(ruta))
+            if url.path == "/api/git/estado":
+                try:
+                    return self.send_json(200, git_overview(ruta))
+                except (ValueError, subprocess.TimeoutExpired) as e:
+                    return self.send_json(400, {"error": str(e)})
             if url.path == "/api/git/archivos":
                 try:
                     return self.send_json(200, git_files(ruta, q.get("hash", "")))
@@ -2751,6 +2934,15 @@ class Handler(BaseHTTPRequestHandler):
                 cfg["ultima"] = data["ultima"]
                 save_config(cfg)
             return self.send_json(200, estado())
+        if url == "/api/git/accion":
+            if self.denied(data.get("ruta", "")):
+                return
+            try:
+                return self.send_json(200, git_action(data["ruta"], str(data.get("accion", "")),
+                                                      [str(a) for a in data.get("archivos") or []], str(data.get("mensaje", "")),
+                                                      str(data.get("rama", "")), bool(data.get("todo"))))
+            except (ValueError, subprocess.TimeoutExpired) as e:
+                return self.send_json(400, {"error": str(e)})
         if url == "/api/git/blame":
             if self.denied(data.get("ruta", "")):
                 return
@@ -3020,9 +3212,11 @@ def window_flags(cfg):
 
 
 def open_window(url):
-    """Ventana propia (modo aplicación de un navegador Chromium); si no hay ninguno, el navegador de siempre."""
+    """Ventana propia en modo aplicación con el navegador de ⚙ Ajustes (o el primero instalado); con «predeterminado»
+    o sin ninguno Chromium, una pestaña del navegador de siempre."""
+    choice = ajuste("navegador")
     try:
-        exe = edge_path()
+        exe = None if choice == "predeterminado" else edge_path(choice)
         if exe:  # start_new_session solo actúa en macOS y Linux: la ventana no muere con el servidor
             return subprocess.Popen([exe, f"--app={url}", *window_flags(load_config())], start_new_session=True,
                                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=NO_WINDOW)

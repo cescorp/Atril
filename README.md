@@ -8,6 +8,7 @@ Todo corre en tu ordenador: un servidor pequeño en Python (solo biblioteca est�
 ## Qué hace
 
 - **Explorador** de proyectos y archivos sueltos, con estado de git y pestañas como en VS Code.
+- **Git** como en VS Code: preparar, commit, ramas, merge, pull y push, y comparar versiones en 2 o 3 columnas.
 - **Leer** casi cualquier formato: Markdown, código, tablas (CSV, JSON…), HTML, Word, PDF, imágenes, audio, vídeo y letras.
 - **Editar**:
   - texto y código (CodeMirror), conservando la codificación y los saltos de línea;
@@ -58,7 +59,7 @@ Las capturas usan un proyecto de ejemplo inventado, «Taller de escritura».
 ## Requisitos
 
 - **Python 3.10 o más nuevo**.
-- **Un navegador Chromium** para la ventana y para crear PDF: Microsoft Edge (viene con Windows), Google Chrome, Chromium o Brave. Sin ninguno, Atril se abre en tu navegador de siempre.
+- **Un navegador Chromium** para la ventana y para crear PDF: Microsoft Edge (viene con Windows), Google Chrome, Chromium o Brave. Cuál usar se elige en ⚙ Ajustes › General (también «Navegador predeterminado»). Sin ninguno, Atril se abre en tu navegador de siempre.
 - Internet la primera vez que se abre un PDF o un Word: sus visores se cargan de una CDN (ver [TERCEROS.md](TERCEROS.md)).
 - Opcional, para el chat: [Claude Code](https://docs.anthropic.com/claude-code), [Codex](https://github.com/openai/codex) o [Gemini CLI](https://github.com/google-gemini/gemini-cli).
 

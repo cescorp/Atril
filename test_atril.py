@@ -527,6 +527,10 @@ assert.deepStrictEqual(findRefs('Ver 1 Samuel 4:4 y 1 Samuel 8:5, 20; Deuteronom
     assert atril.read_text(proj / "grande.txt")[2] is False
     atril.set_ajustes({"ia_limite_tokens": 5000})
     assert atril.ia_prefs()["limite"] == 5000  # un solo valor para ⚙ Ajustes y «Conectar IA»
+    # navegador de la ventana: solo valores ofrecidos (los instalados, «auto» o «predeterminado»)
+    assert atril.set_ajustes({"navegador": "inventado"})["navegador"] == "auto"
+    assert atril.set_ajustes({"navegador": "predeterminado"})["navegador"] == "predeterminado"
+    assert atril.edge_path("no-instalado") == atril.edge_path()  # elegido que ya no está: el primero que haya
     atril.set_ajustes({k: d for k, _, _, d, _, _ in atril.SETTINGS})  # vuelve a los valores por defecto
 
     # nueva carpeta: dentro de un proyecto, nunca reutiliza una existente
@@ -665,6 +669,54 @@ assert.deepStrictEqual(findRefs('Ver 1 Samuel 4:4 y 1 Samuel 8:5, 20; Deuteronom
     st = json.loads(urllib.request.urlopen(req).read())
     assert [p["nombre"] for p in st["proyectos"]] == ["proyecto", "app"]  # la ruta inexistente se ignora
     assert json.loads(get(port, "/api/explorar")[1])["ruta"] == str(fuera.resolve())
+
+    # vista Git: preparar, commit, quitar, descartar, ramas, deshacer commit, merge y push (estos dos en la consola)
+    def git(cwd, *a):
+        subprocess.run(["git", "-C", str(cwd), *a], check=True, capture_output=True)
+
+    def wait_run(rid):
+        for _ in range(200):
+            o = atril.runs[rid].output(0)
+            if o["fin"]:
+                return o
+            time.sleep(0.05)
+        raise AssertionError("la orden de git no terminó")
+
+    rep, remoto = proj / "repo", fuera / "remoto.git"
+    rep.mkdir()
+    git(rep, "init", "-q", "-b", "main")
+    git(rep, "config", "user.name", "Prueba"); git(rep, "config", "user.email", "prueba@example.com")
+    git(fuera, "init", "-q", "--bare", "-b", "main", str(remoto))
+    git(rep, "remote", "add", "origin", str(remoto))
+    (rep / "a.md").write_text("uno\n")
+    code, ov = post("/api/git/accion", {"ruta": str(rep), "accion": "commit", "mensaje": "inicio", "todo": True})
+    assert code == 200 and ov["rama"] == "main" and not ov["cambios"] and not ov["preparados"], ov
+    (rep / "a.md").write_text("dos\n"); (rep / "b.md").write_text("nuevo\n")
+    ov = json.loads(get(port, "/api/git/estado?ruta=" + urllib.request.quote(str(rep)))[1])
+    assert {(c["estado"], c["rel"]) for c in ov["cambios"]} == {("M", "a.md"), ("U", "b.md")}
+    code, ov = post("/api/git/accion", {"ruta": str(rep), "accion": "preparar", "archivos": ["b.md"]})
+    assert [(c["estado"], c["rel"]) for c in ov["preparados"]] == [("A", "b.md")]
+    code, ov = post("/api/git/accion", {"ruta": str(rep), "accion": "quitar", "archivos": ["b.md"]})
+    assert not ov["preparados"] and ("U", "b.md") in {(c["estado"], c["rel"]) for c in ov["cambios"]}
+    code, ov = post("/api/git/accion", {"ruta": str(rep), "accion": "descartar", "archivos": ["a.md"]})
+    assert (rep / "a.md").read_text() == "uno\n" and [c["rel"] for c in ov["cambios"]] == ["b.md"]
+    assert post("/api/git/accion", {"ruta": str(rep), "accion": "preparar", "archivos": ["../fuera.txt"]})[0] == 400
+    assert post("/api/git/accion", {"ruta": str(rep), "accion": "nueva_rama", "rama": "-x"})[0] == 400
+    code, ov = post("/api/git/accion", {"ruta": str(rep), "accion": "nueva_rama", "rama": "tema"})
+    assert ov["rama"] == "tema" and set(ov["ramas"]) == {"main", "tema"}
+    post("/api/git/accion", {"ruta": str(rep), "accion": "commit", "mensaje": "b en tema", "todo": True})
+    code, ov = post("/api/git/accion", {"ruta": str(rep), "accion": "deshacer_commit"})
+    assert ov["preparados"] and ov["preparados"][0]["rel"] == "b.md"  # sin subir: vuelve a preparados
+    post("/api/git/accion", {"ruta": str(rep), "accion": "commit", "mensaje": "b en tema"})
+    post("/api/git/accion", {"ruta": str(rep), "accion": "cambiar_rama", "rama": "main"})
+    assert not (rep / "b.md").exists()
+    code, r = post("/api/git/accion", {"ruta": str(rep), "accion": "fusionar", "rama": "tema"})
+    assert wait_run(r["id"])["codigo"] == 0 and (rep / "b.md").exists()
+    code, r = post("/api/git/accion", {"ruta": str(rep), "accion": "push"})  # sin seguimiento: push -u origin main
+    assert "-u origin main" in r["orden"] and wait_run(r["id"])["codigo"] == 0
+    ov = json.loads(get(port, "/api/git/estado?ruta=" + urllib.request.quote(str(rep)))[1])
+    assert ov["remota"] == "origin/main" and ov["adelante"] == 0
+    assert post("/api/git/accion", {"ruta": str(rep), "accion": "deshacer_commit"})[0] == 400  # ya subido
     srv.shutdown()
 
 print("OK: todas las pruebas pasan")
