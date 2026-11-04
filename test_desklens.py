@@ -746,6 +746,30 @@ assert.deepStrictEqual(findRefs('Ver 1 Samuel 4:4 y 1 Samuel 8:5, 20; Deuteronom
     e = next(c for c in g["commits"] if c["mensaje"] == "e")
     code, d = get(port, f"/api/git/archivos?ruta={urllib.request.quote(str(rep))}&hash={e['hash']}")
     assert [(f["rel"], f["mas"], f["menos"]) for f in json.loads(d)["archivos"]] == [("e.md", 2, 0)]
+    # cambiar de rama con cambios sin commit: 409 con los archivos; «apartar» los guarda en el stash y
+    # «llevar» los vuelve a poner en la rama nueva (aquí sin chocar: tocan líneas distintas)
+    wait_run(post("/api/git/accion", {"ruta": str(rep), "accion": "sincronizar"})[1]["id"])
+    (rep / "h.md").write_text("1\n2\n3\n"); post("/api/git/accion", {"ruta": str(rep), "accion": "commit", "mensaje": "h", "todo": True})
+    post("/api/git/accion", {"ruta": str(rep), "accion": "nueva_rama", "rama": "otra"})
+    (rep / "h.md").write_text("uno\n2\n3\n"); post("/api/git/accion", {"ruta": str(rep), "accion": "commit", "mensaje": "h otra", "todo": True})
+    post("/api/git/accion", {"ruta": str(rep), "accion": "cambiar_rama", "rama": "main"})
+    (rep / "h.md").write_text("1\n2\ntres\n")
+    code, d = post("/api/git/accion", {"ruta": str(rep), "accion": "cambiar_rama", "rama": "otra"})
+    assert code == 409 and d["codigo"] == "cambios_locales" and d["archivos"] == ["h.md"] and "«otra»" in d["error"]
+    code, ov = post("/api/git/accion", {"ruta": str(rep), "accion": "cambiar_rama", "rama": "otra", "modo": "llevar"})
+    assert code == 200 and ov["rama"] == "otra" and (rep / "h.md").read_text() == "uno\n2\ntres\n"  # los dos cambios
+    git(rep, "checkout", "--", "h.md")
+    post("/api/git/accion", {"ruta": str(rep), "accion": "cambiar_rama", "rama": "main"})
+    (rep / "h.md").write_text("1\n2\ntres\n")
+    code, ov = post("/api/git/accion", {"ruta": str(rep), "accion": "cambiar_rama", "rama": "otra", "modo": "apartar"})
+    assert code == 200 and ov["rama"] == "otra" and (rep / "h.md").read_text() == "uno\n2\n3\n" and not ov["cambios"]
+    assert "DeskLens: cambios de «main» al pasar a «otra»" in subprocess.run(["git", "-C", str(rep), "stash", "list"], capture_output=True, text=True, encoding="utf-8").stdout
+    code, ov = post("/api/git/accion", {"ruta": str(rep), "accion": "cambiar_rama", "rama": "main"})
+    assert [s["mensaje"].split(": ", 1)[-1] for s in ov["stashes"]] == ["DeskLens: cambios de «main» al pasar a «otra»"]
+    code, ov = post("/api/git/accion", {"ruta": str(rep), "accion": "recuperar_stash", "rama": ov["stashes"][0]["id"]})
+    assert code == 200 and (rep / "h.md").read_text() == "1\n2\ntres\n" and not ov["stashes"]
+    assert post("/api/git/accion", {"ruta": str(rep), "accion": "recuperar_stash", "rama": "HEAD; rm"})[0] == 400
+    git(rep, "checkout", "--", "h.md")
     resumen = json.loads(get(port, "/api/git/resumen")[1])
     assert any(x["ruta"] == str(proj) for x in resumen)  # un proyecto por fila (sin git: rama None)
     srv.shutdown()

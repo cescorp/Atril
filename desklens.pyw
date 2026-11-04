@@ -2556,6 +2556,9 @@ def git_overview(path):
                               if not b.endswith("/HEAD") and "/" in b],
             "punta": git_run(repo, "rev-parse", "-q", "--verify", "HEAD") + ":" + git_run(repo, "rev-parse", "-q", "--verify", "@{u}"),
             "remotos": git_run(repo, "remote").splitlines(),
+            # cambios guardados aparte (stash): [{id: stash@{N}, mensaje, fecha}], el más reciente primero
+            "stashes": [dict(zip(("id", "mensaje", "fecha"), ln.split("\x1f"))) for ln in
+                        git_run(repo, "-c", "core.quotePath=false", "stash", "list", "--format=%gd\x1f%s\x1f%cr").splitlines() if ln],
             "fusionando": bool(git_run(repo, "rev-parse", "-q", "--verify", "MERGE_HEAD")),
             "comprobado": git_fetch_time(repo),
             "preparados": staged, "cambios": changes, "conflictos": conflicts}
@@ -2623,7 +2626,49 @@ def git_branch_name(repo, name):
     return name
 
 
-def git_action(path, accion, archivos=(), mensaje="", rama="", todo=False):
+class GitLocalChanges(ValueError):
+    """git no cambia de rama porque perdería cambios sin commit: lleva los archivos afectados para que la ventana
+    ofrezca llevarlos a la otra rama o guardarlos a un lado (stash)."""
+
+    def __init__(self, archivos, destino):
+        self.archivos, self.destino = archivos, destino
+        n = len(archivos)
+        super().__init__(f"Tienes cambios sin commit en {n} archivo{'s' if n != 1 else ''} que también "
+                         f"{'son distintos' if n != 1 else 'es distinto'} en «{destino}». Git no cambia de rama para no perderlos.")
+
+
+def git_switch(repo, name, modo=""):
+    """Cambia a la rama `name`. Si git se niega por cambios sin commit, GitLocalChanges con los archivos.
+    modo «llevar»: guarda los cambios (stash), cambia y los vuelve a poner en la rama nueva (como «Migrate changes»
+    de VS Code); si chocan con ella, quedan en conflicto para resolverlos y el stash se conserva.
+    modo «apartar»: los guarda en el stash con un nombre claro y cambia (se recuperan con git stash pop)."""
+    guardado = False
+    if modo in ("llevar", "apartar"):
+        actual = git_run(repo, "rev-parse", "--abbrev-ref", "HEAD")
+        antes = git_run(repo, "rev-parse", "-q", "--verify", "refs/stash")
+        git_do(repo, "stash", "push", "-u", "-m", f"DeskLens: cambios de «{actual}» al pasar a «{name}»")
+        # sin nada que guardar no se crea stash: entonces no hay que sacar ninguno (sería uno viejo, ajeno)
+        guardado = git_run(repo, "rev-parse", "-q", "--verify", "refs/stash") != antes
+    try:
+        git_do(repo, "switch", name)
+    except ValueError as e:
+        if guardado:
+            git_run(repo, "stash", "pop")  # no se pudo cambiar: los cambios vuelven a donde estaban
+        if modo:
+            raise
+        files = re.findall(r"^\t(.+)$", str(e), re.M)  # git los lista con un tabulador delante
+        if "would be overwritten" in str(e) and files:
+            raise GitLocalChanges(files, name)
+        raise
+    if modo == "llevar" and guardado:
+        try:
+            git_do(repo, "stash", "pop")
+        except ValueError:
+            raise ValueError(f"Ya estás en «{name}», pero algunos de tus cambios chocan con esta rama: aparecen en "
+                             "«Conflictos» para resolverlos. Una copia sigue guardada en el stash por si acaso.")
+
+
+def git_action(path, accion, archivos=(), mensaje="", rama="", todo=False, modo=""):
     """Una acción de la vista Git. Las rápidas devuelven el estado nuevo; pull, push, fetch y merge arrancan en la
     consola y devuelven {"id"} para seguir su salida. «descartar» envía a la papelera lo que no tiene seguimiento."""
     repo = repo_of(path)
@@ -2652,9 +2697,17 @@ def git_action(path, accion, archivos=(), mensaje="", rama="", todo=False):
             git_do(repo, "add", "-A")
         git_do(repo, "commit", "-F", "-", stdin=mensaje.strip().encode("utf-8"))
     elif accion == "cambiar_rama":
-        git_do(repo, "switch", git_branch_name(repo, rama))
+        git_switch(repo, git_branch_name(repo, rama), modo)
     elif accion == "nueva_rama":
         git_do(repo, "switch", "-c", git_branch_name(repo, rama))
+    elif accion == "recuperar_stash":  # vuelve a poner los cambios guardados aparte; si chocan, quedan en conflicto
+        if not re.fullmatch(r"stash@\{\d+\}", rama):
+            raise ValueError("Cambios guardados no válidos")
+        try:
+            git_do(repo, "stash", "pop", rama)
+        except ValueError:
+            raise ValueError("Algunos de los cambios guardados chocan con lo que hay ahora: aparecen en «Conflictos». "
+                             "Siguen guardados en el stash por si acaso.")
     elif accion == "deshacer_commit":  # solo un commit que aún no se ha subido (sigue en la rama, en preparados)
         ov = git_overview(repo)
         if ov["remota"] and not ov["adelante"]:
@@ -3034,7 +3087,9 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 return self.send_json(200, git_action(data["ruta"], str(data.get("accion", "")),
                                                       [str(a) for a in data.get("archivos") or []], str(data.get("mensaje", "")),
-                                                      str(data.get("rama", "")), bool(data.get("todo"))))
+                                                      str(data.get("rama", "")), bool(data.get("todo")), str(data.get("modo", ""))))
+            except GitLocalChanges as e:  # la ventana ofrece llevar los cambios o guardarlos a un lado
+                return self.send_json(409, {"error": str(e), "codigo": "cambios_locales", "archivos": e.archivos, "rama": e.destino})
             except (ValueError, subprocess.TimeoutExpired) as e:
                 return self.send_json(400, {"error": str(e)})
         if url == "/api/git/blame":

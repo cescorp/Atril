@@ -817,7 +817,7 @@ const api = (url, body) => fetch(url, body === undefined ? { headers: H } :
     const d = await r.json();
     // ruta que el servidor no conoce: la ventana es más nueva que el servidor que sigue en marcha
     if (r.status === 404 && d.error === 'no existe' && url.startsWith('/api/')) throw new Error(RESTART);
-    if (!r.ok) throw new Error(d.error); return d;
+    if (!r.ok) throw Object.assign(new Error(d.error), { data: d }); return d; // data: código y detalles del servidor
   });
 const RESTART = 'DeskLens se actualizó y el servidor que sigue en marcha es el anterior. Cierra todas las ventanas de DeskLens, espera unos segundos y vuelve a abrirlo.';
 const sepOf = p => /^[A-Za-z]:|^\\\\/.test(p) ? '\\' : '/'; // C:\… o \\servidor → \ ; /home/… → /
@@ -2048,6 +2048,8 @@ function gitDraw() {
   L.innerHTML = '';
   if (!gst) return;
   if (gst.error) return L.innerHTML = `<p class="gnote">${esc(gst.error)}.<br>Elige otro proyecto arriba.</p>`;
+  gst.stashes ||= []; // servidor anterior a esta función: sin cambios guardados que mostrar
+  if (gst.stashes.length) L.insertAdjacentHTML('beforeend', `<p class="gnote">📦 ${gst.stashes.length} cambio${gst.stashes.length === 1 ? '' : 's'} guardado${gst.stashes.length === 1 ? '' : 's'} aparte: ⎇ ▾ › «Recuperar cambios guardados».</p>`);
   if (gst.fusionando) L.insertAdjacentHTML('beforeend', '<p class="gnote">⚠ Fusión en curso: resuelve los conflictos, márcalos con + y haz commit.</p>');
   const sec = (key, title, list, acts) => {
     if (!list.length && key !== 'cambios') return;
@@ -2106,6 +2108,27 @@ async function gitDo(accion, files = [], extra = {}) {
   catch (e) { ask('Git', e.message, ['Entendido']); return false; }
   finally { gbusy = false; }
 }
+// Cambiar de rama. Si git se niega porque perdería cambios sin commit, se explica en español y se ofrece, como
+// VS Code: llevar los cambios a la otra rama (stash → cambiar → recuperarlos) o guardarlos aparte en el stash.
+async function gitSwitch(rama, modo = '') {
+  if (gbusy) return false; gbusy = true;
+  try {
+    const r = await api('/api/git/accion', { ruta: gst.ruta, accion: 'cambiar_rama', rama, modo });
+    gst = { ...r, ruta: gst.ruta }; gitDraw(); loadSide();
+    flash(modo === 'apartar' ? `✓ En «${rama}» · tus cambios quedaron guardados en el stash` : modo === 'llevar' ? `✓ En «${rama}» con tus cambios` : `✓ En «${rama}»`);
+    return true;
+  } catch (e) {
+    gbusy = false;
+    if (e.data?.codigo !== 'cambios_locales') { await ask('Git', e.message, ['Entendido']); gitLoad(); return false; }
+    const fs = e.data.archivos, lista = fs.slice(0, 8).map(f => '• ' + f).join('\n') + (fs.length > 8 ? `\n… y ${fs.length - 8} más` : '');
+    const llevar = `Llevarlos a «${rama}»`, apartar = 'Guardarlos aparte y cambiar';
+    const c = await ask(`Cambiar a «${rama}»`, `${e.message}\n\n${lista}\n\n` +
+      `· Guardarlos aparte: cambias con la rama limpia; los recuperas luego en ⎇ › «Recuperar cambios guardados».\n` +
+      `· Llevarlos: cambias y tus cambios siguen contigo (si chocan con «${rama}», quedan en conflicto para resolverlos).`,
+      [apartar, llevar, 'Cancelar']); // como «Stash & Checkout» de VS Code: lo más seguro primero
+    return c === llevar ? gitSwitch(rama, 'llevar') : c === apartar ? gitSwitch(rama, 'apartar') : false;
+  } finally { gbusy = false; }
+}
 async function gitDiscard(files) {
   const nuevos = files.filter(f => f.estado === 'U').length;
   const what = files.length === 1 ? `«${files[0].rel}»` : `${files.length} archivos`;
@@ -2144,7 +2167,7 @@ async function gitPush() {
 function gitBranchMenu(anchor) {
   const others = gst.ramas.filter(b => b !== gst.rama);
   openMenu(anchor, [{ head: 'Cambiar de rama' },
-    ...gst.ramas.map(b => [(b === gst.rama ? '✓ ' : '\u2003 ') + b, () => b !== gst.rama && gitDo('cambiar_rama', [], { rama: b }).then(ok => ok && loadSide())]),
+    ...gst.ramas.map(b => [(b === gst.rama ? '✓ ' : '\u2003 ') + b, () => b !== gst.rama && gitSwitch(b)]),
     '-', ['＋  Nueva rama…', async () => {
       const rama = await ask('Nueva rama', `Se crea desde «${gst.rama}» y pasas a ella:`, ['Crear', 'Cancelar'], { input: '' });
       if (rama?.trim()) gitDo('nueva_rama', [], { rama: rama.trim() });
@@ -2155,6 +2178,11 @@ function gitBranchMenu(anchor) {
     '-', ['⇣  Pull (traer)', () => gitLong('pull'), gst.remota ? {} : { disabled: true, title: 'La rama no está enlazada a una remota' }],
     ['⇡  Push (subir)', gitPush, gst.remotos.length ? {} : { disabled: true, title: 'Sin remoto' }],
     ['⟳  Fetch (ver novedades del remoto)', () => gitLong('fetch'), gst.remotos.length ? {} : { disabled: true, title: 'Sin remoto' }],
+    ['📦  Recuperar cambios guardados…', () => openMenu(anchor, [{ head: 'Cambios guardados aparte (stash)' }, ...gst.stashes.map(st =>
+      [`${st.mensaje.replace(/^On [^:]+: /, '')} · ${st.fecha}`, async () => {
+        if (await ask('Recuperar cambios guardados', `¿Poner de nuevo en «${gst.rama}» estos cambios?\n${st.mensaje.replace(/^On [^:]+: /, '')}`,
+          ['Recuperar', 'Cancelar']) === 'Recuperar' && await gitDo('recuperar_stash', [], { rama: st.id })) flash('✓ Cambios recuperados');
+      }, { title: st.id }])]), gst.stashes.length ? {} : { disabled: true, title: 'No hay cambios guardados aparte' }],
     '-', ['↶  Deshacer el último commit', async () => {
       if (await ask('Deshacer el último commit', 'El commit se quita y sus cambios vuelven a «Preparados». Solo se puede si aún no lo has subido.',
         ['Deshacer commit', 'Cancelar'], { danger: true }) === 'Deshacer commit') gitDo('deshacer_commit');
@@ -2218,7 +2246,7 @@ async function gitFullDraw() {
   for (const b of gst.ramas) {
     const n = Object.assign(document.createElement('div'), { className: 'node' + (b === gst.rama ? ' on' : ''), title: b === gst.rama ? 'Rama actual' : 'Cambiar a esta rama' });
     n.textContent = (b === gst.rama ? '✓ ' : '\u2003 ') + b;
-    n.onclick = () => b !== gst.rama && gitDo('cambiar_rama', [], { rama: b }).then(ok => ok && loadSide());
+    n.onclick = () => b !== gst.rama && gitSwitch(b);
     B.append(n);
   }
   const R = $('#gfRem'); R.innerHTML = gst.ramas_remotas.length ? '<h4>Remotas</h4>' : '';
@@ -2226,7 +2254,7 @@ async function gitFullDraw() {
     const local = b.split('/').slice(1).join('/'), n = Object.assign(document.createElement('div'), { className: 'node',
       title: gst.ramas.includes(local) ? `Cambiar a «${local}»` : `Crear «${local}» siguiendo a ${b} y cambiar a ella` });
     n.textContent = '\u2003 ' + b;
-    n.onclick = () => local !== gst.rama && gitDo('cambiar_rama', [], { rama: local }).then(ok => ok && loadSide());
+    n.onclick = () => local !== gst.rama && gitSwitch(local);
     R.append(n);
   }
   api('/api/git/resumen').then(sum => { gfSum = sum; gitFullProjects(); }).catch(() => {});
