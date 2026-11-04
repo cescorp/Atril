@@ -68,6 +68,7 @@ SETTINGS = [
     ("bitacora_max_lineas", "Bitácora", "Aviso «Bitácora grande» a partir de (líneas)", 200, 20, 100000),
     ("bitacora_conservar", "Bitácora", "Entradas que se quedan al archivar", 20, 1, 1000),
     ("git_cache_seg", "Git", "Volver a consultar git cada (segundos)", 10, 1, 3600),
+    ("git_fetch_min", "Git", "Buscar novedades en los remotos cada (minutos; 0 = nunca)", 5, 0, 1440),
     ("ia_espera_seg", "IA", "Tiempo máximo de espera de una respuesta (segundos)", 600, 30, 3600),
     ("ia_explicar_lineas", "IA", "Líneas de la consola que envía «Explicar error»", 40, 5, 500),
     ("ia_pdf_en_adelante", "IA", "Páginas que toma «página N en adelante»", 10, 1, 100),
@@ -2517,7 +2518,50 @@ def git_overview(path):
             "ramas": git_run(repo, "branch", "--format=%(refname:short)").splitlines(),
             "remotos": git_run(repo, "remote").splitlines(),
             "fusionando": bool(git_run(repo, "rev-parse", "-q", "--verify", "MERGE_HEAD")),
+            "comprobado": git_fetch_time(repo),
             "preparados": staged, "cambios": changes, "conflictos": conflicts}
+
+
+def git_fetch_time(repo):
+    """Cuándo se miró el remoto por última vez (fecha de FETCH_HEAD: fetch, pull o el fetch automático); None si nunca."""
+    f = git_run(repo, "rev-parse", "--git-path", "FETCH_HEAD")
+    f = Path(f) if Path(f).is_absolute() else Path(repo) / f
+    return f.stat().st_mtime if f.is_file() else None
+
+
+def git_summary():
+    """Estado de git de cada proyecto para el selector de la vista Git: rama, ↓↑ y número de cambios (None si no es git)."""
+    out = []
+    for r in load_config()["proyectos"]:
+        try:
+            ov = git_overview(r)
+            out.append({"ruta": r, "rama": ov["rama"], "remota": ov["remota"], "adelante": ov["adelante"],
+                        "atras": ov["atras"], "cambios": len(ov["cambios"]) + len(ov["preparados"]) + len(ov["conflictos"])})
+        except (ValueError, OSError, subprocess.TimeoutExpired):
+            out.append({"ruta": r, "rama": None})
+    return out
+
+
+def git_autofetch():
+    """Hilo: cada N minutos (⚙ Ajustes, 0 = nunca) hace fetch de los proyectos con remoto, para que ↓ diga si hay
+    novedades sin pulsar nada. Sin ventanas: GCM_INTERACTIVE=never evita que salga a pedir credenciales; si las
+    pide, ese repositorio simplemente no se pone al día hasta el siguiente pull o fetch a mano."""
+    time.sleep(20)  # que arranque primero lo demás
+    while True:
+        mins = ajuste("git_fetch_min")
+        if mins:
+            seen = set()
+            for r in load_config()["proyectos"]:
+                repo = git_root(Path(r))
+                if not repo or repo in seen or not git_run(repo, "remote"):
+                    continue
+                seen.add(repo)
+                try:
+                    subprocess.run(["git", "-C", str(repo), "fetch", "--prune", "--quiet"], capture_output=True, timeout=120,
+                                   creationflags=NO_WINDOW, env={**os.environ, **GIT_ENV, "GCM_INTERACTIVE": "never"})
+                except (OSError, subprocess.TimeoutExpired):
+                    pass
+        time.sleep((mins or 5) * 60)
 
 
 def git_rel(repo, rels):
@@ -2579,8 +2623,12 @@ def git_action(path, accion, archivos=(), mensaje="", rama="", todo=False):
         if not git_run(repo, "rev-parse", "-q", "--verify", "HEAD~1"):
             raise ValueError("Es el primer commit del repositorio: no hay uno anterior al que volver")
         git_do(repo, "reset", "--soft", "HEAD~1")
-    elif accion in ("pull", "push", "fetch", "fusionar"):
+    elif accion in ("pull", "push", "fetch", "fusionar", "sincronizar"):
         ov = git_overview(repo)
+        if accion == "sincronizar" and ov["remota"]:  # como VS Code: primero trae y luego sube (si hay algo tuyo)
+            cmd = "git pull --no-rebase" + (" && git push" if ov["adelante"] else "")
+            return {"id": start_run(f"cmd /c {cmd}" if WINDOWS else ["sh", "-c", cmd], str(repo), "utf-8",
+                                    f"git sincronizar · {repo.name}", GIT_ENV), "orden": cmd}
         if accion == "pull":
             args = ["pull", "--no-rebase"]
         elif accion == "fetch":
@@ -2588,7 +2636,7 @@ def git_action(path, accion, archivos=(), mensaje="", rama="", todo=False):
         elif accion == "fusionar":
             args = ["merge", "--no-edit", git_branch_name(repo, rama)]
         elif ov["remota"]:
-            args = ["push"]
+            args = ["push"]  # (sincronizar sin rama remota también llega aquí: se publica la rama)
         elif ov["remotos"]:  # rama sin seguimiento: se sube al primer remoto (origin) y queda enlazada
             args = ["push", "-u", "origin" if "origin" in ov["remotos"] else ov["remotos"][0], ov["rama"]]
         else:
@@ -2799,6 +2847,8 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if url.path == "/api/estado":
                 return self.send_json(200, estado())
+            if url.path == "/api/git/resumen":
+                return self.send_json(200, git_summary())
             if url.path == "/api/explorar":  # sin parámetro: la última ubicación usada
                 return self.send_json(200, explore(q.get("ruta", load_config().get("ultima", ""))))
             if url.path == "/api/ia":
@@ -3243,6 +3293,7 @@ def main():
     if server:
         threading.Thread(target=watchdog, args=(server,), daemon=True).start()
         threading.Thread(target=indexer, daemon=True).start()  # también limpia el historial de cambios
+        threading.Thread(target=git_autofetch, daemon=True).start()  # ↓ al día sin pulsar Fetch
         server.serve_forever()
         for r in runs.values():  # al cerrar la ventana no quedan programas corriendo
             r.kill()

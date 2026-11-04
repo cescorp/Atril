@@ -182,8 +182,15 @@ body:not(.noside):not(.vsearch):not(.vgit) #ribbon [data-v=e],body.vsearch:not(.
 #gitv .shead{padding-left:0}#gitv .shead h2{margin-left:0}
 .gline{display:flex;align-items:center;gap:6px;min-width:0}
 .gline>button:not(.small){min-width:0;flex:1;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12.5px;padding:3px 8px}
-#gSync{font-size:11px;color:var(--muted);white-space:nowrap}
-.gsync>button{flex:1}
+/* Sincronizar: en color si hay commits por traer o subir (como «Sync Changes» de VS Code) */
+#gSyncBtn{width:100%;font-weight:500}
+#gSyncBtn.pending{color:var(--accent);border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent)}
+/* selector de repositorio: cada dato con su color */
+.menu .mr-mark{display:inline-block;width:1.1em;color:var(--accent)}.menu .mr-name{font-weight:600;color:var(--ink);margin-right:4px}
+.menu :is(.mr-br,.mr-down,.mr-up,.mr-ok,.mr-ch,.mr-off){font-size:11.5px;margin-left:8px}
+.menu .mr-br{color:var(--muted)}.menu .mr-down{color:#2f7fd8;font-weight:600}.menu .mr-up{color:var(--accent);font-weight:600}
+.menu .mr-ok{color:#2e8b57}.menu .mr-ch{color:#b07800}.menu .mr-off{color:var(--faint);font-style:italic}
+#gChecked{margin-top:-2px;font-size:11px;color:var(--faint);text-align:center}
 #gMsg{width:100%;box-sizing:border-box;resize:vertical;font:13px Inter,sans-serif;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--paper);color:var(--ink)}
 #gMsg:focus{outline:none;border-color:var(--accent)}
 #gCommit{width:100%}
@@ -716,11 +723,11 @@ button:disabled{opacity:.45;cursor:not-allowed}
     <div id="gitv">
       <div class="shead"><h2>Git</h2><span id="gbtns"></span></div>
       <div class="gline"><button id="gRepo" title="Repositorio (proyecto)"></button></div>
-      <div class="gline"><button id="gBranch" title="Rama: cambiar, crear o fusionar"></button><span id="gSync"></span></div>
-      <div class="gline gsync"><button id="gPull" class="small" title="Traer los commits del remoto (git pull)">⇣ Pull</button>
-        <button id="gPush" class="small" title="Subir tus commits al remoto (git push)">⇡ Push</button></div>
+      <div class="gline"><button id="gBranch" title="Rama: cambiar, crear, fusionar, pull y push"></button></div>
       <textarea id="gMsg" rows="2" placeholder="Mensaje del commit (Ctrl+Enter)" spellcheck="true"></textarea>
       <button id="gCommit" class="primary">✓ Commit</button>
+      <button id="gSyncBtn"></button>
+      <div class="gnote" id="gChecked"></div>
       <div id="glist"></div>
     </div>
     <h2>Proyectos</h2>
@@ -1999,10 +2006,9 @@ const GST_TXT = { M: 'Modificado', A: 'Añadido', D: 'Borrado', R: 'Renombrado',
 // Dibuja rama, ↓↑ y las listas Conflictos · Preparados · Cambios; cada fila y cada título llevan sus botones
 function gitDraw() {
   const L = $('#glist'), ok = gst && !gst.error;
-  for (const id of ['#gBranch', '#gPull', '#gPush', '#gCommit', '#gMsg']) $(id).disabled = !ok;
+  for (const id of ['#gBranch', '#gCommit', '#gMsg', '#gSyncBtn']) $(id).disabled = !ok;
   $('#gBranch').textContent = ok ? '⎇ ' + gst.rama + ' ▾' : '⎇';
-  $('#gSync').textContent = ok && gst.remota ? `↓${gst.atras} ↑${gst.adelante}` : ok ? 'sin remoto' : '';
-  $('#gSync').title = ok && gst.remota ? `${gst.atras} commit(s) por traer y ${gst.adelante} por subir (${gst.remota})` : '';
+  gitSyncDraw(ok);
   L.innerHTML = '';
   if (!gst) return;
   if (gst.error) return L.innerHTML = `<p class="gnote">${esc(gst.error)}.<br>Elige otro proyecto arriba.</p>`;
@@ -2032,6 +2038,29 @@ function gitDraw() {
   sec('conflictos', 'Conflictos', gst.conflictos, [['+', 'Marcar como resuelto (preparar)', fs => gitDo('preparar', fs)]]);
   sec('preparados', 'Preparados', gst.preparados, [['−', 'Quitar de preparados', fs => gitDo('quitar', fs)]]);
   sec('cambios', 'Cambios', gst.cambios, [['↶', 'Descartar los cambios', gitDiscard], ['+', 'Preparar para el commit', fs => gitDo('preparar', fs)]]);
+}
+// Botón Sincronizar: «⟳ Sincronizar ↓2 ↑13» en color si hay algo pendiente, «⇡ Publicar rama» si no tiene remota,
+// «✓ Al día» si no (un clic comprueba). Debajo, cuándo se miró el remoto (fetch automático cada N min, ⚙ Ajustes).
+function gitSyncDraw(ok) {
+  const B = $('#gSyncBtn'), C = $('#gChecked'), pend = ok && gst.remota && (gst.atras || gst.adelante);
+  B.classList.toggle('pending', !!(pend || (ok && !gst.remota && gst.remotos.length)));
+  B.textContent = !ok ? '⟳ Sincronizar' : !gst.remotos.length ? 'Sin remoto' : !gst.remota ? '⇡ Publicar rama'
+    : pend ? `⟳ Sincronizar  ↓${gst.atras}  ↑${gst.adelante}` : '✓ Al día';
+  B.title = !ok ? '' : !gst.remotos.length ? 'Este repositorio no tiene remoto (git remote add origin <url>)'
+    : !gst.remota ? `Subir «${gst.rama}» al remoto y enlazarla` : pend ? `${gst.atras} commit(s) por traer y ${gst.adelante} por subir (${gst.remota}): primero trae y luego sube`
+    : `Sin nada por traer ni subir respecto a ${gst.remota}. Clic: comprobar ahora`;
+  if (ok && !gst.remotos.length) B.disabled = true;
+  const t = ok && gst.comprobado, m = t ? Math.round((Date.now() / 1000 - t) / 60) : null;
+  C.textContent = !ok || !gst.remotos.length ? '' : m === null ? 'Remoto sin comprobar' : m < 1 ? 'Comprobado ahora' : m < 60 ? `Comprobado hace ${m} min`
+    : `Comprobado ${new Date(t * 1000).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}`;
+}
+async function gitSync() {
+  if (!gst.remota) return gitPush(); // publicar la rama
+  if (!gst.atras && !gst.adelante) return gitLong('fetch'); // al día: comprobar ahora
+  const n = (k, w) => `${k} commit${k === 1 ? '' : 's'} ${w}`;
+  if (await ask('Sincronizar', `¿Sincronizar «${gst.rama}» con ${gst.remota}? ` +
+    [gst.atras && n(gst.atras, 'por traer'), gst.adelante && n(gst.adelante, 'por subir')].filter(Boolean).join(' y ') + '.',
+    ['Sincronizar', 'Cancelar']) === 'Sincronizar') gitLong('sincronizar');
 }
 // Acción rápida: el servidor la hace y devuelve el estado nuevo. Los archivos van por su ruta relativa al repositorio.
 async function gitDo(accion, files = [], extra = {}) {
@@ -2063,7 +2092,8 @@ async function gitCommit() {
 // pull, push, fetch y merge: en la consola (su salida en vivo); al terminar, la vista y el árbol se ponen al día
 function gitLong(accion, extra = {}) {
   const ruta = gst.ruta;
-  const cmd = { pull: 'git pull --no-rebase', push: 'git push', fetch: 'git fetch --prune', fusionar: 'git merge --no-edit ' + extra.rama }[accion];
+  const cmd = { pull: 'git pull --no-rebase', push: 'git push', fetch: 'git fetch --prune', fusionar: 'git merge --no-edit ' + extra.rama,
+    sincronizar: 'git pull --no-rebase' + (gst.adelante ? ' && git push' : '') }[accion];
   launch(() => api('/api/git/accion', { ruta, accion, ...extra }), `git ${accion} · ${gst.nombre}`, cmd,
     gst.repositorio, ruta, () => { gitLoad(); loadSide(); });
 }
@@ -2085,22 +2115,34 @@ function gitBranchMenu(anchor) {
     ['⤵  Fusionar otra rama en esta…', () => openMenu(anchor, [{ head: `Fusionar en «${gst.rama}»` }, ...others.map(b => [b, async () => {
       if (await ask('Fusionar', `¿Fusionar «${b}» en «${gst.rama}»? Si hay conflictos, aparecen en la lista para resolverlos.`, ['Fusionar', 'Cancelar']) === 'Fusionar') gitLong('fusionar', { rama: b });
     }])]), others.length ? {} : { disabled: true, title: 'No hay otras ramas' }],
+    '-', ['⇣  Pull (traer)', () => gitLong('pull'), gst.remota ? {} : { disabled: true, title: 'La rama no está enlazada a una remota' }],
+    ['⇡  Push (subir)', gitPush, gst.remotos.length ? {} : { disabled: true, title: 'Sin remoto' }],
     ['⟳  Fetch (ver novedades del remoto)', () => gitLong('fetch'), gst.remotos.length ? {} : { disabled: true, title: 'Sin remoto' }],
     '-', ['↶  Deshacer el último commit', async () => {
       if (await ask('Deshacer el último commit', 'El commit se quita y sus cambios vuelven a «Preparados». Solo se puede si aún no lo has subido.',
         ['Deshacer commit', 'Cancelar'], { danger: true }) === 'Deshacer commit') gitDo('deshacer_commit');
     }]]);
 }
-function gitRepoMenu(anchor) {
-  openMenu(anchor, [{ head: 'Repositorio' }, ...(side?.proyectos || []).map(p =>
-    [(p.ruta === gst?.ruta ? '✓ ' : '\u2003 ') + p.nombre, () => { LS('desklens.git.repo', p.ruta); gitLoad(); }, { title: p.ruta }])]);
+// Selector de repositorio con el estado de cada proyecto: rama, ↓ por traer, ↑ por subir y cambios sin commit
+async function gitRepoMenu(anchor) {
+  let sum = [];
+  try { sum = await api('/api/git/resumen'); } catch {}
+  // nombre en negrita · rama en gris · ↓ por traer en azul · ↑ por subir en morado · al día en verde · cambios en ámbar
+  const st = r => { const g = sum.find(x => x.ruta === r); if (!g) return ''; if (!g.rama) return '<span class="mr-off">sin git</span>';
+    return `<span class="mr-br">⎇ ${esc(g.rama)}</span>` + (g.remota && g.atras ? `<span class="mr-down">↓${g.atras}</span>` : '')
+      + (g.remota && g.adelante ? `<span class="mr-up">↑${g.adelante}</span>` : '') + (g.remota && !g.atras && !g.adelante ? '<span class="mr-ok">al día</span>' : '')
+      + (g.cambios ? `<span class="mr-ch">${g.cambios} cambio${g.cambios === 1 ? '' : 's'}</span>` : ''); };
+  openMenu(anchor, [{ head: 'Repositorio' }, ...(side?.proyectos || []).map(p => {
+    const mark = p.ruta === gst?.ruta ? '✓' : '\u2003', info = st(p.ruta);
+    return [mark + ' ' + p.nombre + ' ' + info.replace(/<[^>]+>/g, ' '), () => { LS('desklens.git.repo', p.ruta); gitLoad(); },
+      { title: p.ruta, html: `<span class="mr-mark">${mark}</span><b class="mr-name">${esc(p.nombre)}</b>${info}` }];
+  })]);
 }
 // Botones y avisos de la vista Git (se llama al arrancar, cuando ya existen button/iconBtn)
 function gitInit() {
   $('#gRepo').onclick = e => { e.stopPropagation(); gitRepoMenu(e.currentTarget); };
   $('#gBranch').onclick = e => { e.stopPropagation(); gitBranchMenu(e.currentTarget); };
-  $('#gPull').onclick = () => gitLong('pull');
-  $('#gPush').onclick = gitPush;
+  $('#gSyncBtn').onclick = gitSync;
   $('#gCommit').onclick = gitCommit;
   $('#gMsg').onkeydown = e => { if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); gitCommit(); } };
   $('#gbtns').append(iconBtn('refresh', 'Actualizar', () => gitLoad()));
@@ -2902,6 +2944,7 @@ function openMenu(anchor, items, { search } = {}) {
     if (it.head) return Object.assign(document.createElement('div'), { className: 'mhead', textContent: it.head });
     if (it.el) { btns.push(it.btn); rows.push(it.el); it.el._btn = it.btn; return it.el; } // fila propia (p. ej. commit con ▸ archivos)
     const [t, fn, o = {}] = it, b = button(t, () => { closeMenu(); fn(); });
+    if (o.html) b.innerHTML = o.html; // fila con formato (ya escapado por quien llama); el buscador sigue usando el texto
     Object.assign(b, { title: o.title || '', disabled: !!o.disabled });
     if (o.key) b.append(Object.assign(document.createElement('kbd'), { className: 'mkey', textContent: o.key })); // atajo, a la derecha
     btns.push(b); rows.push(b); return b;

@@ -37,6 +37,8 @@ with tempfile.TemporaryDirectory() as tmp:
     desklens.CONFIG = tmp / "config.json"
     # nada de la prueba va al historial\ real de DeskLens (copias para deshacer, versiones, archivos de la IA)
     desklens.UNDO_DIR, desklens.HIST_DIR, desklens.IA_DIR = tmp / "deshacer", tmp / "versiones", tmp / "ia"
+    # ni al índice, conversaciones o recuperación reales: con DeskLens abierto, su índice está en uso y la prueba esperaba
+    desklens.INDEX_DB, desklens.CONV_DIR, desklens.RECOVERY_DIR = tmp / "idx" / "indice.db", tmp / "conv", tmp / "recuperacion"
     proj, fuera = tmp / "proyecto", tmp / "fuera"
     proj.mkdir(), fuera.mkdir()
     (proj / "utf8.md").write_bytes("# Hola ñ\n".encode())
@@ -717,6 +719,23 @@ assert.deepStrictEqual(findRefs('Ver 1 Samuel 4:4 y 1 Samuel 8:5, 20; Deuteronom
     ov = json.loads(get(port, "/api/git/estado?ruta=" + urllib.request.quote(str(rep)))[1])
     assert ov["remota"] == "origin/main" and ov["adelante"] == 0
     assert post("/api/git/accion", {"ruta": str(rep), "accion": "deshacer_commit"})[0] == 400  # ya subido
+    # Sincronizar: otro clon sube un commit (↓1) y aquí hay uno sin subir (↑1); pull y push dejan los dos en 0
+    otro = fuera / "otro"
+    git(fuera, "clone", "-q", str(remoto), str(otro))
+    git(otro, "config", "user.name", "Otra"); git(otro, "config", "user.email", "otra@example.com")
+    (otro / "c.md").write_text("de otra persona\n"); git(otro, "add", "-A"); git(otro, "commit", "-q", "-m", "c"); git(otro, "push", "-q")
+    (rep / "d.md").write_text("mío\n")
+    post("/api/git/accion", {"ruta": str(rep), "accion": "commit", "mensaje": "d", "todo": True})
+    code, r = post("/api/git/accion", {"ruta": str(rep), "accion": "fetch"})
+    wait_run(r["id"])
+    ov = json.loads(get(port, "/api/git/estado?ruta=" + urllib.request.quote(str(rep)))[1])
+    assert (ov["atras"], ov["adelante"]) == (1, 1) and ov["comprobado"] and time.time() - ov["comprobado"] < 60
+    code, r = post("/api/git/accion", {"ruta": str(rep), "accion": "sincronizar"})
+    assert r["orden"] == "git pull --no-rebase && git push" and wait_run(r["id"])["codigo"] == 0
+    ov = json.loads(get(port, "/api/git/estado?ruta=" + urllib.request.quote(str(rep)))[1])
+    assert (ov["atras"], ov["adelante"]) == (0, 0) and (rep / "c.md").exists()
+    resumen = json.loads(get(port, "/api/git/resumen")[1])
+    assert any(x["ruta"] == str(proj) for x in resumen)  # un proyecto por fila (sin git: rama None)
     srv.shutdown()
 
 print("OK: todas las pruebas pasan")
