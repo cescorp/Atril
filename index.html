@@ -1575,7 +1575,13 @@ async function compareDialog(path, carry = null) {
       const x0 = (d.querySelector('.clist')?.offsetWidth || 0) + 8, w = (b.width - x0 - 28) / heads.length;
       return heads.forEach((h, i) => Object.assign(h.style, { left: x0 + i * w + 'px', width: w - 12 + 'px' }));
     }
-    heads.forEach((h, i) => { const r = ps[i]?.getBoundingClientRect(); if (r) Object.assign(h.style, { left: r.left - b.left + 'px', width: r.width + 'px' }); });
+    // con la lista oculta la 1.ª columna empieza en el borde: su combo no puede quedar debajo del botón ▤
+    const btn = H.querySelector('#clistb'), minL = btn ? btn.offsetLeft + btn.offsetWidth + 8 : 0;
+    heads.forEach((h, i) => {
+      const r = ps[i]?.getBoundingClientRect(); if (!r) return;
+      const left = r.left - b.left, cut = Math.max(0, minL - left);
+      Object.assign(h.style, { left: left + cut + 'px', width: r.width - cut + 'px' });
+    });
   }
   function resizers(body, panes) {
     const drag = (e, move, done) => {
