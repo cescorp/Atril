@@ -67,7 +67,7 @@ Las capturas usan un proyecto de ejemplo inventado, «Taller de escritura».
 
 Descarga el repositorio (botón **Code → Download ZIP** o `git clone`) y:
 
-**Windows, la primera vez:** doble clic en **`instalar.bat`**. Revisa e instala (preguntando antes cada cosa) Python, Git y, si quieres, las herramientas de IA; crea el acceso directo «DeskLens» y ejecuta las pruebas. Con `instalar.bat -SoloRevisar` solo muestra qué hay y qué falta. Todo sale de winget (Microsoft) y npm; el script está comentado paso a paso.
+**Windows, la primera vez:** doble clic en **`instalar.bat`** (o `.\instalar.ps1` en PowerShell). En cada paso muestra el comando que va a ejecutar y pregunta «¿Ejecutar? (s/n)»: Python, Git, actualizar lo que ya tengas, las herramientas de IA, el acceso directo y las pruebas. Con winget usa el repositorio de Microsoft; sin winget (p. ej. Windows Server) descarga los instaladores oficiales de python.org, Git para Windows y nodejs.org y comprueba su firma digital antes de ejecutarlos. `instalar.bat -SoloRevisar` solo informa. El script está comentado paso a paso.
 
 | Sistema | Cómo abrirlo |
 |---|---|
