@@ -231,6 +231,13 @@ dialog#dlg.imgcmp{width:min(1200px,94vw);max-width:none}.imgcmp header{display:f
 .imgcmp-b{display:grid;grid-template-columns:1fr 1fr;gap:14px}.imgcmp figure{margin:0;display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0}
 .imgcmp figcaption{font-size:12px;font-weight:600;color:var(--muted)}.imgcmp img{max-width:100%;max-height:70vh;object-fit:contain;background:repeating-conic-gradient(#ddd 0 25%,#fff 0 50%) 0 0/16px 16px;border:1px solid var(--line)}
 .gfmore{padding:8px 12px;font-size:12px;color:var(--muted)}
+.gfrow .gi{flex:none;width:14px;margin-left:8px;text-align:center;color:var(--accent);font-size:12px}.gfrow .gi.head{font-weight:700}
+.gfrow.merge .gm{color:var(--muted)}.gfrow.merge .gm b{color:var(--ink);font-weight:600}
+.gfrow.sub{padding-left:22px}.gfrow.sub .gi{color:var(--faint)}.gfrow.sub .gm{color:var(--muted)}
+.gtog{border:0;background:none;padding:0 2px;color:var(--muted);cursor:pointer;font-size:11px}.gtog:hover{color:var(--ink)}
+.gfcols{position:relative;height:84px;margin-left:3px;flex:none} /* nombres de las columnas, en vertical sobre su línea */
+.gfcols span{position:absolute;bottom:2px;writing-mode:vertical-rl;transform:rotate(180deg);max-height:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11.5px;font-weight:600}
+.gfwrap{position:relative}.gfwrap>svg{position:absolute;left:3px;top:0;pointer-events:none;overflow:visible}
 /* selector de repositorio: cada dato con su color */
 .gfpi>span:first-child{margin-left:0!important}
 .menu .mr-mark{display:inline-block;width:1.1em;color:var(--accent)}.menu .mr-name{font-weight:600;color:var(--ink);margin-right:4px}
@@ -2248,6 +2255,7 @@ let gfGraph = null, gfKey = '', gfSel = null, gfSum = [], gitvHome = null;
 // archivo, ir a otra vista), que no cambia lo recordado.
 function gitFullOpen() {
   if (!gst || gst.error) return flash('Elige primero un repositorio git');
+  if (gitFullOn()) gitFullClose(true); // ya abierta: devolver #gitv a su sitio antes de rehacerla, o se pierde con el innerHTML
   LS('desklens.git.full', '1');
   const G = $('#gitfull');
   G.innerHTML = `<div class="gfbar"><b>Git</b><span class="gft" id="gfTitle"></span><span class="sp"></span>
@@ -2308,56 +2316,101 @@ function gitFullProjects() {
     P.append(n);
   }
 }
-// Carriles del grafo: cada commit va en el carril que lo esperaba (el de su hijo); su 1.er padre sigue en ese carril y
-// los demás padres (merge) abren o reusan otro. ponytail: algoritmo simple de carriles; con cientos de ramas vivas se ensancha
-function gitLanes(commits) {
-  let lanes = []; const rows = [];
-  for (const c of commits) {
-    const had = lanes.includes(c.hash);
-    let i = lanes.indexOf(c.hash);
-    if (i < 0) { i = lanes.indexOf(null); if (i < 0) i = lanes.length; lanes[i] = c.hash; }
-    const before = lanes.slice(), merging = [];
-    before.forEach((h, j) => { if (h === c.hash && j !== i) merging.push(j); });
-    const after = before.map(h => (h === c.hash ? null : h)), parents = [];
-    c.padres.forEach((p, k) => {
-      let j = after.indexOf(p);
-      if (j < 0) { if (k === 0) j = i; else { j = after.indexOf(null); if (j < 0) j = after.length; } after[j] = p; }
-      parents.push(j);
-    });
-    while (after.length && after.at(-1) === null) after.pop();
-    rows.push({ i, had, before, after, merging, parents });
-    lanes = after;
-  }
-  return rows;
+// Nombre corto de una rama de %D: sin «HEAD -> » ni el remoto («origin/jeanr» y «jeanr» van juntas)
+const branchKey = f => { f = f.replace(/^HEAD -> /, ''); const r = (gst?.remotos || []).find(x => f.startsWith(x + '/')); return r ? f.slice(r.length + 1) : f; };
+// Rama que entró en un merge: la del mensaje (git, GitHub, GitLab) o, si no, la etiqueta del commit fusionado
+function mergeName(c, by) {
+  const m = c.mensaje.match(/^Merge (?:remote-tracking )?branch '([^']+)'|^Merge pull request #\d+ from [^/\s]+\/(\S+)|^Merge branch "?([^"\s]+)/);
+  if (m) return branchKey(m[1] || m[2] || m[3]);
+  const r = by.get(c.padres[1])?.refs.find(f => !f.startsWith('tag: ') && !/(^|\/)HEAD$/.test(f));
+  return r ? branchKey(r) : '';
 }
 const LANE_COLORS = ['#7c5cdb', '#2f7fd8', '#2e8b57', '#c08a00', '#d0508a', '#1aa3a3', '#d35400'];
-function gitGraphDraw() {
-  const G = $('#gfGraph'), cs = gfGraph.commits; G.innerHTML = ''; G.style.opacity = '';
+let gfOpen = new Set(), gfLine = null; // merges desplegados en la vista sencilla · su estructura (para ir a un commit)
+// Vista sencilla (sin «Todas las ramas»): la línea principal, el 1.er padre desde HEAD y desde su remota. Cada merge
+// agrupa lo que trajo; se recorren del más viejo al más nuevo y cada commit es del primero que lo alcanza, así un merge
+// solo muestra lo que entró con él (lo mismo que `git log p1..p2`, sin pedirlo a git).
+function gitMainLine(cs) {
+  const by = new Map(cs.map(c => [c.hash, c])), main = new Set(), side = new Map(), claimed = new Set();
+  for (const tip of (gst.punta || '').split(':')) for (let h = tip; h && by.has(h) && !main.has(h); h = by.get(h).padres[0]) main.add(h);
+  for (const c of [...cs].reverse()) {
+    if (!main.has(c.hash) || c.padres.length < 2) continue;
+    const got = new Set(), stack = c.padres.slice(1);
+    while (stack.length) { const h = stack.pop(); if (!by.has(h) || main.has(h) || claimed.has(h)) continue; claimed.add(h); got.add(h); stack.push(...by.get(h).padres); }
+    side.set(c.hash, cs.filter(x => got.has(x.hash)));
+  }
+  return { by, side, owner: new Map([...side].flatMap(([m, l]) => l.map(x => [x.hash, m]))), top: cs.filter(c => !claimed.has(c.hash)) };
+}
+// Vista con «Todas las ramas»: una columna por rama, con nombre y color fijos. Cada rama reclama su 1.er padre desde su
+// punta (primero main/master, luego la actual, luego el resto); lo que entró por un merge de una rama ya borrada toma el
+// nombre del mensaje del merge; lo que quede, «(otras)».
+function gitColumns(cs) {
+  const by = new Map(cs.map(c => [c.hash, c])), col = new Map(), names = [];
+  const claim = (tip, name) => { let j = names.indexOf(name);
+    for (let h = tip; h && by.has(h) && !col.has(h); h = by.get(h).padres[0]) { if (j < 0) j = names.push(name) - 1; col.set(h, j); } };
+  const rank = n => /^(main|master)$/.test(n) ? 0 : n === gst.rama ? 1 : 2, tips = [];
+  for (const c of cs) for (const f of c.refs) { const n = branchKey(f); if (!f.startsWith('tag: ') && n !== 'HEAD' && !n.endsWith('/HEAD')) tips.push([n, c.hash]); }
+  tips.sort((a, b) => rank(a[0]) - rank(b[0])).forEach(([n, h]) => claim(h, n));
+  for (const c of cs) c.padres.slice(1).forEach(p => claim(p, mergeName(c, by) || 'rama fusionada'));
+  for (const c of cs) claim(c.hash, '(otras)');
+  return { col, names };
+}
+// Una fila del historial: lead = lo que va antes del hash (grafo o icono); msg = HTML del mensaje
+function gitRow(c, lead, msg, cls = '') {
+  const refs = c.refs.map(f => { const h = f.startsWith('HEAD -> '), n = h ? f.slice(8) : f;
+    return `<span class="gref${h ? ' head' : ''}${n.includes('/') && !h ? ' rem' : ''}">${esc(n.replace(/^tag: /, '🏷 '))}</span>`; }).join('');
+  const row = Object.assign(document.createElement('div'), { className: 'gfrow' + cls + (gfSel === c.hash ? ' on' : ''), title: `${c.hash}\n${c.mensaje}` });
+  row.dataset.lado = c.lado; row.dataset.hash = c.hash;
+  row.innerHTML = lead + `<span class="gl">${c.lado === 'entrante' ? '↓' : c.lado === 'saliente' ? '↑' : ''}</span><span class="gh">${esc(c.corto)}</span>${refs}`
+    + `<span class="gm">${msg ?? esc(c.mensaje)}</span><span class="ga">${esc(c.autor)}</span><span class="gfdate">${esc(c.fecha)}</span>`;
+  row.onclick = () => { gfSel = c.hash; $('#gfGraph').querySelectorAll('.gfrow.on').forEach(e => e.classList.remove('on')); row.classList.add('on'); gitCommitDetail(c); };
+  return row;
+}
+// keep: solo se redibuja la lista (desplegar un merge), sin volver a pedir el detalle ni mover el scroll
+function gitGraphDraw(keep = false) {
+  const G = $('#gfGraph'), cs = gfGraph.commits, top = G.scrollTop; G.innerHTML = ''; G.style.opacity = '';
   if (!cs.length) return G.innerHTML = '<p class="gfmore">Este repositorio aún no tiene commits.</p>';
-  const rows = gitLanes(cs), width = Math.max(...rows.map(r => Math.max(r.before.length, r.after.length, r.i + 1))), W = 14, H = 28, m = H / 2;
-  const x = j => 8 + j * W, col = j => LANE_COLORS[j % LANE_COLORS.length];
   const nIn = cs.filter(c => c.lado === 'entrante').length, nOut = cs.filter(c => c.lado === 'saliente').length;
   G.insertAdjacentHTML('beforeend', `<h4>Historial${gfGraph.remota ? ` · <span style="color:#2f7fd8">↓ ${nIn} por traer</span> · <span style="color:var(--accent)">↑ ${nOut} por subir</span>` : ''}</h4>`);
-  cs.forEach((c, k) => {
-    const r = rows[k];
+  const head = c => c.refs.some(f => f.startsWith('HEAD'));
+  if (!$('#gfAll').checked) {
+    gfLine = gitMainLine(cs);
+    for (const c of gfLine.top) {
+      const sub = gfLine.side.get(c.hash);
+      if (!sub) { G.append(gitRow(c, `<span class="gi${head(c) ? ' head' : ''}">${head(c) ? '○' : '●'}</span>`)); continue; }
+      const open = gfOpen.has(c.hash), name = mergeName(c, gfLine.by);
+      const row = gitRow(c, '<span class="gi">⤵</span>', `<button class="gtog" title="${open ? 'Ocultar' : 'Ver'} los commits que entraron">${open ? '▾' : '▸'}</button>`
+        + ` Fusionó ${name ? `<b>«${esc(name)}»</b>` : 'otra rama'} · ${sub.length} commit${sub.length === 1 ? '' : 's'}`, ' merge');
+      row.querySelector('.gtog').onclick = e => { e.stopPropagation(); open ? gfOpen.delete(c.hash) : gfOpen.add(c.hash); gitGraphDraw(true); };
+      G.append(row);
+      if (open) sub.forEach(s => G.append(gitRow(s, '<span class="gi">·</span>', null, ' sub')));
+    }
+  } else {
+    gfLine = null;
+    const { col, names } = gitColumns(cs), W = 20, H = 28, X = j => 10 + j * W, Y = k => k * H + H / 2, idx = new Map(cs.map((c, k) => [c.hash, k]));
+    const color = j => LANE_COLORS[j % LANE_COLORS.length], width = X(names.length - 1) + 10;
     let svg = '';
-    r.before.forEach((h, j) => { if (h && h !== c.hash) { const t = r.after.indexOf(h); if (t >= 0) svg += `<path d="M${x(j)} 0 L${x(t)} ${H}" stroke="${col(j)}"/>`; } });
-    if (r.had) svg += `<path d="M${x(r.i)} 0 L${x(r.i)} ${m}" stroke="${col(r.i)}"/>`;
-    r.merging.forEach(j => { svg += `<path d="M${x(j)} 0 L${x(r.i)} ${m}" stroke="${col(j)}"/>`; });
-    r.parents.forEach(j => { svg += `<path d="M${x(r.i)} ${m} L${x(j)} ${H}" stroke="${col(j)}"/>`; });
-    const head = c.refs.some(f => f.startsWith('HEAD'));
-    svg += `<circle cx="${x(r.i)}" cy="${m}" r="${head ? 5 : 4}" fill="${c.lado === 'entrante' ? '#2f7fd8' : head ? 'var(--bg)' : col(r.i)}" stroke="${col(r.i)}" stroke-width="${head ? 2.5 : 1}"/>`;
-    const refs = c.refs.map(f => { const h = f.startsWith('HEAD -> '), n = h ? f.slice(8) : f;
-      return `<span class="gref${h ? ' head' : ''}${n.includes('/') && !h ? ' rem' : ''}">${esc(n.replace(/^tag: /, '🏷 '))}</span>`; }).join('');
-    const row = Object.assign(document.createElement('div'), { className: 'gfrow' + (gfSel === c.hash ? ' on' : ''), title: `${c.hash}\n${c.mensaje}` });
-    row.dataset.lado = c.lado;
-    row.innerHTML = `<svg width="${8 + width * W}" height="${H}" fill="none" stroke-width="2">${svg}</svg>`
-      + `<span class="gl">${c.lado === 'entrante' ? '↓' : c.lado === 'saliente' ? '↑' : ''}</span><span class="gh">${esc(c.corto)}</span>${refs}`
-      + `<span class="gm">${esc(c.mensaje)}</span><span class="ga">${esc(c.autor)}</span><span class="gfdate">${esc(c.fecha)}</span>`;
-    row.onclick = () => { gfSel = c.hash; G.querySelectorAll('.gfrow.on').forEach(e => e.classList.remove('on')); row.classList.add('on'); gitCommitDetail(c); };
-    G.append(row);
-  });
+    cs.forEach((c, k) => {
+      const j = col.get(c.hash);
+      c.padres.forEach((p, n) => {
+        const kp = idx.get(p), jp = col.get(p);
+        if (kp == null) svg += `<path d="M${X(j)} ${Y(k)} V${cs.length * H}" stroke="${color(j)}"/>`; // el padre está más abajo de lo cargado
+        else if (jp === j) svg += `<path d="M${X(j)} ${Y(k)} V${Y(kp)}" stroke="${color(j)}"/>`;
+        else if (n > 0) svg += `<path d="M${X(j)} ${Y(k)} L${X(jp)} ${Math.min(Y(k) + H, Y(kp))} V${Y(kp)}" stroke="${color(jp)}"/>`; // merge: va a la rama que entró y baja por ella
+        else svg += `<path d="M${X(j)} ${Y(k)} V${Math.max(Y(k), Y(kp) - H)} L${X(jp)} ${Y(kp)}" stroke="${color(j)}"/>`; // rama que nace de p
+      });
+    });
+    cs.forEach((c, k) => { const j = col.get(c.hash);
+      svg += `<circle cx="${X(j)}" cy="${Y(k)}" r="${head(c) ? 5 : 4}" fill="${head(c) ? 'var(--bg)' : color(j)}" stroke="${color(j)}" stroke-width="${head(c) ? 2.5 : 1}"/>`; });
+    G.insertAdjacentHTML('beforeend', `<div class="gfcols" style="width:${width}px">${names.map((n, j) =>
+      `<span style="left:${X(j) - 7}px;color:${color(j)}" title="${esc(n)}">${esc(n)}</span>`).join('')}</div>`);
+    const wrap = Object.assign(document.createElement('div'), { className: 'gfwrap' });
+    wrap.innerHTML = `<svg width="${width}" height="${cs.length * H}" fill="none" stroke-width="2">${svg}</svg>`;
+    cs.forEach(c => wrap.append(gitRow(c, `<span style="width:${width}px;flex:none"></span>`)));
+    G.append(wrap);
+  }
   if (gfGraph.mas) G.insertAdjacentHTML('beforeend', '<p class="gfmore">Se muestran los 300 commits más recientes.</p>');
+  if (keep) return G.scrollTop = top;
   const sel = gfSel && cs.find(c => c.hash === gfSel); if (sel) gitCommitDetail(sel); else $('#gfDetail').innerHTML = '';
 }
 // Detalle de un commit: cabecera completa (mensaje entero, hash con copiar, autor y email, fecha absoluta y relativa,
@@ -2431,9 +2484,9 @@ async function gitCommitDetail(c) {
 }
 // Lleva a un commit del grafo (p. ej. un padre): lo marca, lo enseña y muestra su detalle
 function gitSelectCommit(hash) {
-  const i = gfGraph?.commits.findIndex(x => x.hash === hash);
-  if (i == null || i < 0) return flash('Ese commit no está en el historial que se ve (prueba «Todas las ramas»)');
-  const row = $('#gfGraph').querySelectorAll('.gfrow')[i]; row?.click(); row?.scrollIntoView({ block: 'center' });
+  if (!gfGraph?.commits.some(x => x.hash === hash)) return flash('Ese commit no está en el historial que se ve (prueba «Todas las ramas»)');
+  const m = gfLine?.owner.get(hash); if (m && !gfOpen.has(m)) { gfOpen.add(m); gitGraphDraw(true); } // está dentro de un merge plegado
+  const row = $('#gfGraph').querySelector(`.gfrow[data-hash="${hash}"]`); row?.click(); row?.scrollIntoView({ block: 'center' });
 }
 // ⋯ del commit: copiar hash, crear una rama aquí, revertir
 function gitCommitMenu(anchor, c, info) {
