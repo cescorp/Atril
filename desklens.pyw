@@ -2278,8 +2278,8 @@ def search_scope(raices):
     None = en todo lo añadido."""
     if raices is None:
         return "1", []
-    roots = [str(Path(r)) for r in raices if r != "sueltos"]
-    loose = [str(Path(s)) for s in load_config()["sueltos"]] if "sueltos" in raices else []
+    roots = [str(Path(r).resolve()) for r in raices if r != "sueltos"]
+    loose = [str(Path(s).resolve()) for s in load_config()["sueltos"]] if "sueltos" in raices else []
     conds = ([f"files.root in ({','.join('?' * len(roots))})"] if roots else []) + \
             ([f"files.path in ({','.join('?' * len(loose))})"] if loose else [])
     return "(" + " or ".join(conds) + ")" if conds else "0", roots + loose
