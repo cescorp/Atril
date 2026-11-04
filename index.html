@@ -215,7 +215,8 @@ main{display:grid;grid-template-rows:1fr auto auto;min-width:0;min-height:0}
 /* vista dividida: cada .pane tiene sus #tabs, #bar y #view; $() busca primero en la activa (.on) */
 #panes{display:grid;grid-template-columns:minmax(0,1fr);min-width:0;min-height:0}
 body.split #panes{grid-template-columns:minmax(0,var(--splitL,1fr)) 5px minmax(0,1fr)}
-.pane{position:relative;display:grid;grid-template-rows:auto auto 1fr;min-width:0;min-height:0}
+/* minmax(0,1fr): sin esto la columna implícita crece hasta el ancho del Word/PDF y el lado tapa al otro y esconde sus botones */
+.pane{position:relative;display:grid;grid-template-rows:auto auto 1fr;grid-template-columns:minmax(0,1fr);min-width:0;min-height:0}
 #splitGrip{cursor:ew-resize;background:var(--line);transition:background .15s}#splitGrip:hover,#splitGrip.drag{background:var(--accent)}
 body.split .pane.on #tabs{box-shadow:inset 0 2px 0 var(--accent)}
 body.split .pane:not(.on) #view{opacity:.92}
@@ -5304,8 +5305,7 @@ $('#sidetools').append(
   iconBtn('collapse', 'Plegar todo', () => { tree.clear(); loadSide(); }),
   (b => { b.className = 'ic bakbtn'; b.textContent = '.bak'; return b; })(iconBtn('', 'Mostrar u ocultar las copias de seguridad (.bak)', () => {
     LS('atril.bak', document.body.classList.toggle('showbak') ? '1' : '');
-  })),
-  iconBtn('panelLeft', 'Ocultar barra lateral (📁 en la cinta la vuelve a mostrar)', toggleSide));
+  })));
 addEventListener('keydown', e => {
   if (e.altKey && e.key === 'ArrowLeft') { e.preventDefault(); nav(-1); }
   if (e.altKey && e.key === 'ArrowRight') { e.preventDefault(); nav(1); }

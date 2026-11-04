@@ -193,6 +193,32 @@ def in_git(p):
     return any((d / ".git").exists() for d in p.parents)
 
 
+def backup_once(p):
+    """.bak la primera vez que se guarda el archivo en esta sesión, si no está en git. Devuelve su ruta o None."""
+    p = Path(p).resolve()
+    if p in backed_up or in_git(p):
+        return None
+    bak = p.with_name(p.name + ".bak")
+    shutil.copy2(p, bak)
+    backed_up.add(p)
+    return bak
+
+
+def replace_atomic(p, src, busy):
+    """Escribe de golpe (temporal + os.replace): nunca queda el archivo a medias.
+    src: bytes, o una ruta que se copia con sus fechas. busy: el aviso si otro programa lo tiene abierto."""
+    tmp = p.with_name(p.name + ".atril-tmp")
+    if isinstance(src, Path):
+        shutil.copy2(src, tmp)
+    else:
+        tmp.write_bytes(src)
+    try:
+        os.replace(tmp, p)
+    except PermissionError:
+        tmp.unlink(missing_ok=True)
+        raise PermissionError(busy)
+
+
 def save_text(path, text, encoding, eol, mtime, force=False):
     """Guarda en el original conservando codificación y saltos de línea. Devuelve (código HTTP, datos)."""
     p = Path(path).resolve()
@@ -216,11 +242,7 @@ def save_text(path, text, encoding, eol, mtime, force=False):
         line = text.count("\n", 0, e.start) + 1
         return 422, {"error": f"El carácter «{text[e.start]}» (línea {line}) no existe en {encoding}. "
                               "No se guardó para no romper el archivo."}
-    bak = None
-    if p not in backed_up and not in_git(p):
-        bak = p.with_name(p.name + ".bak")
-        shutil.copy2(p, bak)
-        backed_up.add(p)
+    bak = backup_once(p)
     p.write_bytes(data)
     idx_update(p)
     return 200, {"mtime": str(p.stat().st_mtime_ns), "bak": str(bak) if bak else None}
@@ -1633,19 +1655,9 @@ def docx_transform(data, ops, folder):
 def write_with_backup(p, data, busy):
     """Escribe de golpe: .bak la primera vez (si no está en git) y copia exacta de antes para «Deshacer».
     busy: el aviso si otro programa lo tiene abierto (Windows no deja reemplazarlo)."""
-    bak = None
-    if p.resolve() not in backed_up and not in_git(p.resolve()):
-        bak = p.with_name(p.name + ".bak")
-        shutil.copy2(p, bak)
-        backed_up.add(p.resolve())
+    bak = backup_once(p)
     undo_id = undo_save(p)
-    tmp = p.with_name(p.name + ".atril-tmp")
-    tmp.write_bytes(data)
-    try:
-        os.replace(tmp, p)
-    except PermissionError:
-        tmp.unlink(missing_ok=True)
-        raise PermissionError(busy)
+    replace_atomic(p, data, busy)
     idx_update(p)
     return {"bak": str(bak) if bak else None, "mtime": str(p.stat().st_mtime_ns), "deshacer": undo_id}
 
@@ -1769,7 +1781,6 @@ def hist_step(path, padre, desc, data, extra=None):
             _hist_node(meta, padre)
         nid = _hist_add(meta, p, padre, desc, data, extra)
         _hist_write_meta(p, meta)
-    hist_cleanup(keep=hist_dir(p))
     return {"id": nid, **hist_public(p)}
 
 
@@ -1845,26 +1856,27 @@ def hist_diff(path, nid):
     return out[:200]
 
 
-def hist_cleanup(keep=None):
-    """Borra el historial de los archivos sin actividad desde hace N días y, si todo pasa del tope, los más viejos."""
+def hist_cleanup():
+    """Borra el historial de los archivos sin actividad desde hace N días y, si todo pasa del tope, los más viejos.
+    Corre en el hilo del índice (al arrancar y en cada repaso), no en cada paso: recorre todo el historial."""
     if not HIST_DIR.is_dir():
         return
-    limit, cap = time.time() - ajuste("historial_dias") * 86400, ajuste("historial_mb") * 1_000_000
-    folders = []
-    for d in HIST_DIR.iterdir():
-        try:
-            last = json.loads((d / "meta.json").read_text(encoding="utf-8")).get("ultimo", 0)
-        except (OSError, ValueError):
-            last = d.stat().st_mtime
-        if last < limit and d != keep:
-            shutil.rmtree(d, ignore_errors=True)
-        else:
-            folders.append((last, d, sum(f.stat().st_size for f in d.iterdir())))
-    total = sum(s for _, _, s in folders)
-    for last, d, size in sorted(folders):  # ponytail: se borra el historial entero del archivo más viejo, no paso a paso
-        if total <= cap:
-            break
-        if d != keep:
+    with _hist_lock:  # no borra una carpeta mientras hist_step escribe en ella
+        limit, cap = time.time() - ajuste("historial_dias") * 86400, ajuste("historial_mb") * 1_000_000
+        folders = []
+        for d in HIST_DIR.iterdir():
+            try:
+                last = json.loads((d / "meta.json").read_text(encoding="utf-8")).get("ultimo", 0)
+            except (OSError, ValueError):
+                last = d.stat().st_mtime
+            if last < limit:
+                shutil.rmtree(d, ignore_errors=True)
+            else:
+                folders.append((last, d, sum(f.stat().st_size for f in d.iterdir())))
+        total = sum(s for _, _, s in folders)
+        for last, d, size in sorted(folders):  # ponytail: se borra el historial entero del archivo más viejo, no paso a paso
+            if total <= cap:
+                break
             shutil.rmtree(d, ignore_errors=True)
             total -= size
 
@@ -1908,13 +1920,7 @@ def docx_undo(path, uid):
     p, src = Path(path), UNDO_DIR / f"{uid}{Path(path).suffix}"
     if not src.is_file():
         raise ValueError("Ya no está la copia para deshacer este cambio")
-    tmp = p.with_name(p.name + ".atril-tmp")
-    shutil.copy2(src, tmp)
-    try:
-        os.replace(tmp, p)
-    except PermissionError:
-        tmp.unlink(missing_ok=True)
-        raise PermissionError("El archivo está abierto en otro programa (¿Word?): ciérralo allí y vuelve a pulsar Deshacer")
+    replace_atomic(p, src, "El archivo está abierto en otro programa (¿Word?): ciérralo allí y vuelve a pulsar Deshacer")
     idx_update(p)
     return {"mtime": str(p.stat().st_mtime_ns)}
 
@@ -2068,8 +2074,13 @@ def idx_pass():
 
 
 def indexer():
-    """Hilo del índice: una pasada al arrancar y luego cada N minutos, o antes si se añade un proyecto (idx_wake)."""
+    """Hilo del índice: una pasada al arrancar y luego cada N minutos, o antes si se añade un proyecto (idx_wake).
+    En cada vuelta también limpia el historial de cambios (días y tope de MB)."""
     while True:
+        try:
+            hist_cleanup()
+        except OSError:
+            pass
         try:
             idx_pass()
         except Exception as e:
@@ -2352,25 +2363,6 @@ def _pdf_str(raw, key):
     return f"{d[3]}/{d[2]}/{d[1]}" + (f" {d[4]}:{d[5]}" if d[4] and d[5] else "") if d else s
 
 
-def _image_size(raw):
-    """Ancho y alto de una imagen para el modal de información (PNG, GIF, JPEG) leyendo solo su cabecera."""
-    if raw[:8] == b"\x89PNG\r\n\x1a\n":
-        return int.from_bytes(raw[16:20], "big"), int.from_bytes(raw[20:24], "big")
-    if raw[:6] in (b"GIF87a", b"GIF89a"):
-        return int.from_bytes(raw[6:8], "little"), int.from_bytes(raw[8:10], "little")
-    if raw[:2] == b"\xff\xd8":
-        i = 2
-        while i + 9 < len(raw):
-            if raw[i] != 0xFF:
-                i += 1
-                continue
-            marker, size = raw[i + 1], int.from_bytes(raw[i + 2:i + 4], "big")
-            if marker in (0xC0, 0xC1, 0xC2):
-                return int.from_bytes(raw[i + 7:i + 9], "big"), int.from_bytes(raw[i + 5:i + 7], "big")
-            i += 2 + size
-    return None
-
-
 def file_meta(path):
     """Datos del modal ⓘ Información: tamaño, fechas, atributos, codificación y saltos de línea si es texto,
     y las propiedades del documento (autor, título, revisión) en Word, Excel, PowerPoint, PDF e imágenes.
@@ -2399,9 +2391,9 @@ def file_meta(path):
             doc = {k: _pdf_str(raw, k.encode()) for k in ("Title", "Author", "Creator", "Producer", "CreationDate", "ModDate")}
             doc = {k: v for k, v in doc.items() if v}
             doc["Páginas"] = len(re.findall(rb"/Type\s*/Page(?![sA-Za-z])", raw)) or None
-        elif ext in (".png", ".gif", ".jpg", ".jpeg"):
+        elif ext in (".png", ".gif", ".jpg", ".jpeg", ".bmp", ".webp"):
             with open(p, "rb") as f:
-                size = _image_size(f.read(512_000))
+                size = image_size(f.read(512_000))
             if size:
                 doc["Dimensiones"] = f"{size[0]} × {size[1]} px"
     except (OSError, KeyError, zipfile.BadZipFile, ET.ParseError, ValueError):
@@ -2470,6 +2462,20 @@ class Handler(BaseHTTPRequestHandler):
             return False
         return True
 
+    def denied(self, ruta):
+        """403 si la ruta no está dentro de lo añadido a Atril. True si ya respondió."""
+        if allowed(ruta):
+            return False
+        self.send_json(403, {"error": "ruta no añadida a Atril"})
+        return True
+
+    def stale(self, ruta, mtime, msg):
+        """409 si el archivo cambió en disco desde que la ventana lo leyó (mtime). True si ya respondió."""
+        if not mtime or mtime == str(Path(ruta).stat().st_mtime_ns):
+            return False
+        self.send_json(409, {"error": msg})
+        return True
+
     def do_GET(self):
         """Peticiones GET: la página (index.html), /raw/ (archivos de los proyectos, para visores e iframes) y /api/…
         Todo exige Host local; la API además la cabecera X-Atril (una web externa no puede enviarla sin CORS).
@@ -2492,8 +2498,8 @@ class Handler(BaseHTTPRequestHandler):
                 if not self.guard(need_header=False):
                     return
                 ruta = q.get("ruta", "")
-                if not allowed(ruta):
-                    return self.send_json(403, {"error": "ruta no añadida a Atril"})
+                if self.denied(ruta):
+                    return
                 try:
                     data = hist_docx(ruta, q.get("id", "")) if url.path == "/api/hist/docx" else hist_data(ruta, q.get("id", ""), q.get("parte", "dat"))
                 except (ValueError, OSError, KeyError, zipfile.BadZipFile, ET.ParseError) as e:
@@ -2545,8 +2551,8 @@ class Handler(BaseHTTPRequestHandler):
                 text, _, keep, by_year = plan_archive(ruta)
                 return self.send_json(200, {"lineas": text.count("\n"), "quedan": len(keep),
                                             "mover": {y: len(m) for y, m in by_year.items()}})
-            if not allowed(ruta):
-                return self.send_json(403, {"error": "ruta no añadida a Atril"})
+            if self.denied(ruta):
+                return
             if url.path == "/api/dir":
                 return self.send_json(200, list_dir(ruta))
             if url.path == "/api/abrir":
@@ -2596,7 +2602,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(404, {"error": "no existe"})
         except (ConnectionError, TimeoutError):
             pass
-        except (OSError, sqlite3.Error) as e:  # sqlite3.Error no es OSError: sin esto la petición se cortaba
+        except (OSError, ValueError, KeyError, sqlite3.Error) as e:  # sin esto la petición se cortaba sin respuesta
             self.send_json(500, {"error": str(e)})
 
     def do_POST(self):
@@ -2605,6 +2611,8 @@ class Handler(BaseHTTPRequestHandler):
             self.post()
         except (ConnectionError, TimeoutError):
             pass
+        except PermissionError as e:  # otro programa (Word…) tiene el archivo abierto
+            self.send_json(423, {"error": str(e)})
         except (OSError, ValueError, KeyError, sqlite3.Error) as e:
             self.send_json(500, {"error": str(e)})
 
@@ -2635,15 +2643,15 @@ class Handler(BaseHTTPRequestHandler):
                 save_config(cfg)
             return self.send_json(200, estado())
         if url == "/api/git/blame":
-            if not allowed(data.get("ruta", "")):
-                return self.send_json(403, {"error": "ruta no añadida a Atril"})
+            if self.denied(data.get("ruta", "")):
+                return
             try:
                 return self.send_json(200, git_blame(data["ruta"], data.get("hash", ""), data.get("rel", ""), data.get("texto")))
             except (ValueError, OSError, subprocess.TimeoutExpired) as e:
                 return self.send_json(400, {"error": str(e)})
         if url == "/api/guardar":
-            if not allowed(data.get("ruta", "")):
-                return self.send_json(403, {"error": "ruta no añadida a Atril"})
+            if self.denied(data.get("ruta", "")):
+                return
             return self.send_json(*save_text(data["ruta"], data.get("texto", ""), data.get("codificacion"),
                                              data.get("eol"), data.get("mtime"), bool(data.get("forzar"))))
         if url in ("/api/plantilla", "/api/archivar"):
@@ -2655,8 +2663,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json(200, {"creados": creados, **estado()})
             return self.send_json(200, {"movidas": archive_log(data["ruta"]), **estado()})
         if url == "/api/ejecutar":
-            if not allowed(data.get("ruta", "")):
-                return self.send_json(403, {"error": "ruta no añadida a Atril"})
+            if self.denied(data.get("ruta", "")):
+                return
             p = Path(data["ruta"]).resolve()
             args, enc = command_for(p)
             if args is None:
@@ -2690,8 +2698,8 @@ class Handler(BaseHTTPRequestHandler):
         if url == "/api/ajustes":
             return self.send_json(200, {"valores": set_ajustes(data)})
         if url == "/api/recup/guardar":
-            if data.get("ruta") and not allowed(data["ruta"]):
-                return self.send_json(403, {"error": "ruta no añadida a Atril"})
+            if data.get("ruta") and self.denied(data["ruta"]):
+                return
             recovery_save(data)
             return self.send_json(200, {})
         if url == "/api/recup/borrar":
@@ -2700,19 +2708,17 @@ class Handler(BaseHTTPRequestHandler):
         if url == "/api/docx":  # cambios de formato/texto propuestos por la IA en un Word
             if not allowed(data.get("ruta", "")) or not data.get("ruta", "").lower().endswith(".docx"):
                 return self.send_json(403, {"error": "Solo se pueden cambiar .docx de los proyectos añadidos"})
-            if data.get("mtime") and data["mtime"] != str(Path(data["ruta"]).stat().st_mtime_ns):
-                return self.send_json(409, {"error": "El Word cambió en disco mientras lo editabas (¿la IA o Word?): "
-                                                     "descarta tus cambios y vuelve a editar"})
+            if self.stale(data["ruta"], data.get("mtime"), "El Word cambió en disco mientras lo editabas (¿la IA o Word?): "
+                                                     "descarta tus cambios y vuelve a editar"):
+                return
             try:
                 return self.send_json(200, docx_apply(data["ruta"], data.get("ops") or []))
-            except PermissionError as e:
-                return self.send_json(423, {"error": str(e)})
             except (ValueError, KeyError, zipfile.BadZipFile, ET.ParseError) as e:
                 return self.send_json(400, {"error": str(e)})
         if url.startswith("/api/hist/"):  # ↶ ↷: pasos del historial de un archivo en edición
             ruta = data.get("ruta", "")
-            if not allowed(ruta):
-                return self.send_json(403, {"error": "ruta no añadida a Atril"})
+            if self.denied(ruta):
+                return
             try:
                 if url == "/api/hist/paso":  # texto: llega tal cual; lo demás en base64
                     d = data.get("datos")
@@ -2724,9 +2730,9 @@ class Handler(BaseHTTPRequestHandler):
                 if url == "/api/hist/guardado":
                     return self.send_json(200, hist_saved(ruta, str(data.get("id", ""))))
                 if url == "/api/hist/escribir":  # Word: el estado de ese paso se escribe en el archivo
-                    if data.get("mtime") and data["mtime"] != str(Path(ruta).stat().st_mtime_ns):
-                        return self.send_json(409, {"error": "El Word cambió en disco mientras lo editabas (¿la IA o Word?): "
-                                                             "lo que ves sigue en el historial; vuelve a editar y recupéralo desde ↶"})
+                    if self.stale(ruta, data.get("mtime"), "El Word cambió en disco mientras lo editabas (¿la IA o Word?): "
+                                                             "lo que ves sigue en el historial; vuelve a editar y recupéralo desde ↶"):
+                        return
                     nid = str(data.get("id", ""))
                     r = write_with_backup(Path(ruta), hist_docx(ruta, nid), "El documento está abierto en Word: ciérralo allí y vuelve a guardar")
                     return self.send_json(200, {**r, **hist_saved(ruta, nid)})
@@ -2735,23 +2741,19 @@ class Handler(BaseHTTPRequestHandler):
             except (ValueError, OSError, KeyError, zipfile.BadZipFile, ET.ParseError) as e:
                 return self.send_json(400, {"error": str(e)})
         if url == "/api/binario":  # imagen o PDF editados en Atril (llegan en base64)
-            if not allowed(data.get("ruta", "")):
-                return self.send_json(403, {"error": "ruta no añadida a Atril"})
-            if data.get("mtime") and data["mtime"] != str(Path(data["ruta"]).stat().st_mtime_ns):
-                return self.send_json(409, {"error": "El archivo cambió en disco mientras lo editabas: descarta y vuelve a editar"})
+            if self.denied(data.get("ruta", "")):
+                return
+            if self.stale(data["ruta"], data.get("mtime"), "El archivo cambió en disco mientras lo editabas: descarta y vuelve a editar"):
+                return
             try:
                 return self.send_json(200, binary_save(data["ruta"], base64.b64decode(data.get("datos", ""))))
-            except PermissionError as e:
-                return self.send_json(423, {"error": str(e)})
             except (ValueError, KeyError) as e:
                 return self.send_json(400, {"error": str(e)})
         if url == "/api/docx/deshacer":  # sirve para cualquier archivo con copia en historial\deshacer (Word, imágenes)
-            if not allowed(data.get("ruta", "")):
-                return self.send_json(403, {"error": "ruta no añadida a Atril"})
+            if self.denied(data.get("ruta", "")):
+                return
             try:
                 return self.send_json(200, docx_undo(data["ruta"], str(data.get("id", ""))))
-            except PermissionError as e:
-                return self.send_json(423, {"error": str(e)})
             except ValueError as e:
                 return self.send_json(400, {"error": str(e)})
         if url == "/api/carpeta":
@@ -2901,13 +2903,10 @@ def window_flags(cfg):
 def open_window(url):
     """Ventana propia (modo aplicación de un navegador Chromium); si no hay ninguno, el navegador de siempre."""
     try:
-        if WINDOWS:
-            return subprocess.Popen(["cmd", "/c", "start", "", "msedge", f"--app={url}", *window_flags(load_config())],
-                                    creationflags=NO_WINDOW)
         exe = edge_path()
-        if exe:
+        if exe:  # start_new_session solo actúa en macOS y Linux: la ventana no muere con el servidor
             return subprocess.Popen([exe, f"--app={url}", *window_flags(load_config())], start_new_session=True,
-                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=NO_WINDOW)
     except OSError:
         pass
     webbrowser.open(url)
@@ -2930,8 +2929,7 @@ def main():
         open_window(url)
     if server:
         threading.Thread(target=watchdog, args=(server,), daemon=True).start()
-        threading.Thread(target=indexer, daemon=True).start()
-        threading.Thread(target=hist_cleanup, daemon=True).start()  # historial de cambios: lo que pasó de N días
+        threading.Thread(target=indexer, daemon=True).start()  # también limpia el historial de cambios
         server.serve_forever()
         for r in runs.values():  # al cerrar la ventana no quedan programas corriendo
             r.kill()
