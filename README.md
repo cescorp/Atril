@@ -67,6 +67,8 @@ Las capturas usan un proyecto de ejemplo inventado, «Taller de escritura».
 
 Descarga el repositorio (botón **Code → Download ZIP** o `git clone`) y:
 
+**Windows, la primera vez:** doble clic en **`instalar.bat`**. Revisa e instala (preguntando antes cada cosa) Python, Git y, si quieres, las herramientas de IA; crea el acceso directo «DeskLens» y ejecuta las pruebas. Con `instalar.bat -SoloRevisar` solo muestra qué hay y qué falta. Todo sale de winget (Microsoft) y npm; el script está comentado paso a paso.
+
 | Sistema | Cómo abrirlo |
 |---|---|
 | **Windows** | Doble clic en `desklens.pyw`. Arrastra archivos sobre él para abrirlos. |

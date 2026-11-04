@@ -2009,13 +2009,14 @@ $('#sideQ').onkeydown = e => {
 };
 // 📁 Explorador · 🔍 Buscar · ⎇ Git; clic en la vista que ya se ve = ocultar la barra (como VS Code)
 function sideView(v, keep) {
-  if (gitFullOn()) { gitFullClose(); if (v === 'g') return; } // desde la pantalla completa de Git: volver a la barra
+  // desde la pantalla completa de Git: ⎇ vuelve al panel (y se recuerda); otra vista solo la cierra por ahora
+  if (gitFullOn()) { gitFullClose(v !== 'g'); if (v === 'g') return; }
   const B = document.body.classList, hidden = B.contains('noside'), now = B.contains('vsearch') ? 'b' : B.contains('vgit') ? 'g' : 'e';
   if (!hidden && v === now && !keep) return toggleSide();
   if (hidden) toggleSide();
   B.toggle('vsearch', v === 'b'); B.toggle('vgit', v === 'g'); LS('desklens.vista', v === 'e' ? '' : v);
   if (v === 'b') { $('#sideQ').focus(); $('#sideQ').select(); if (!sres) sideSearch(); }
-  else if (v === 'g') gitLoad();
+  else if (v === 'g') gitLoad().then(() => LS('desklens.git.full') === '1' && !gitFullOn() && gitFullOpen()); // como se dejó
   else reveal(cur);
 }
 
@@ -2182,8 +2183,11 @@ async function gitRepoMenu(anchor) {
 // La columna derecha es la propia vista Git (#gitv), que se muda aquí mientras dura y vuelve a la barra al salir.
 const gitFullOn = () => document.body.classList.contains('gitfull');
 let gfGraph = null, gfKey = '', gfSel = null, gfSum = [], gitvHome = null;
+// Se recuerda si Git quedó a pantalla completa o en el panel (predeterminado: panel). keep: cierre de paso (abrir un
+// archivo, ir a otra vista), que no cambia lo recordado.
 function gitFullOpen() {
   if (!gst || gst.error) return flash('Elige primero un repositorio git');
+  LS('desklens.git.full', '1');
   const G = $('#gitfull');
   G.innerHTML = `<div class="gfbar"><b>Git</b><span class="gft" id="gfTitle"></span><span class="sp"></span>
       <label title="Ver también las demás ramas locales y remotas"><input type="checkbox" id="gfAll"> Todas las ramas</label>
@@ -2191,7 +2195,7 @@ function gitFullOpen() {
       <button class="small" id="gfFetch" title="Ver si hay novedades en el remoto">⟳ Fetch</button></div>
     <div class="gfbody"><div class="gfside"><h4>Proyectos</h4><div id="gfProj"></div><h4>Ramas</h4><div id="gfBr"></div><div id="gfRem"></div></div>
       <div class="gfmain"><div class="gfgraph" id="gfGraph"></div><div class="gfdetail" id="gfDetail"></div></div><div class="gfright"></div></div>`;
-  G.querySelector('.gfbar').append(Object.assign(iconBtn('min', 'Salir de la pantalla completa (Esc)', gitFullClose), { id: 'gfClose' }));
+  G.querySelector('.gfbar').append(Object.assign(iconBtn('min', 'Salir de la pantalla completa (Esc)', () => gitFullClose()), { id: 'gfClose' }));
   gitvHome ||= { parent: $('#gitv').parentNode, next: $('#gitv').nextSibling };
   G.querySelector('.gfright').append($('#gitv'));
   $('#gfAll').checked = LS('desklens.git.todas') === '1';
@@ -2200,7 +2204,8 @@ function gitFullOpen() {
   document.body.classList.add('gitfull', 'vgit');
   gfKey = ''; gfSel = null; gitFullDraw();
 }
-function gitFullClose() {
+function gitFullClose(keep = false) {
+  if (!keep) LS('desklens.git.full', '');
   if (gitvHome) gitvHome.parent.insertBefore($('#gitv'), gitvHome.next);
   document.body.classList.remove('gitfull'); $('#gitfull').innerHTML = '';
 }
@@ -2311,7 +2316,7 @@ async function gitCommitDetail(c) {
       before ? { id: before, label: `${before.slice(0, 7)} · antes de este commit`, title: before } : { id: 'disco', label: 'Disco', title: '' },
       { id: c.hash, label: `${c.corto} · ${c.mensaje}`, title: c.hash }] }));
     ver.className = 'small';
-    const abrir = button('Abrir', () => { gitFullClose(); openTab(f.ruta, true); });
+    const abrir = button('Abrir', () => { gitFullClose(true); openTab(f.ruta, true); });
     abrir.className = 'small'; abrir.disabled = f.estado === 'D' || c.lado === 'entrante'; // entrante: aún no está en tu disco
     abrir.title = abrir.disabled ? 'No está en tu disco (borrado o aún sin traer)' : 'Abrir el archivo tal como está ahora';
     row.append(ver, abrir); D.append(row);
@@ -2996,7 +3001,7 @@ let hi = -1;
 // Abre (o enseña) una pestaña en el lado activo. Sin fijar, reemplaza a la de vista previa (como VS Code);
 // fijada, se queda. fromHist: viene de ← →, no se añade al historial de navegación.
 function openTab(path, pin = false, fromHist = false) {
-  if (gitFullOn()) gitFullClose(); // la pantalla completa de Git tapa las pestañas: se sale para ver el archivo
+  if (gitFullOn()) gitFullClose(true); // la pantalla completa de Git tapa las pestañas: se sale para ver el archivo
   const usePreview = AJ.pestanas_vista_previa !== false;
   if (!tabs.includes(path)) {
     const i = usePreview ? tabs.indexOf(previewTab) : -1;
@@ -5844,7 +5849,10 @@ $('#sbtns').append(
   iconBtn('refresh', 'Repetir la búsqueda', sideSearch),
   iconBtn('x', 'Limpiar la búsqueda', () => { $('#sideQ').value = ''; sideSearch(); $('#sideQ').focus(); }));
 if (LS('desklens.vista') === 'b') document.body.classList.add('vsearch');
-if (LS('desklens.vista') === 'g') { document.body.classList.add('vgit'); setTimeout(gitLoad, 600); } // tras cargar el árbol (side)
+if (LS('desklens.vista') === 'g') { // tras cargar el árbol (side); a pantalla completa si así se dejó
+  document.body.classList.add('vgit');
+  setTimeout(() => gitLoad().then(() => LS('desklens.git.full') === '1' && gitFullOpen()), 600);
+}
 drawResults();
 $('#sidetools').append(
   iconBtn('filePlus', 'Nuevo archivo (en la carpeta elegida) · Ctrl+N: "nuevo 1" sin guardar', () => newInline('archivo')),
