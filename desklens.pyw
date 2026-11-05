@@ -578,7 +578,7 @@ class Run:
 
     def read(self, stream, kind, encoding):
         """Lee la salida a trozos de 4 KB y la decodifica de forma incremental (un carácter puede quedar partido entre dos trozos)."""
-        dec = codecs.getincrementaldecoder(encoding)(errors="replace")
+        dec = MixedDecoder() if encoding == "auto" else codecs.getincrementaldecoder(encoding)(errors="replace")
         while chunk := stream.read1(4096):
             text = dec.decode(chunk).replace("\r\n", "\n")
             if text:
@@ -594,7 +594,8 @@ class Run:
     def send(self, text):
         """Una línea de la caja de entrada de la consola al proceso (input() de Python, set /p de un .bat…)."""
         try:
-            self.proc.stdin.write((text + "\r\n").encode(self.encoding, errors="replace"))
+            enc = ANSI if self.encoding == "auto" else self.encoding  # varias líneas pegadas: cada una, una orden
+            self.proc.stdin.write((text.replace("\r\n", "\n").replace("\n", "\r\n") + "\r\n").encode(enc, errors="replace"))
             self.proc.stdin.flush()
         except OSError:
             pass
@@ -609,6 +610,35 @@ class Run:
                 os.killpg(self.proc.pid, signal.SIGKILL)
             except OSError:
                 pass
+
+
+class MixedDecoder:
+    """Salida de la terminal: git, npm, php o python escriben UTF-8 y las órdenes propias de cmd (dir, echo, type) la
+    página de códigos de Windows. Cada trozo se lee como UTF-8 (respetando un carácter partido entre trozos) y, si no
+    lo es, en la página de Windows. ponytail: por trozos de 4 KB; un trozo con las dos mezcladas sale en la de Windows."""
+
+    def __init__(self):
+        self.utf8 = codecs.getincrementaldecoder("utf-8")(errors="strict")
+
+    def decode(self, data):
+        try:
+            return self.utf8.decode(data)
+        except UnicodeDecodeError:
+            self.utf8.reset()
+            return data.decode(ANSI, errors="replace")
+
+
+ANSI = f"cp{__import__('ctypes').windll.kernel32.GetACP()}" if WINDOWS else "utf-8"  # p. ej. cp1252
+
+
+def start_terminal(cwd):
+    """Una terminal para escribir órdenes: cmd de Windows (o el shell del sistema) en esa carpeta, con la entrada por
+    la consola de DeskLens. cd se mantiene entre órdenes; las que piden una contraseña de git fallan en vez de esperar."""
+    if WINDOWS:  # misma página de códigos para lo que se escribe y lo que cmd responde (si no, «cd año» falla)
+        args = ["cmd.exe", "/d", "/k", f"chcp {ANSI[2:]}>nul"]
+    else:
+        args = [os.environ.get("SHELL") or "sh", "-i"]
+    return start_run(args, cwd, "auto", f"＞ Terminal · {Path(cwd).name}", GIT_ENV)
 
 
 def start_run(args, cwd, encoding, label, env=None):
@@ -3346,6 +3376,11 @@ class Handler(BaseHTTPRequestHandler):
             cmd = data["comando"].strip()
             rid = start_run(f"cmd /c {cmd}" if WINDOWS else ["bash", "-lc", cmd], p, "utf-8", "Pruebas · " + Path(p).name)
             return self.send_json(200, {"id": rid})
+        if url == "/api/terminal":
+            cwd = Path(data.get("cwd", "")).resolve()
+            if not allowed(str(cwd)) or not cwd.is_dir():
+                return self.send_json(403, {"error": "La carpeta no está en DeskLens"})
+            return self.send_json(200, {"id": start_terminal(str(cwd)), "cwd": str(cwd)})
         if url in ("/api/entrada", "/api/detener", "/api/consola"):
             r = runs.get(str(data.get("id")))
             if not r:

@@ -759,6 +759,22 @@ assert.deepStrictEqual(findRefs('Ver 1 Samuel 4:4 y 1 Samuel 8:5, 20; Deuteronom
     assert act("pull_rama", "main")[0] == 400 and act("push_a", "nada/x")[0] == 400 and act("push_a", "origin/-x")[0] == 400
     assert act("cancelar_fusion", "")[0] == 400  # no hay fusión en curso
     git(otro, "checkout", "-q", "main")
+    # terminal: varias líneas pegadas se ejecutan en orden, cd se mantiene, tildes en rutas y salida UTF-8 de git
+    (proj / "año").mkdir(); (proj / "año" / "camión.txt").write_text("x")
+    code, r = post("/api/terminal", {"cwd": str(proj)})
+    assert code == 200 and post("/api/terminal", {"cwd": str(tmp / "no-existe")})[0] == 403
+    post("/api/entrada", {"id": r["id"], "texto": "cd año\ndir /b\ngit --version\necho listo" if desklens.WINDOWS else "cd año\nls\ngit --version\necho listo"})
+    for _ in range(100):
+        out = "".join(t for _, t in desklens.runs[r["id"]].output(0)["trozos"])
+        if "listo\n" in out.replace("\r", ""):
+            break
+        time.sleep(0.1)
+    assert "camión.txt" in out and "git version" in out, out[-400:]
+    if desklens.WINDOWS:
+        assert "año>" in out  # el prompt muestra la carpeta nueva: cd se mantuvo
+    assert desklens.MixedDecoder().decode("«En:»".encode()) == "«En:»"
+    assert desklens.MixedDecoder().decode("año".encode("cp1252")) == "año"
+    post("/api/detener", {"id": r["id"]})
     # abrir desde Windows: otra instancia pasa archivos a esta ventana; «Abrir con» no ejecuta programas
     nota = proj / "desde_windows.txt"; nota.write_text("x")
     code, r = post("/api/abrir_fuera", {"rutas": [str(nota), str(proj / "no-existe.txt")]})

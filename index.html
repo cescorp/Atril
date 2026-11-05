@@ -352,7 +352,8 @@ body.split .pane:not(.on) #view{opacity:.92}
 #out .err{color:#d14}#out .cmd{color:var(--faint)}#out .in{color:var(--accent)}
 #inrow{display:flex;gap:6px;align-items:center;padding:4px 12px;background:var(--paper);border-top:1px solid var(--line);font:12.5px Consolas,"Cascadia Mono",monospace;color:var(--accent)}
 #inrow[hidden]{display:none}
-#inrow input{flex:1;border:0;background:none;color:var(--ink);font:inherit;outline:none}
+#inrow textarea{flex:1;border:0;background:none;color:var(--ink);font:inherit;outline:none;resize:none;max-height:9em;padding:2px 0}
+#runtabs .rnew{flex:none;border:0;background:none;color:var(--muted);font-size:12px;padding:2px 8px;cursor:pointer;white-space:nowrap}#runtabs .rnew:hover{color:var(--accent)}
 #runbar{display:flex;gap:6px;align-items:center;padding:5px 8px;font-size:12px;flex-wrap:wrap}
 #runbar button{padding:2px 10px;font-size:12px}
 .rstate{margin-right:auto;color:var(--muted)}
@@ -839,7 +840,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
     <div id="grip" title="Arrastra para cambiar el tamaño"></div>
     <div class="ph"><div id="runtabs"></div><span id="phTools"></span></div>
     <pre id="out"></pre>
-    <form id="inrow" hidden><span>&gt;</span><input id="stdin" autocomplete="off" placeholder="Escribe aquí y pulsa Enter (para pause, S/N, input())"></form>
+    <form id="inrow" hidden><span>&gt;</span><textarea id="stdin" rows="1" autocomplete="off" spellcheck="false" placeholder="Escribe aquí y pulsa Enter (para pause, S/N, input())"></textarea></form>
     <div id="runbar"></div>
   </section>
   <div id="status"><span id="idx" title="Ver detalles de la indexación"></span><span id="stmain"></span></div>
@@ -1033,7 +1034,7 @@ function nodeEl(name, path, isDir, removable, git) {
       if (!isDir) return remove();
       const o = sortOf(path), setSort = m => { const all = sortMap(); all[path] = m; LS('desklens.orden', JSON.stringify(all)); loadSide(); };
       return openMenu(e.target, [['Nuevo archivo aquí', () => newInline('archivo', path)], ['Nueva carpeta aquí', () => newInline('carpeta', path)],
-        ['Ejecutar pruebas', () => runTests(path, name)],
+        ['Ejecutar pruebas', () => runTests(path, name)], ['＞ Terminal aquí', () => openTerminal(path)],
         ['Mostrar en carpeta', () => api('/api/mostrar', { ruta: path })], ['Quitar de DeskLens', remove],
         '-', { head: 'Ordenar (carpetas primero)' },
         sortRow('Alfabético', 'alfa', o, setSort, 'asc', [['asc', '↑', 'Ascendente: de la A a la Z'], ['desc', '↓', 'Descendente: de la Z a la A']]),
@@ -5469,6 +5470,7 @@ async function launch(start, label, cmd, cwd, ruta, onDone = null) {
   // como mucho 7 pestañas: se quitan las terminadas más antiguas (las que siguen corriendo, nunca)
   while (runsUI.length > 7) { const old = runsUI.find(x => x.fin && x !== r); if (!old) break; runsUI.splice(runsUI.indexOf(old), 1); }
   showPanel(true); drawRuns(); poll(r);
+  return r;
 }
 // Trae la salida nueva de un proceso cada 300 ms hasta que termina; al final llama a onDone (p. ej. «Explicar error»).
 async function poll(r) {
@@ -5495,6 +5497,7 @@ function drawRunTabs() {
     el.querySelector('b').onclick = e => { e.stopPropagation(); closeRun(r); };
     T.append(el);
   }
+  T.append(Object.assign(button('＋ Terminal', () => openTerminal()), { className: 'rnew', title: 'Abrir una terminal en la carpeta del proyecto para escribir órdenes' }));
 }
 function closeRun(r) {
   if (!r.fin) api('/api/detener', { id: r.id });
@@ -5520,6 +5523,8 @@ function appendOut(trozos) {
 function drawRunBar() {
   const B = $('#runbar'), r = curRun; B.innerHTML = '';
   $('#inrow').hidden = !r || r.fin;
+  $('#stdin').placeholder = r?.term ? 'Escribe una orden y pulsa Enter · pega varias líneas para ejecutarlas en orden · ↑↓ anteriores'
+    : 'Escribe aquí y pulsa Enter (para pause, S/N, input())';
   if (!r) return;
   B.append(Object.assign(document.createElement('span'), { className: 'rstate',
     textContent: r.fin ? `${r.codigo === 0 ? '✓' : '✗'} código ${r.codigo} · ${fmtDur(r.dur)}` : `● En ejecución · ${fmtDur(r.dur)}` }));
@@ -5535,11 +5540,33 @@ function showPanel(v) {
 }
 $('#inrow').onsubmit = e => {
   e.preventDefault();
-  const t = $('#stdin').value; $('#stdin').value = '';
+  const t = $('#stdin').value.replace(/\s+$/, ''); $('#stdin').value = ''; stdinFit();
   if (!curRun || curRun.fin) return;
-  appendOut([['in', t + '\n']]);
+  if (curRun.term) { if (t) { curRun.hist = [...(curRun.hist || []).filter(x => x !== t), t].slice(-100); } curRun.hi = null; }
+  else appendOut([['in', t + '\n']]);
   api('/api/entrada', { id: curRun.id, texto: t });
 };
+const stdinFit = () => { const s = $('#stdin'); s.style.height = 'auto'; s.style.height = s.scrollHeight + 'px'; };
+$('#stdin').addEventListener('input', stdinFit);
+$('#stdin').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); return $('#inrow').requestSubmit(); }
+  // ↑ ↓: órdenes anteriores de esta terminal (solo con el cuadro de una línea, para no estorbar al editar varias)
+  const r = curRun; if (!r?.term || !r.hist?.length || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') || $('#stdin').value.includes('\n')) return;
+  e.preventDefault();
+  r.hi = Math.max(0, Math.min(r.hist.length, (r.hi ?? r.hist.length) + (e.key === 'ArrowUp' ? -1 : 1)));
+  $('#stdin').value = r.hist[r.hi] ?? ''; stdinFit();
+});
+// ＞ Terminal: cmd en la carpeta del proyecto (el del archivo abierto, el elegido en Git o el primero) para escribir órdenes
+function termCwd() {
+  const ps = side?.proyectos || [], inside = p => p && ps.find(x => p.toLowerCase().startsWith(x.ruta.toLowerCase() + '\\') || p.toLowerCase() === x.ruta.toLowerCase());
+  return (inside(cur) || inside(gst?.ruta) || ps[0])?.ruta;
+}
+async function openTerminal(cwd = termCwd()) {
+  if (!cwd) return flash('Añade primero un proyecto: la terminal se abre en su carpeta');
+  const r = await launch(() => api('/api/terminal', { cwd }), '＞ Terminal · ' + cwd.split(/[\\/]/).pop(), 'terminal (cmd)', cwd, cwd);
+  if (!r?.id) return; // no arrancó (el aviso ya salió)
+  r.term = true; drawRunBar(); setTimeout(() => $('#stdin').focus(), 50);
+}
 $('#grip').onmousedown = e => {
   e.preventDefault();
   if (maxZone === 'con') return; // a pantalla completa no se cambia la altura

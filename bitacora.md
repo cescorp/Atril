@@ -8,6 +8,10 @@ Entradas nuevas arriba. Formato: `## AAAA-MM-DD · título` + 2–4 líneas (qu�
 - **Cómo trabaja el usuario:** escribe en español. **Antes de construir algo nuevo, dibujarlo en texto y esperar su «ok».** No instalar nada sin acuerdo. Ahorrar tokens. Prefiere lo simple: rechazó un panel de IA con modos (ver 2026-11-02).
 - **Para verificar sin tocar su DeskLens:** levantar `desklens.Handler` en el puerto 8799 con `CONFIG`, `CONV_DIR`, `RECOVERY_DIR` e `INDEX_DB` en una carpeta temporal y hacer captura con Edge sin ventana (`--headless=new --screenshot`). Así se probó cada paso. Ojo: en Windows dos servidores pueden escuchar el mismo puerto sin error; si hay otra sesión probando, usa otro puerto.
 
+## 2026-11-04 · ＞ Terminal para escribir órdenes
+El usuario quería escribir sus propias órdenes (p. ej. `git fetch origin && git log --oneline -1 origin/calidad`). «＋ Terminal» al final de las pestañas de la consola (y «＞ Terminal aquí» en el ⋮ del proyecto): `cmd.exe /d /k` en la carpeta del proyecto con la entrada por la consola (`/api/terminal`, ruta comprobada). `cd` se mantiene; varias líneas pegadas se ejecutan en orden (el cuadro es un textarea: Enter envía, Mayús+Enter salta de línea); ↑↓ historial por terminal; no se oculta sola ni cuenta para el límite de 7 mientras corre. Codificación: `chcp` a la página ANSI (cp1252) y la entrada en ella (si no, `cd año` falla); la salida con `MixedDecoder` (UTF-8 de git/npm/php y, si no lo es, cp1252 de dir/echo). No sirve para programas de pantalla completa (vim, top): para eso, «Abrir en una terminal».
+Ojo al probar: el servidor de prueba lanzado desde Git Bash hereda su PATH y `find` es el de Linux (recorrió C:\ hasta detenerlo); DeskLens abierto desde su acceso directo tiene el PATH de Windows.
+
 ## 2026-11-04 · Consola: como mucho 7 pestañas
 Captura del usuario: las ejecuciones (sobre todo de git) se acumulaban en la consola. Al lanzar una nueva, si hay más de 7 se quitan las terminadas más antiguas; las que siguen corriendo no se quitan nunca.
 
