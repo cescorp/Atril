@@ -2917,7 +2917,7 @@ Si se parecen, el número es fiable. Se ajustan en ⚙ Ajustes › Git."><small>
     else if (b.dataset.s) set({ serie: b.dataset.s }); else if (b.dataset.v) set({ ver: b.dataset.v }); };
   // solo los bloques desplegados se dibujan
   if ($('#esChart')) estChart(work, f, t0, t1);
-  if ($('#esHeat')) estHeat(cs);
+  if ($('#esHeat')) estHeat(work); // sin merges, como el recuadro «Commits» del resumen
   if ($('#esAut')) estTable('#esAut', 'autor', cs, f);
   if ($('#esRam')) estTable('#esRam', 'rama', cs, f);
   if ($('#esPro')) estTable('#esPro', 'proy', cs, f);
@@ -2929,12 +2929,18 @@ Si se parecen, el número es fiable. Se ajustan en ⚙ Ajustes › Git."><small>
 const EST_ORDER = ['resumen', 'grafico', 'horas', 'autores', 'proyectos', 'ramas', 'archivos'];
 const estOrder = () => { const all = EST_ORDER.filter(k => k !== 'proyectos' || estUnion()), o = (gfL.estOrden || []).filter(k => all.includes(k));
   return [...o, ...all.filter(k => !o.includes(k))]; };
+// Lo que se está mirando, para los subtítulos: «del 01/11/26 al 05/11/26 · rama publico · autor Ana · sin merges»
+function estFiltro(f) {
+  const d = s => s ? s.split('-').reverse().map((x, i) => i === 2 ? x.slice(2) : x).join('/') : '';
+  return [`del ${d(f.desde)} al ${d(f.hasta)}`, f.rama && `rama ${f.rama}`, f.autor && `autor ${f.autor}`, f.proy && `proyecto ${f.proy}`, 'sin merges']
+    .filter(Boolean).map(esc).join(' · ');
+}
 function estBlocks(f, tiles) {
   const seg = (attr, cur, list) => `<span class="seg sm">${list.map(([k, n]) => `<button data-${attr}="${k}" class="${cur === k ? 'on' : ''}">${n}</button>`).join('')}</span>`;
   const B = {
     resumen: ['Resumen', '', tiles],
     grafico: ['Commits por', seg('g', f.grupo, [['dia', 'Día'], ['semana', 'Semana'], ['mes', 'Mes']]) + ' ' + seg('s', f.serie, [['autor', 'por autor'], ['rama', 'por rama']]), '<div id="esChart"></div>'],
-    horas: ['¿Cuándo se trabaja?', '<small>commits por día de la semana y hora</small>', '<div id="esHeat"></div>'],
+    horas: ['¿Cuándo se trabaja?', `<small>commits por día de la semana y hora · ${estFiltro(f)}</small>`, '<div id="esHeat"></div>'],
     autores: ['Quién envía más', '<small>todas las ramas, también las remotas</small> ' + seg('v', f.ver, [['commits', 'Commits'], ['lineas', 'Líneas'], ['palabras', 'Palabras'], ['horas', 'Horas']]), '<div id="esAut"></div>'],
     ramas: ['Por rama', '<small>cada commit en la rama donde se hizo (aproximado)</small>', '<div id="esRam"></div>'],
     proyectos: ['Por proyecto', '<small>cuánto se trabajó en cada uno y quién</small>', '<div id="esPro"></div>'],
