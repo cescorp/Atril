@@ -79,6 +79,10 @@ Para usarlo como servidor sin ventana: `python3 desklens.pyw --sin-ventana` y ab
 
 Estado: probado en **Windows 10** y **Linux** (Debian, Python 3.12). En **macOS** está preparado pero aún sin probar: si lo usas en Mac, cuéntanos cómo va.
 
+## Llevarlo a otro equipo
+
+Doble clic en **`empaquetar.bat`**: crea `DeskLens-AAAA-MM-DD.zip` (≈ 250 KB) con solo lo necesario, sin tus datos (`config.json`, `historial/`). En el otro equipo, descomprímelo y haz doble clic en `DeskLens\instalar.bat`.
+
 ## Tus datos
 
 - `config.json`: tus proyectos y ajustes.

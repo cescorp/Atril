@@ -2,3 +2,5 @@ config.json
 historial/
 __pycache__/
 _demo/
+# paquetes creados con empaquetar.bat
+DeskLens-*.zip

@@ -8,6 +8,9 @@ Entradas nuevas arriba. Formato: `## AAAA-MM-DD · título` + 2–4 líneas (qu�
 - **Cómo trabaja el usuario:** escribe en español. **Antes de construir algo nuevo, dibujarlo en texto y esperar su «ok».** No instalar nada sin acuerdo. Ahorrar tokens. Prefiere lo simple: rechazó un panel de IA con modos (ver 2026-11-02).
 - **Para verificar sin tocar su DeskLens:** levantar `desklens.Handler` en el puerto 8799 con `CONFIG`, `CONV_DIR`, `RECOVERY_DIR` e `INDEX_DB` en una carpeta temporal y hacer captura con Edge sin ventana (`--headless=new --screenshot`). Así se probó cada paso. Ojo: en Windows dos servidores pueden escuchar el mismo puerto sin error; si hay otra sesión probando, usa otro puerto.
 
+## 2026-11-05 · Empaquetar para otro equipo
+`empaquetar.bat` → `empaquetar.ps1` (comentado): copia a una carpeta temporal «DeskLens» solo el programa, el instalador, sus pruebas, los lanzadores, la documentación básica y `plantillas/`, y crea `DeskLens-AAAA-MM-DD.zip` (≈ 257 KB) sin `config.json` ni `historial/`; al terminar marca el zip en el Explorador (`-SinAbrir` para no abrirlo). Los zips están en .gitignore. Probado: descomprimido en otra carpeta, el instalador en modo revisión y las pruebas pasan.
+
 ## 2026-11-05 · Una ventana o varias
 ⚙ Ajustes › General › «Al abrir DeskLens o un archivo con DeskLens ya abierto»: «Usar la misma ventana» (predeterminado: el icono trae al frente la ventana abierta y un archivo se añade como pestaña, vía `hand_to_running`, también sin archivos) u «Abrir otra ventana, con sus propias pestañas» (`?nueva=1`). Las pestañas de cada ventana van en sessionStorage; la última que cambia las deja en localStorage para la próxima vez (una ventana nueva aún vacía no lo pisa). Antes todas compartían `desklens.tabs` y una ventana nueva salía idéntica a la otra. Probado con una copia en el 8798: misma ventana (no abre otra; el archivo llega como pestaña) y varias (cada una con sus pestañas).
 
