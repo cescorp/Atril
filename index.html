@@ -2,6 +2,17 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
+<script>
+// Tema: «auto» sigue a Windows; «claro»/«oscuro» lo fijan (⚙ Ajustes › General). Se aplica antes de pintar con lo
+// último guardado en este navegador; loadSettings lo confirma con config.json.
+function applyTheme(t) {
+  const v = t === 'oscuro' ? 'dark' : t === 'claro' ? 'light' : '';
+  if (v) document.documentElement.dataset.theme = v; else delete document.documentElement.dataset.theme;
+  try { localStorage.setItem('desklens.tema', t || 'auto'); } catch {}
+}
+try { applyTheme(localStorage.getItem('desklens.tema') || 'auto'); } catch {}
+const isDark = () => (document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')) === 'dark';
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DeskLens</title>
 <!-- icono: una hoja de texto sobre su atril (ventana, barra de tareas y pestaña); en línea, sin archivo aparte -->
@@ -23,6 +34,14 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/meta.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/mode/loadmode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/mode/simple.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldgutter.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldgutter.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/brace-fold.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/xml-fold.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/indent-fold.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/markdown-fold.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/comment-fold.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/dialog/dialog.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/search/searchcursor.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/search/search.min.js"></script>
@@ -98,9 +117,11 @@ for (const [name, exts] of [['PostgreSQL', ['psql', 'pgsql']], ['VBScript', ['ba
    (CodeMirror). Selectores con un nivel más que los temas de origen (github, material-darker) para ganarles. */
 :root{--tk-kw:#0000ff;--tk-ctrl:#af00db;--tk-str:#a31515;--tk-com:#008000;--tk-num:#098658;--tk-fn:#795e26;--tk-type:#267f99;
   --tk-var:#001080;--tk-prop:#0451a5;--tk-tag:#800000;--tk-attr:#e50000;--tk-lit:#0000ff;--tk-re:#811f3f;--tk-sel:#800000;--tk-head:#0451a5;--tk-ink:#1f1f1f}
-@media (prefers-color-scheme:dark){:root{--tk-kw:#569cd6;--tk-ctrl:#c586c0;--tk-str:#ce9178;--tk-com:#6a9955;--tk-num:#b5cea8;--tk-fn:#dcdcaa;--tk-type:#4ec9b0;
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--tk-kw:#569cd6;--tk-ctrl:#c586c0;--tk-str:#ce9178;--tk-com:#6a9955;--tk-num:#b5cea8;--tk-fn:#dcdcaa;--tk-type:#4ec9b0;
   --tk-var:#9cdcfe;--tk-prop:#9cdcfe;--tk-tag:#569cd6;--tk-attr:#9cdcfe;--tk-lit:#569cd6;--tk-re:#d16969;--tk-sel:#d7ba7d;--tk-head:#569cd6;--tk-ink:#d4d4d4}}
-.hljs{color:var(--tk-ink)}
+:root[data-theme=dark]{--tk-kw:#569cd6;--tk-ctrl:#c586c0;--tk-str:#ce9178;--tk-com:#6a9955;--tk-num:#b5cea8;--tk-fn:#dcdcaa;--tk-type:#4ec9b0;
+  --tk-var:#9cdcfe;--tk-prop:#9cdcfe;--tk-tag:#569cd6;--tk-attr:#9cdcfe;--tk-lit:#569cd6;--tk-re:#d16969;--tk-sel:#d7ba7d;--tk-head:#569cd6;--tk-ink:#d4d4d4}
+.hljs{color:var(--tk-ink);background:transparent}
 .hljs .hljs-keyword,.hljs .hljs-doctag,.hljs .hljs-meta .hljs-keyword{color:var(--tk-kw)}
 .hljs .hljs-string,.hljs .hljs-meta .hljs-string,.hljs .hljs-code{color:var(--tk-str)}
 .hljs .hljs-comment,.hljs .hljs-quote{color:var(--tk-com);font-style:normal}
@@ -137,7 +158,8 @@ for (const [name, exts] of [['PostgreSQL', ['psql', 'pgsql']], ['VBScript', ['ba
 .CodeMirror span.cm-error{color:#f14c4c}
 /* Estilo inspirado en Obsidian: grises neutros, acento morado, árbol con líneas guía */
 :root{--bg:#fff;--side:#f6f6f6;--paper:#fff;--ink:#222;--muted:#5c5c5c;--faint:#ababab;--line:#e3e3e3;--accent:#7c5cdb;--hover:rgba(0,0,0,.05);--active:rgba(0,0,0,.085);--chip:#f0f0f0;--warn:#a35a00;--warnbg:#fbecd6;--lock:#8a2f2f;--lockbg:#f6dede}
-@media (prefers-color-scheme:dark){:root{--bg:#1e1e1e;--side:#262626;--paper:#1e1e1e;--ink:#dadada;--muted:#a3a3a3;--faint:#666;--line:#363636;--accent:#a68af9;--hover:rgba(255,255,255,.06);--active:rgba(255,255,255,.1);--chip:#2a2a2a;--warn:#f0b46a;--warnbg:#3a2c18;--lock:#f0a0a0;--lockbg:#3a2020}}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#1e1e1e;--side:#262626;--paper:#1e1e1e;--ink:#dadada;--muted:#a3a3a3;--faint:#666;--line:#363636;--accent:#a68af9;--hover:rgba(255,255,255,.06);--active:rgba(255,255,255,.1);--chip:#2a2a2a;--warn:#f0b46a;--warnbg:#3a2c18;--lock:#f0a0a0;--lockbg:#3a2020}}
+:root[data-theme=dark]{--bg:#1e1e1e;--side:#262626;--paper:#1e1e1e;--ink:#dadada;--muted:#a3a3a3;--faint:#666;--line:#363636;--accent:#a68af9;--hover:rgba(255,255,255,.06);--active:rgba(255,255,255,.1);--chip:#2a2a2a;--warn:#f0b46a;--warnbg:#3a2c18;--lock:#f0a0a0;--lockbg:#3a2020}
 *{box-sizing:border-box}
 /* overflow:clip y no hidden: hidden deja que scrollIntoView() desplace la página entera aunque no haya barra */
 html,body{height:100%;overflow:clip}
@@ -678,6 +700,13 @@ dialog#dlg.fcmp[open]{display:flex}
 .code .nums{color:var(--muted);text-align:right;user-select:none;border-right:1px solid var(--line);opacity:.7}
 .code{position:relative}.code .linemark{position:absolute;left:0;right:0;pointer-events:none;background:color-mix(in srgb,var(--accent) 22%,transparent);transition:opacity .4s}
 .code code.hljs{padding:0;background:none}
+.code .nl{position:relative;padding-left:14px}.code .nl .fd{position:absolute;left:0;width:12px;font-style:normal;text-align:center;color:var(--faint)}
+.code .nl.can{cursor:pointer}.code .nl.can:hover,.code .nl.can:hover .fd{color:var(--accent)}.code .nl .fd::before{content:"▾"}.code .nl.off .fd::before{content:"▸";color:var(--accent)}
+.code .hid{display:none}
+.code .fmk{display:inline-block;margin-left:6px;padding:0 6px;border-radius:4px;background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent);cursor:pointer;font-size:.85em;line-height:1.3}
+.CodeMirror-foldgutter{width:14px}.CodeMirror-foldgutter-open,.CodeMirror-foldgutter-folded{color:var(--faint);cursor:pointer}
+.CodeMirror-foldgutter-open:after{content:"▾"}.CodeMirror-foldgutter-folded:after{content:"▸";color:var(--accent)}
+.CodeMirror-foldmarker{color:var(--accent);background:color-mix(in srgb,var(--accent) 16%,transparent);border:0;border-radius:4px;padding:0 6px;font-family:inherit;text-shadow:none;line-height:1.3;cursor:pointer}
 .grid{border-collapse:collapse;font-size:13px;background:var(--paper)}
 .grid th,.grid td{border:1px solid var(--line);padding:4px 8px;white-space:nowrap;max-width:420px;overflow:hidden;text-overflow:ellipsis}
 .grid th{position:sticky;top:0;background:var(--chip)}
@@ -1046,6 +1075,7 @@ const set = s => new Set(s.split(' '));
 const I = {
   folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
   search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+  foldAll: '<path d="m7 20 5-5 5 5M7 4l5 5 5-5"/>', unfoldAll: '<path d="m7 15 5 5 5-5M7 9l5-5 5 5"/>',
   terminal: '<path d="m5 7 5 5-5 5"/><path d="M12 19h7"/>',
   git: '<circle cx="6" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="7" r="2"/><path d="M6 7v10M18 9c0 5-6 4-11 8"/>',
   sparkles: '<path d="M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7-4.7-1.8 4.7-1.8z"/><path d="M19 15l.8 2.2 2.2.8-2.2.8L19 21l-.8-2.2-2.2-.8 2.2-.8z"/>',
@@ -1460,7 +1490,7 @@ async function compareFiles(a, b) {
     box.innerHTML = '';
     mv = CodeMirror.MergeView(box, { value: text, origLeft: A.text, lineNumbers: true, readOnly: !editable, revertButtons: editable,
       highlightDifferences: true, connect: 'align', collapseIdentical: $('#ffold').checked ? 3 : false, lineWrapping: true,
-      mode: info?.mime || info?.mimes?.[0], theme: matchMedia('(prefers-color-scheme: dark)').matches ? 'material-darker' : 'default' });
+      mode: info?.mime || info?.mimes?.[0], theme: isDark() ? 'material-darker' : 'default' });
     if (info) CodeMirror.autoLoadMode(mv.editor(), info.mode);
     const count = () => {
       const n = mv.leftChunks()?.length || 0;
@@ -1526,7 +1556,7 @@ function printPdf(path) { // el PDF tal cual, con el diálogo de impresión de E
 }
 // Código con colores en una tabla de líneas (número | línea): se puede partir en líneas largas sin desalinear los números.
 // hljs deja <span> que cruzan saltos de línea: se cierran al final de cada línea y se vuelven a abrir en la siguiente.
-function codeLines(text, lang) {
+function hlLines(text, lang) {
   const html = text.length < 500000 && hljs.getLanguage(lang) ? hljs.highlight(text, { language: lang }).value : esc(text);
   const lines = [], open = []; let line = '';
   for (const part of html.split(/(<span[^>]*>|<\/span>|\n)/)) {
@@ -1534,6 +1564,10 @@ function codeLines(text, lang) {
     else { if (part.startsWith('<span')) open.push(part); else if (part === '</span>') open.pop(); line += part; }
   }
   lines.push(line);
+  return lines;
+}
+function codeLines(text, lang) {
+  const lines = hlLines(text, lang);
   const t = document.createElement('table'); t.className = 'pcode hljs';
   t.innerHTML = lines.map((l, i) => `<tr><td class="pn">${i + 1}</td><td class="pl">${l || ' '}</td></tr>`).join('');
   return t;
@@ -1752,7 +1786,7 @@ async function compareDialog(path, carry = null) {
         <section class="ctab" data-t="cambios"><input type="search" placeholder="Filtrar cambios…" aria-label="Filtrar cambios"><div class="cl"></div></section>
         <section class="ctab" data-t="archivos"><input type="search" placeholder="Filtrar archivos…" aria-label="Filtrar archivos"><div class="cl"></div><p class="csum"></p></section></nav>
       <div class="cmerge"></div><div class="cmap" title="Mapa de cambios: clic o arrastra para ir"><i class="cview"></i></div>`;
-    const info = CodeMirror.findModeByFileName(name), dark = matchMedia('(prefers-color-scheme: dark)').matches;
+    const info = CodeMirror.findModeByFileName(name), dark = isDark();
     // 2 columnas: izquierda (origLeft) | derecha (value) · 3: izquierda | centro (value) | derecha (orig)
     body.querySelector('.cmerge').classList.add('fresh'); // aparece con un fundido corto
     mv = CodeMirror.MergeView(body.querySelector('.cmerge'), { value: texts[1], origLeft: texts[0], orig: cols === 3 ? texts[2] : null,
@@ -2046,7 +2080,7 @@ function authorColor(c) {
   if (c.local) return 'var(--faint)';
   let h = 0; for (const ch of c.autor) h = (h * 31 + ch.codePointAt(0)) % 9973;
   const hue = [212, 338, 28, 152, 268, 188, 4, 52][h % 8]; // 8 tonos bien distintos entre sí
-  return `hsl(${hue} 65% ${matchMedia('(prefers-color-scheme: dark)').matches ? 68 : 42}%)`;
+  return `hsl(${hue} 65% ${isDark() ? 68 : 42}%)`;
 }
 
 function toggle(el) { tree.set(el.dataset.path, !tree.get(el.dataset.path)); tree.get(el.dataset.path) ? expand(el) : collapse(el); syncFold(); }
@@ -2962,7 +2996,7 @@ const EST_OTHER = '#8f8f8f';
 const EST_SKIP = /(^|\/)(package-lock\.json|composer\.lock|yarn\.lock|pnpm-lock\.yaml|[^/]+\.min\.(js|css))$|(^|\/)(vendor|node_modules|dist|build)\//i;
 const DAYS_ES = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 let gfSt = null; // { ruta, data, commits, err }
-const estDark = () => matchMedia('(prefers-color-scheme: dark)').matches;
+const estDark = isDark;
 const estDay = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const estParse = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
 const estMonday = d => { const x = new Date(d); x.setDate(x.getDate() - (x.getDay() + 6) % 7); return x; };
@@ -3938,6 +3972,7 @@ let AJ = {};
 // Lee ⚙ Ajustes en AJ y aplica los que son CSS (tamaño de letra de documentos y de código).
 async function loadSettings() {
   try { AJ = (await api('/api/ajustes')).valores; } catch { AJ = {}; }
+  if (AJ.tema) { applyTheme(AJ.tema); editorCM?.setOption('theme', isDark() ? 'material-darker' : 'default'); }
   const r = document.documentElement.style;
   r.setProperty('--docFont', (AJ.letra_documento || 18) + 'px');
   r.setProperty('--codeFont', (AJ.letra_codigo || 13) + 'px');
@@ -4576,7 +4611,7 @@ async function render() {
   if (FONT.has(k.ext)) return fontView(V, f);
   if (k.ext === 'docx') return docxView(V, f);
   if (f.texto === null) return card(V, f);
-  if (showSrc || !canSrc) return codeView(V, f.texto, k.lang);
+  if (showSrc || !canSrc) return codeView(V, f.texto, k.lang, path);
   if (MD.has(k.ext)) return V.append(page(DOMPurify.sanitize(marked.parse(f.texto)), dir));
   if (HTML.has(k.ext)) { V.className = 'flush'; return V.append(frame(raw(f.ruta))); }
   if (k.ext in TABLE) return tableView(V, f.texto, TABLE[k.ext]);
@@ -4605,7 +4640,17 @@ function textDesc(a, b) {
 function editorView(V, ed, name, path) {
   V.className = 'flush';
   const cm = CodeMirror(V, { value: ed.text, lineNumbers: true, matchBrackets: true, indentUnit: AJ.editor_tab || 4, tabSize: AJ.editor_tab || 4, lineWrapping: wrapOn(),
-    theme: matchMedia('(prefers-color-scheme: dark)').matches ? 'material-darker' : 'default' });
+    theme: isDark() ? 'material-darker' : 'default', foldGutter: true, gutters: ['CodeMirror-linenumbers', 'CodeMirror-foldgutter'],
+    foldOptions: { rangeFinder: foldFinder, widget: '⋯', minFoldSize: 1 },
+    extraKeys: { 'Shift-Ctrl-[': 'fold', 'Shift-Ctrl-]': 'unfold' } });
+  // plegado: se guarda al plegar o desplegar; al abrir, se recupera cuando el modo ya cargó (lo usa para encontrar el bloque)
+  const foldList = () => cm.getAllMarks().filter(m => m.__isFold).map(m => m.find()?.from.line).filter(l => l != null).map(l => [l, cm.getLine(l).trim()]);
+  let foldReady = false; const foldKeep = () => { if (foldReady && !isUntitled(path)) foldSave(path, foldList()); };
+  cm.on('fold', foldKeep); cm.on('unfold', foldKeep);
+  setTimeout(() => { const lines = cm.getValue().split('\n');
+    for (const sv of foldStore()[path] || []) { const l = foldAnchor(lines, sv); if (l >= 0) cm.foldCode(CodeMirror.Pos(l, 0), null, 'fold'); }
+    foldReady = true; }, 500);
+  foldButtons(() => { cm.operation(() => CodeMirror.commands.foldAll(cm)); foldKeep(); }, () => { cm.operation(() => CodeMirror.commands.unfoldAll(cm)); foldKeep(); });
   const info = CodeMirror.findModeByFileName(name.toLowerCase().endsWith('.blade.php') ? 'x.php' : name);
   if (info) { cm.setOption('mode', info.mime || info.mimes?.[0]); CodeMirror.autoLoadMode(cm, info.mode); }
   editorCM = cm;
@@ -5145,13 +5190,116 @@ function page(html, dir) {
   return d;
 }
 // Código en lectura con números de línea y colores (sin colores por encima de 500 KB, para no bloquear la ventana).
-function codeView(V, text, lang) {
-  const lines = text.split('\n').length, d = document.createElement('div');
+// ---------- plegar bloques (funciones, clases, etiquetas, títulos) al leer y al editar ----------
+// Bloques por la forma del texto, para cualquier lenguaje: llaves/corchetes/paréntesis (ignorando cadenas y
+// comentarios), etiquetas (HTML/XML/SVG), títulos (Markdown) y, para Python/YAML o si no hay otra cosa, sangría.
+// Lo plegado se recuerda por archivo (localStorage «desklens.pliegues»: ruta → [[línea, texto]]): al volver, cada
+// bloque se busca por el texto de su primera línea cerca de donde estaba (el archivo pudo cambiar por fuera).
+const FOLD_TAG = new Set(['xml', 'html', 'xhtml', 'svg', 'vue']);
+const FOLD_INDENT = new Set(['python', 'yaml', 'coffeescript', 'nim', 'fsharp', 'haskell', 'elm']);
+const FOLD_HASH = new Set(['python', 'ruby', 'bash', 'sh', 'shell', 'powershell', 'yaml', 'r', 'perl', 'makefile', 'dockerfile',
+  'toml', 'ini', 'hcl', 'graphql', 'elixir', 'julia', 'nim', 'coffeescript', 'cmake']);
+const FOLD_DASH = new Set(['sql', 'lua', 'haskell', 'elm']); // -- comentario
+const FOLD_VOID = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'param', 'source', 'track', 'wbr', '!doctype']);
+function foldRanges(lines, lang) {
+  const out = new Map(), ind = l => l.match(/^\s*/)[0].replace(/\t/g, '    ').length, blank = l => !l.trim();
+  const put = (s, end, keep) => { if (end > s && (!out.has(s) || out.get(s).end < end)) out.set(s, { end, keep }); };
+  if (lines.length > 50000) return out;
+  if (lang === 'markdown') {
+    let fence = false; const H = lines.map(l => { if (/^\s*(```|~~~)/.test(l)) fence = !fence; return !fence && /^(#{1,6})\s/.test(l) ? l.match(/^#+/)[0].length : 0; });
+    H.forEach((h, i) => { if (!h) return; let j = i + 1; while (j < lines.length && !(H[j] && H[j] <= h)) j++;
+      let e = j - 1; while (e > i && blank(lines[e])) e--; put(i, e, false); });
+    return out;
+  }
+  if (FOLD_TAG.has(lang)) {
+    const st = []; let com = false;
+    lines.forEach((raw, i) => {
+      let l = raw;
+      if (com) { const k = l.indexOf('-->'); if (k < 0) return; l = l.slice(k + 3); com = false; }
+      l = l.replace(/<!--.*?-->/g, ''); const k = l.indexOf('<!--'); if (k >= 0) { l = l.slice(0, k); com = true; }
+      for (const m of l.matchAll(/<(\/?)([A-Za-z!][\w:.-]*)((?:[^>"']|"[^"]*"|'[^']*')*?)(\/?)>/g)) {
+        const name = m[2].toLowerCase();
+        if (m[1]) { const at = st.map(x => x.name).lastIndexOf(name); if (at < 0) continue; const o = st[at]; st.length = at; if (i > o.line) put(o.line, i, true); }
+        else if (!m[4] && !FOLD_VOID.has(name)) st.push({ name, line: i });
+      }
+    });
+  } else if (!FOLD_INDENT.has(lang)) {
+    const st = []; let com = false;
+    lines.forEach((raw, i) => {
+      let l = raw;
+      if (com) { const k = l.indexOf('*/'); if (k < 0) return; l = l.slice(k + 2); com = false; }
+      l = l.replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`/g, '""').replace(/\/\*.*?\*\//g, '');
+      const k = l.indexOf('/*'); if (k >= 0) { l = l.slice(0, k); com = true; }
+      l = l.replace(FOLD_HASH.has(lang) ? /#.*$/ : FOLD_DASH.has(lang) ? /--.*$/ : /\/\/.*$/, '');
+      for (const ch of l) {
+        if ('{[('.includes(ch)) st.push(i);
+        else if ('}])'.includes(ch) && st.length) {
+          let o = st.pop();
+          if (i > o) { if (/^\s*[{[(]\s*$/.test(lines[o]) && o > 0 && !blank(lines[o - 1])) o--; put(o, i, true); } // estilo Allman: la llave sola va con su cabecera
+        }
+      }
+    });
+  }
+  if (!out.size || FOLD_INDENT.has(lang)) lines.forEach((l, i) => { // sangría: lo que sigue más adentro es su bloque
+    if (blank(l) || out.has(i)) return;
+    let j = i + 1; while (j < lines.length && blank(lines[j])) j++;
+    if (j >= lines.length || ind(lines[j]) <= ind(l)) return;
+    let e = j; for (let k = j; k < lines.length; k++) { if (blank(lines[k])) continue; if (ind(lines[k]) <= ind(l)) break; e = k; }
+    put(i, e, false);
+  });
+  return out;
+}
+const foldStore = () => { try { return JSON.parse(localStorage.getItem('desklens.pliegues') || '{}'); } catch { return {}; } };
+function foldSave(path, list) {
+  const all = foldStore(); delete all[path]; if (list.length) all[path] = list; // lo último, al final
+  const keys = Object.keys(all); for (const k of keys.slice(0, Math.max(0, keys.length - 300))) delete all[k];
+  LS('desklens.pliegues', JSON.stringify(all));
+}
+// línea guardada → línea de ahora: la misma si su texto coincide, si no la más cercana con ese texto (o -1)
+function foldAnchor(lines, [n, text]) {
+  if ((lines[n] || '').trim() === text) return n;
+  for (let d = 1; d < 500; d++) { if (n - d >= 0 && (lines[n - d] || '').trim() === text) return n - d; if ((lines[n + d] || '').trim() === text) return n + d; }
+  return -1;
+}
+// Editor: el bloque según el modo (llaves, etiquetas, títulos…) o, si el modo no sabe, por sangría; y como en VS Code,
+// una cabecera cuya «{» va sola en la línea siguiente (estilo Allman: PHP, C#…) pliega desde la cabecera
+function foldFinder(cm, start) {
+  const r = CodeMirror.fold.auto(cm, start) || CodeMirror.fold.indent(cm, start); if (r) return r;
+  if (!/^\s*[{[]\s*$/.test(cm.getLine(start.line + 1) ?? '') || !cm.getLine(start.line).trim()) return;
+  const b = CodeMirror.fold.brace(cm, CodeMirror.Pos(start.line + 1, 0));
+  if (b) return { from: CodeMirror.Pos(start.line, cm.getLine(start.line).length), to: b.to };
+}
+// ⊟ Plegar todo · ⊞ Desplegar todo en la barra del archivo, antes de 🔍
+function foldButtons(all, none) {
+  const B = $('#bar'), s = [...B.querySelectorAll('button.ic')].find(b => b.title.startsWith('Buscar'));
+  B.insertBefore(iconBtn('foldAll', 'Plegar todo (funciones, clases, etiquetas…)', all), s || null);
+  B.insertBefore(iconBtn('unfoldAll', 'Desplegar todo', none), s || null);
+}
+// Lectura: cada línea es un bloque (para poder ocultarla); ▾/▸ junto al número en las que abren un bloque
+function codeView(V, text, lang, path) {
+  const raw = text.split('\n'), html = hlLines(text, lang), d = document.createElement('div'), ranges = foldRanges(raw, lang);
   d.className = 'code';
-  d.innerHTML = `<pre class="nums">${Array.from({ length: lines }, (_, i) => i + 1).join('\n')}</pre><pre><code></code></pre>`;
-  const code = d.querySelector('code'); code.textContent = text;
-  if (text.length < 500000 && hljs.getLanguage(lang)) { code.className = 'language-' + lang; hljs.highlightElement(code); }
+  d.innerHTML = `<pre class="nums">${raw.map((_, i) => `<div class="nl${ranges.has(i) ? ' can' : ''}" data-i="${i}">${ranges.has(i) ? '<i class="fd"></i>' : ''}${i + 1}</div>`).join('')}</pre>`
+    + `<pre><code class="hljs">${html.map((l, i) => `<div class="cl" data-i="${i}">${l || ' '}</div>`).join('')}</code></pre>`;
+  const nl = d.querySelectorAll('.nl'), cl = d.querySelectorAll('.cl'), folded = new Set();
+  const apply = () => {
+    d.querySelectorAll('.hid').forEach(x => x.classList.remove('hid')); d.querySelectorAll('.fmk').forEach(x => x.remove()); d.querySelectorAll('.nl.off').forEach(x => x.classList.remove('off'));
+    for (const s of [...folded].sort((a, b) => a - b)) {
+      if (nl[s].classList.contains('hid')) continue; // dentro de otro plegado
+      const r = ranges.get(s), last = r.keep ? r.end - 1 : r.end;
+      for (let i = s + 1; i <= last; i++) { nl[i].classList.add('hid'); cl[i].classList.add('hid'); }
+      nl[s].classList.add('off');
+      cl[s].insertAdjacentHTML('beforeend', `<span class="fmk" data-s="${s}" title="Desplegar (${last - s} línea${last - s === 1 ? '' : 's'})">⋯</span>`);
+    }
+    if (path) foldSave(path, [...folded].map(s => [s, raw[s].trim()]));
+  };
+  const toggle = s => { folded.has(s) ? folded.delete(s) : folded.add(s); apply(); };
+  d.onclick = e => { const n = e.target.closest('.nl.can'), m = e.target.closest('.fmk'); if (n) toggle(+n.dataset.i); else if (m) toggle(+m.dataset.s); };
+  for (const sv of path ? foldStore()[path] || [] : []) { const s = foldAnchor(raw, sv); if (ranges.has(s)) folded.add(s); }
+  if (folded.size) apply();
   V.className = 'flush'; V.append(d);
+  if (ranges.size) foldButtons(() => { ranges.forEach((_, s) => folded.add(s)); apply(); }, () => { folded.clear(); apply(); });
+  d.unfoldTo = n => { let ch = false; for (const s of [...folded]) { const r = ranges.get(s); if (n > s && n <= r.end) { folded.delete(s); ch = true; } } if (ch) apply(); };
 }
 // CSV/TSV a filas, con comillas y saltos de línea dentro de los campos ("" es una comilla).
 function parseDelimited(t, sep) {
@@ -6939,7 +7087,7 @@ function rulesDialog() {
   d.querySelector('b').textContent = 'Reglas · ' + proj.nombre;
   const orig = norm(info.texto || '');
   const cm = CodeMirror($('#rEd'), { value: orig, mode: 'markdown', lineWrapping: true,
-    theme: matchMedia('(prefers-color-scheme: dark)').matches ? 'material-darker' : 'default' });
+    theme: isDark() ? 'material-darker' : 'default' });
   CodeMirror.autoLoadMode(cm, 'markdown');
   const upd = () => {
     const t = cm.getValue(), n = (t.match(/^\s*[-*+]\s+\S/gm) || []).length, tok = Math.ceil(t.length / 4);
@@ -7070,12 +7218,13 @@ async function goToLine() {
   if (editorCM) return editorCM.execCommand('jumpToLine');
   const code = $('#view .code'), nums = code?.querySelector('.nums');
   if (!nums) return flash('Ir a la línea: solo en archivos de texto con líneas numeradas');
-  const total = nums.textContent.split('\n').length;
+  const total = code.querySelectorAll('.cl').length;
   const v = await ask('Ir a la línea', `Número de línea (1–${total}):`, ['Ir', 'Cancelar'], { input: '', numeric: true });
   const n = Math.min(total, Math.max(1, parseInt(v, 10) || 0));
   if (!v || !n) return;
-  const pad = parseFloat(getComputedStyle(nums).paddingTop), lh = (nums.offsetHeight - 2 * pad) / total;
-  const V = $('#view'), mark = document.createElement('div'), y = pad + (n - 1) * lh;
+  code.unfoldTo?.(n - 1);
+  const row = code.querySelector(`.cl[data-i="${n - 1}"]`), y = row.offsetTop, lh = row.offsetHeight;
+  const V = $('#view'), mark = document.createElement('div');
   V.scrollTop = code.offsetTop + y - V.clientHeight / 3;
   mark.className = 'linemark'; mark.style.top = y + 'px'; mark.style.height = lh + 'px';
   code.append(mark); setTimeout(() => mark.remove(), 1500);

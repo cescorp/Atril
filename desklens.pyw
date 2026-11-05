@@ -119,6 +119,8 @@ SETTINGS = [
     ("indice_repaso_min", "Índice", "Repasar los cambios cada (minutos)", 5, 1, 240),
     ("bitacora_max_lineas", "Bitácora", "Aviso «Bitácora grande» a partir de (líneas)", 200, 20, 100000),
     ("bitacora_conservar", "Bitácora", "Entradas que se quedan al archivar", 20, 1, 1000),
+    ("tema", "General", "Tema de la ventana (claro, oscuro o como esté Windows)", "auto",
+     [("auto", "Como Windows"), ("claro", "Claro"), ("oscuro", "Oscuro")], None),
     ("git_cache_seg", "Git", "Volver a consultar git cada (segundos)", 10, 1, 3600),
     ("git_fetch_min", "Git", "Buscar novedades en los remotos cada (minutos; 0 = nunca)", 5, 0, 1440),
     ("est_pausa_min", "Git", "Estadística: pausa máxima dentro de una sesión de trabajo (minutos; más, es otra sesión)", 120, 10, 1440),
