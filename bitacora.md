@@ -8,6 +8,9 @@ Entradas nuevas arriba. Formato: `## AAAA-MM-DD · título` + 2–4 líneas (qu�
 - **Cómo trabaja el usuario:** escribe en español. **Antes de construir algo nuevo, dibujarlo en texto y esperar su «ok».** No instalar nada sin acuerdo. Ahorrar tokens. Prefiere lo simple: rechazó un panel de IA con modos (ver 2026-11-02).
 - **Para verificar sin tocar su DeskLens:** levantar `desklens.Handler` en el puerto 8799 con `CONFIG`, `CONV_DIR`, `RECOVERY_DIR` e `INDEX_DB` en una carpeta temporal y hacer captura con Edge sin ventana (`--headless=new --screenshot`). Así se probó cada paso. Ojo: en Windows dos servidores pueden escuchar el mismo puerto sin error; si hay otra sesión probando, usa otro puerto.
 
+## 2026-11-05 · Volver a Git a pantalla completa al cerrar el archivo
+Abrir un archivo desde la pantalla completa de Git la cierra (tapa las pestañas). Ahora esa pestaña queda en `gitReturn` y, al cerrarla, se vuelve a la pantalla completa (mismo repositorio y commit seleccionado, que ya se recordaban), salvo que mientras tanto se haya ido a otra vista. «Abrir» del detalle del commit pasa por `openTab` para marcarse igual. Probado: abrir → cerrar vuelve; abrir → Explorador → cerrar no vuelve.
+
 ## 2026-11-05 · Instalador: «desbordamiento de la profundidad de llamada» con winget
 En otro equipo sin Python, al aceptar instalarlo con winget, el instalador fallaba. La función se llamaba `Winget` y dentro ejecutaba `winget …`: PowerShell no distingue mayúsculas, así que se llamaba a sí misma sin fin. Ahora es `Usar-Winget` y llama a `winget.exe`. En este equipo no salía porque todo estaba instalado y nunca se llegaba ahí. Comprobado ejecutando la función con `winget show` (responde winget, sin bucle) y revisando que ninguna otra función del script se llame como un programa o cmdlet.
 

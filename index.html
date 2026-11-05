@@ -3276,7 +3276,7 @@ async function gitCommitDetail(c) {
         { id: 'disco', label: '💾 Disco (actual)', title: '' },
         { id: c.hash, label: `${msgParts(c.mensaje)[0]} · ${fmtWhen(c.ts)}`, title: `${c.corto} · ${c.mensaje}` }] }));
       ver.className = 'small'; ver.disabled = !canSee; ver.title = img ? 'Imagen antes y después, lado a lado' : canSee ? 'Disco (actual) ↔ este commit' : 'Archivo binario: no se compara como texto';
-      const abrir = button('Abrir', () => { gitFullClose(true); openTab(f.ruta, true); });
+      const abrir = button('Abrir', () => openTab(f.ruta, true)); // openTab sale de la pantalla completa y vuelve al cerrar
       abrir.className = 'small'; abrir.disabled = f.estado === 'D' || c.lado === 'entrante'; // entrante: aún no está en tu disco
       abrir.title = abrir.disabled ? 'No está en tu disco (borrado o aún sin traer)' : 'Abrir el archivo tal como está ahora';
       tr.lastChild.append(ver, abrir); body.append(tr);
@@ -4033,8 +4033,10 @@ let hi = -1;
 
 // Abre (o enseña) una pestaña en el lado activo. Sin fijar, reemplaza a la de vista previa (como VS Code);
 // fijada, se queda. fromHist: viene de ← →, no se añade al historial de navegación.
+// Pestaña abierta desde la pantalla completa de Git: al cerrarla se vuelve a ella (si se sigue en la vista Git)
+let gitReturn = null;
 function openTab(path, pin = false, fromHist = false) {
-  if (gitFullOn()) gitFullClose(true); // la pantalla completa de Git tapa las pestañas: se sale para ver el archivo
+  if (gitFullOn()) { gitFullClose(true); gitReturn = path; } // la pantalla completa tapa las pestañas: se sale para ver el archivo
   const usePreview = AJ.pestanas_vista_previa !== false;
   if (!tabs.includes(path)) {
     const i = usePreview ? tabs.indexOf(previewTab) : -1;
@@ -4079,6 +4081,10 @@ async function closeTab(path) {
   const i = tabs.indexOf(path); tabs.splice(i, 1);
   if (cur === path) cur = tabs[Math.min(i, tabs.length - 1)] ?? null;
   persist(); render();
+  if (path === gitReturn) { // vino de la pantalla completa de Git: se vuelve, salvo que mientras tanto se fuera a otra vista
+    gitReturn = null;
+    if (document.body.classList.contains('vgit') && LS('desklens.git.full') === '1' && !gitFullOn()) gitFullOpen();
+  }
 }
 
 let dragTab = null; // pestaña que se está arrastrando
