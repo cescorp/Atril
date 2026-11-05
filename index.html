@@ -223,9 +223,11 @@ body.gitfull #gitfull{grid-row:1;display:grid;grid-template-rows:auto minmax(0,1
 .estblocks .fold{border:0;background:none;padding:0 2px;color:var(--muted);font-size:11px;cursor:pointer}
 .estblocks section.dropb::before,.estblocks section.dropa::after{content:"";position:absolute;left:0;right:0;height:3px;border-radius:2px;background:var(--accent)}
 .estblocks section.dropb::before{top:-9px}.estblocks section.dropa::after{bottom:-9px}
-dialog#dlg.sets.win.uni{width:min(1200px,calc(100vw - 32px))}
-.unitab{overflow:auto;max-height:calc(100vh - 260px)}.unitab td{vertical-align:top;white-space:normal}.unitab tbody tr{cursor:default}
-.unitab .uname{font:inherit;font-weight:600;width:100%;min-width:140px;padding:3px 6px;border:1px solid var(--line);border-radius:5px;background:var(--bg);color:var(--ink)}
+dialog#dlg.sets.win.uni{width:fit-content;min-width:min(640px,calc(100vw - 32px));max-width:min(1200px,calc(100vw - 32px))}
+.uni .wbody>p{max-width:600px}
+.unitab{overflow:auto;max-height:calc(100vh - 260px)}.unitab table{width:auto;min-width:100%}.unitab td{vertical-align:top;white-space:normal}.unitab tbody tr{cursor:default}
+.unitab th:first-child,.unitab td:first-child{width:240px;max-width:240px}.unitab th:not(:first-child){min-width:150px}
+.unitab .uname{font:inherit;font-weight:600;width:100%;max-width:240px;min-width:140px;padding:3px 6px;border:1px solid var(--line);border-radius:5px;background:var(--bg);color:var(--ink)}
 .chip{display:inline-block;margin:2px 4px 2px 0;padding:2px 9px;border:1px solid var(--line);border-radius:12px;background:var(--bg);font-size:12px;cursor:grab;user-select:none;white-space:nowrap}
 .chip:hover{border-color:var(--accent)}.chip.sug{border-color:#c08a00;border-style:dashed}.chip.ghost{position:fixed;z-index:50;pointer-events:none;box-shadow:0 4px 12px rgba(0,0,0,.2)}
 .unitab tr.drop td{background:color-mix(in srgb,var(--accent) 14%,transparent)}.unitab .unew td{color:var(--faint);font-size:12px;text-align:center;border:1px dashed var(--line)}
@@ -3000,7 +3002,7 @@ function estAliasDialog() {
           return `<span class="chip${p.sug.has(f) ? ' sug' : ''}" data-f="${esc(f)}" title="${esc(f)} en ${esc(pr)}: ${i.proy.get(pr)} commit${i.proy.get(pr) === 1 ? '' : 's'} · último ${esc(fmtWhen(i.ultimo))}\nRamas: ${esc([...i.ramas].slice(0, 6).join(', '))}${p.sug.has(f) ? '\n💡 Junto por parecido: si no es la misma persona, arrástralo a «otra persona»' : ''}\nArrastra a otra fila o haz clic para moverlo">${p.sug.has(f) ? '💡 ' : ''}${esc(f)}</span>`; }).join('')}</td>`).join('')}</tr>`).join('')}
       <tr data-new class="unew"><td colspan="${projs.length + 1}">＋ Suelta aquí un nombre para separarlo como otra persona</td></tr></tbody></table></div>
       ${projs.length < 2 ? '<p class="ok">Solo se ve el proyecto actual: para ver aquí todos, elige varios en «📁 Proyectos».</p>' : ''}</div>
-      <footer><span class="ok">${shown.length} personas · ${info.size} nombres en ${projs.length} proyecto${projs.length === 1 ? '' : 's'} · se guarda en config.json</span><div class="exp-actions"></div></footer>`;
+      <footer><span class="ok">${shown.length} persona${shown.length === 1 ? '' : 's'} · ${info.size} nombre${info.size === 1 ? '' : 's'} en ${projs.length} proyecto${projs.length === 1 ? '' : 's'} · se guarda en config.json</span><div class="exp-actions"></div></footer>`;
     d.querySelectorAll('.uname').forEach(i => i.oninput = () => { people[+i.dataset.i].nombre = i.value; });
     d.querySelector('.exp-actions').append(Object.assign(button('Guardar', async () => {
       try { gfPersonas = (await api('/api/personas', { personas: people.map(p => ({ nombre: p.nombre.trim() || p.firmas[0], firmas: p.firmas })) })).personas; }
