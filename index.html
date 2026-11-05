@@ -2875,7 +2875,6 @@ function estRender() {
   E.innerHTML = `<div class="estbar">
       <label>Desde <input type="date" id="esD" value="${f.desde}"></label><label>Hasta <input type="date" id="esH" value="${f.hasta}"></label>
       <span class="seg">${[['hoy', 'Hoy'], ['semana', 'Esta semana'], ['mes', 'Este mes'], ['anio', 'Este año'], ['todo', 'Todo']].map(([k, n]) => `<button data-p="${k}" class="${f.preset === k ? 'on' : ''}">${n}</button>`).join('')}</span>
-      <span class="seg" title="Agrupar el gráfico">${[['dia', 'Día'], ['semana', 'Semana'], ['mes', 'Mes']].map(([k, n]) => `<button data-g="${k}" class="${f.grupo === k ? 'on' : ''}">${n}</button>`).join('')}</span>
       <select id="esR">${opts('rama', 'Todas las ramas')}</select><select id="esA">${opts('autor', 'Todos los autores')}</select>
       <button class="estproj" id="esP" title="Ver juntos varios proyectos (unificar)">📁 ${estUnion() ? `${estRutas().length} proyectos` : esc(projLabel(gst.ruta))} ▾</button>
       <button class="estproj" id="esU" title="Nombres distintos de la misma persona (p. ej. «jramos» y «Jean Ramos»)">👥 Unir autores…</button></div>
@@ -2919,7 +2918,7 @@ function estBlocks(f, tiles) {
   const seg = (attr, cur, list) => `<span class="seg sm">${list.map(([k, n]) => `<button data-${attr}="${k}" class="${cur === k ? 'on' : ''}">${n}</button>`).join('')}</span>`;
   const B = {
     resumen: ['Resumen', '', tiles],
-    grafico: [`Commits por ${f.grupo === 'dia' ? 'día' : f.grupo}`, seg('s', f.serie, [['autor', 'por autor'], ['rama', 'por rama']]), '<div id="esChart"></div>'],
+    grafico: ['Commits por', seg('g', f.grupo, [['dia', 'Día'], ['semana', 'Semana'], ['mes', 'Mes']]) + ' ' + seg('s', f.serie, [['autor', 'por autor'], ['rama', 'por rama']]), '<div id="esChart"></div>'],
     horas: ['¿Cuándo se trabaja?', '<small>commits por día de la semana y hora</small>', '<div id="esHeat"></div>'],
     autores: ['Quién envía más', '<small>todas las ramas, también las remotas</small> ' + seg('v', f.ver, [['commits', 'Commits'], ['lineas', 'Líneas'], ['palabras', 'Palabras'], ['horas', 'Horas']]), '<div id="esAut"></div>'],
     ramas: ['Por rama', '<small>cada commit en la rama donde se hizo (aproximado)</small>', '<div id="esRam"></div>'],
