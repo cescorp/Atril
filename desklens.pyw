@@ -2584,7 +2584,10 @@ def git_overview(path):
             "remotos": ("remote",),
             "stash": ("-c", "core.quotePath=false", "stash", "list", "--format=%gd\x1f%s\x1f%cr"),
             "merge": ("rev-parse", "-q", "--verify", "MERGE_HEAD"),
-            "revert": ("rev-parse", "-q", "--verify", "REVERT_HEAD")}.items()}
+            "revert": ("rev-parse", "-q", "--verify", "REVERT_HEAD"),
+            # cada rama local con la remota que sigue y cuánto va por delante/detrás: «[ahead 3, behind 2]», «[gone]»
+            "track": ("for-each-ref", "--format=%(refname:short)\x1f%(upstream:short)\x1f%(upstream:track)", "refs/heads"),
+            "urls": ("config", "--get-regexp", r"^remote\..*\.url$")}.items()}
         fetched = ex.submit(git_fetch_time, repo)
         out = git_do(repo, "-c", "core.quotePath=false", "status", "--porcelain=v1", "-z", "--branch", "--untracked-files=all")
         q = {k: f.result() for k, f in q.items()}
@@ -2623,8 +2626,26 @@ def git_overview(path):
             # cambios guardados aparte (stash): [{id: stash@{N}, mensaje, fecha}], el más reciente primero
             "stashes": [dict(zip(("id", "mensaje", "fecha"), ln.split("\x1f"))) for ln in q["stash"].splitlines() if ln],
             "fusionando": bool(q["merge"] or q["revert"]),  # merge o revert a medias
+            "ramas_info": [git_track(ln) for ln in q["track"].splitlines() if ln],
+            "servicio": git_service(q["urls"]),
             "comprobado": fetched.result(),
             "preparados": staged, "cambios": changes, "conflictos": conflicts}
+
+
+def git_track(line):
+    """Una línea de for-each-ref («rama␟origin/rama␟[ahead 1, behind 2]») → {rama, remota, adelante, atras, borrada}."""
+    name, up, track = (line.split("\x1f") + ["", ""])[:3]
+    num = lambda k: int(m.group(1)) if (m := re.search(k + r" (\d+)", track)) else 0
+    return {"rama": name, "remota": up or None, "adelante": num("ahead"), "atras": num("behind"), "borrada": track == "[gone]"}
+
+
+def git_service(urls):
+    """Nombre del servicio del primer remoto para la interfaz («GitHub», «GitLab»…); «el remoto» si no se reconoce."""
+    url = urls.split(" ", 1)[1] if " " in urls.split("\n", 1)[0] else ""
+    for host, name in (("github", "GitHub"), ("gitlab", "GitLab"), ("bitbucket", "Bitbucket"), ("dev.azure", "Azure DevOps")):
+        if host in url.lower():
+            return name
+    return "el remoto" if url else None
 
 
 def git_fetch_time(repo):

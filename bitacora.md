@@ -8,6 +8,9 @@ Entradas nuevas arriba. Formato: `## AAAA-MM-DD · título` + 2–4 líneas (qu�
 - **Cómo trabaja el usuario:** escribe en español. **Antes de construir algo nuevo, dibujarlo en texto y esperar su «ok».** No instalar nada sin acuerdo. Ahorrar tokens. Prefiere lo simple: rechazó un panel de IA con modos (ver 2026-11-02).
 - **Para verificar sin tocar su DeskLens:** levantar `desklens.Handler` en el puerto 8799 con `CONFIG`, `CONV_DIR`, `RECOVERY_DIR` e `INDEX_DB` en una carpeta temporal y hacer captura con Edge sin ventana (`--headless=new --screenshot`). Así se probó cada paso. Ojo: en Windows dos servidores pueden escuchar el mismo puerto sin error; si hay otra sesión probando, usa otro puerto.
 
+## 2026-11-04 · Panel de proyecto y ramas más claro
+El usuario encontraba confuso el panel izquierdo de Git (Proyectos, Ramas y Remotas iguales y cada rama dos veces). Ahora: el proyecto en un desplegable (el mismo menú de la vista Git, con los sin git al final), su estado en palabras («⎇ pruebas · ↑ 3 commits por subir · 7 archivos sin commit» o «✓ Todo al día con GitHub») y «Ramas de X» con una fila por rama (local y remota juntas): ✓ al día, ↑/↓ N, 💻 solo en tu PC, 💻 sin enlazar, 💻 ya no está en GitHub, ☁ solo en GitHub. Servidor: `ramas_info` (`for-each-ref` con `upstream:track`, en la tanda paralela) y `servicio` (GitHub/GitLab/… por la URL del remoto). En pantalla completa se ocultan los selectores de proyecto y rama de la derecha (están a la izquierda).
+
 ## 2026-11-04 · Comparador al instante y ⋮ más fácil de pulsar
 «Ver» (y todo lo que abre el comparador) esperaba al historial del archivo y a la librería antes de mostrar nada: ahora el modal se abre ya con «Cargando…» (7 ms) y se rellena al llegar (≈ 260 ms en la prueba); si se cierra mientras carga, no se reabre. El ⋮ de los proyectos y el ✕ de los sueltos tienen zona de clic de 26×22 px con fondo al pasar el ratón (antes solo el carácter).
 

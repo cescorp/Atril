@@ -734,6 +734,11 @@ assert.deepStrictEqual(findRefs('Ver 1 Samuel 4:4 y 1 Samuel 8:5, 20; Deuteronom
     assert r["orden"] == "git pull --no-rebase && git push" and wait_run(r["id"])["codigo"] == 0
     ov = json.loads(get(port, "/api/git/estado?ruta=" + urllib.request.quote(str(rep)))[1])
     assert (ov["atras"], ov["adelante"]) == (0, 0) and (rep / "c.md").exists()
+    # estado de cada rama (panel de ramas) y nombre del servicio del remoto
+    assert desklens.git_track("a\x1forigin/a\x1f[ahead 1, behind 2]") == {"rama": "a", "remota": "origin/a", "adelante": 1, "atras": 2, "borrada": False}
+    assert desklens.git_track("b\x1forigin/b\x1f[gone]")["borrada"] and desklens.git_track("c\x1f\x1f")["remota"] is None
+    assert desklens.git_service("remote.origin.url https://github.com/x/y.git") == "GitHub" and desklens.git_service("") is None
+    assert desklens.git_service("remote.origin.url //servidor/repo.git") == "el remoto"
     # grafo de la pantalla completa: entrantes y salientes, padres de un merge y +/− líneas por archivo
     (rep / "e.md").write_text("uno\ndos\n"); post("/api/git/accion", {"ruta": str(rep), "accion": "commit", "mensaje": "e", "todo": True})
     git(otro, "pull", "-q", "--no-rebase")  # el otro clon se pone al día con lo sincronizado arriba

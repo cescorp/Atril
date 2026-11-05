@@ -208,7 +208,13 @@ body.gitfull #gitfull{grid-row:1;display:grid;grid-template-rows:auto minmax(0,1
 .gfright{border-left:1px solid var(--line);padding-top:6px}.gfright #gitv{display:flex}
 .gfside h4,.gfgraph h4{margin:10px 6px 4px;font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
 .gfside .node{font-size:12.5px}.gfside .node.on{font-weight:600;color:var(--ink)}
-.gfside .gfp{flex-direction:column;align-items:flex-start;gap:1px}.gfside .gfp .gfpi{font-size:11px}
+.gfrepo{display:flex;align-items:center;justify-content:space-between;width:calc(100% - 12px);margin:0 6px;padding:6px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);font-size:13px;text-align:left}
+.gfrepo:hover{border-color:var(--accent)}.gfrepo span{color:var(--muted);font-size:11px}
+.gfst{margin:6px 8px 4px;font-size:12px;color:var(--muted);line-height:1.4}.gfst .gbok{color:#2e8b57}
+.gfside .gfb{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;row-gap:0}.gfb .gbn{font-weight:500}.gfb.on .gbn{font-weight:700;color:var(--ink)}
+.gfb .gbh{font-size:11px;color:var(--accent)}.gfb .gbs{margin-left:auto;font-size:11.5px;white-space:nowrap}
+.gbs.gbok{color:#2e8b57}.gbs.gbmove{color:var(--accent);font-weight:600}.gbs.gbweb{color:#2f7fd8}.gbs.gbpc{color:#b07800}
+body.gitfull #gitv .gline:has(#gRepo),body.gitfull #gitv .gline:has(#gBranch){display:none} /* ya están a la izquierda */
 .gfmain{display:grid;grid-template-rows:minmax(0,1fr) auto auto;grid-template-columns:minmax(0,1fr);min-width:0;min-height:0} /* sin la columna explícita, el grafo ensancha la central */
 body.gitfull #gitv .shead{display:none} /* la barra de arriba ya dice «Git» */
 .gfgraph{overflow:auto;min-height:0;grid-row:1}
@@ -2214,10 +2220,9 @@ async function gitSwitch(rama, modo = '') {
 // trabaja; gitDraw/gitGraphDraw lo dejan como corresponde al llegar la respuesta.
 function gitPending(rama) {
   $('#gBranch').textContent = '⏳ ' + rama;
-  for (const n of document.querySelectorAll('#gfBr .node, #gfRem .node')) {
-    const name = n.textContent.replace(/^[✓ ⏳ ]+/, ''), hit = name === rama || name.split('/').slice(1).join('/') === rama;
-    n.classList.toggle('on', hit && n.parentNode.id === 'gfBr');
-    if (hit) n.textContent = '⏳ ' + name;
+  for (const n of document.querySelectorAll('#gfBr .gfb')) {
+    const hit = n.dataset.rama === rama; n.classList.toggle('on', hit);
+    if (hit) n.querySelector('.gbs').textContent = '⏳ cambiando…';
   }
   const g = $('#gfGraph'); if (g) g.style.opacity = '.45';
 }
@@ -2284,8 +2289,8 @@ function gitBranchMenu(anchor) {
 // cambios en ámbar · «sin git» atenuado (selector de repositorio y lista de proyectos a pantalla completa)
 function repoInfoHtml(g) {
   if (!g) return ''; if (!g.rama) return '<span class="mr-off">sin git</span>';
-  return `<span class="mr-br">⎇ ${esc(g.rama)}</span>` + (g.remota && g.atras ? `<span class="mr-down">↓${g.atras}</span>` : '')
-    + (g.remota && g.adelante ? `<span class="mr-up">↑${g.adelante}</span>` : '') + (g.remota && !g.atras && !g.adelante ? '<span class="mr-ok">al día</span>' : '')
+  return `<span class="mr-br">⎇ ${esc(g.rama)}</span>` + (g.remota && g.atras ? `<span class="mr-down">↓ ${g.atras} por traer</span>` : '')
+    + (g.remota && g.adelante ? `<span class="mr-up">↑ ${g.adelante} por subir</span>` : '') + (g.remota && !g.atras && !g.adelante ? '<span class="mr-ok">✓ al día</span>' : '')
     + (g.cambios ? `<span class="mr-ch">${g.cambios} cambio${g.cambios === 1 ? '' : 's'}</span>` : '');
 }
 // Selector de repositorio con el estado de cada proyecto: rama, ↓ por traer, ↑ por subir y cambios sin commit
@@ -2293,16 +2298,17 @@ async function gitRepoMenu(anchor) {
   let sum = [];
   try { sum = await api('/api/git/resumen'); } catch {}
   const st = r => repoInfoHtml(sum.find(x => x.ruta === r));
-  openMenu(anchor, [{ head: 'Repositorio' }, ...(side?.proyectos || []).map(p => {
+  const ps = [...(side?.proyectos || [])].sort((a, b) => !sum.find(x => x.ruta === a.ruta)?.rama - !sum.find(x => x.ruta === b.ruta)?.rama);
+  openMenu(anchor, [{ head: 'Proyecto' }, ...ps.map(p => {
     const mark = p.ruta === gst?.ruta ? '✓' : '\u2003', info = st(p.ruta);
-    return [mark + ' ' + p.nombre + ' ' + info.replace(/<[^>]+>/g, ' '), () => { LS('desklens.git.repo', p.ruta); gitLoad(); },
+    return [mark + ' ' + p.nombre + ' ' + info.replace(/<[^>]+>/g, ' '), () => { LS('desklens.git.repo', p.ruta); gfSel = gfL.sel[p.ruta] || null; gfRestore = true; gitLoad(); },
       { title: p.ruta, html: `<span class="mr-mark">${mark}</span><b class="mr-name">${esc(p.nombre)}</b>${info}` }];
   })]);
 }
 // ---------- Git a pantalla completa (⤢): proyectos y ramas · grafo con entrantes y salientes · detalle · cambios ----------
 // La columna derecha es la propia vista Git (#gitv), que se muda aquí mientras dura y vuelve a la barra al salir.
 const gitFullOn = () => document.body.classList.contains('gitfull');
-let gfGraph = null, gfKey = '', gfSel = null, gfSum = [], gitvHome = null;
+let gfGraph = null, gfKey = '', gfSel = null, gitvHome = null;
 // Disposición de la pantalla de Git, que se recuerda: anchos de las columnas, alto del detalle, paneles ocultos, panel
 // ampliado y, por repositorio, el commit elegido y el scroll del historial. (Aquí aún no existe LS: va más abajo.)
 const GF_DEF = { izq: 220, der: 330, alto: 300 };
@@ -2346,7 +2352,8 @@ function gitFullOpen() {
       <label title="Ver también las demás ramas locales y remotas"><input type="checkbox" id="gfAll"> Todas las ramas</label>
       <button class="small" id="gfPull" title="git pull">⇣ Pull</button><button class="small" id="gfPush" title="git push">⇡ Push</button>
       <button class="small" id="gfFetch" title="Ver si hay novedades en el remoto">⟳ Fetch</button></div>
-    <div class="gfbody"><div class="gfside"><h4>Proyectos</h4><div id="gfProj"></div><h4>Ramas</h4><div id="gfBr"></div><div id="gfRem"></div></div><div class="gfrs l"></div>
+    <div class="gfbody"><div class="gfside"><h4>Proyecto</h4><button class="gfrepo" id="gfRepo" title="Elegir otro proyecto"></button><div class="gfst" id="gfSt"></div>
+      <h4 id="gfBrH">Ramas</h4><div id="gfBr"></div></div><div class="gfrs l"></div>
       <div class="gfmain"><div class="gfgraph" id="gfGraph"></div><div class="gfrs d"></div><div class="gfdetail" id="gfDetail"></div></div>
       <div class="gfrs r"></div><div class="gfright"></div></div>`;
   // ◧ ⬓ ◨: ocultar o mostrar proyectos y ramas, el detalle del commit y la columna de commit y cambios
@@ -2379,23 +2386,7 @@ async function gitFullDraw() {
   if (!gitFullOn() || !gst || gst.error) return;
   $('#gfTitle').textContent = `${gst.nombre} · ⎇ ${gst.rama}` + (gst.remota ? ` ↔ ${gst.remota}` : ' (sin remota)');
   $('#gfPull').disabled = !gst.remota; $('#gfPush').disabled = $('#gfFetch').disabled = !gst.remotos.length;
-  const B = $('#gfBr'); B.innerHTML = '';
-  for (const b of gst.ramas) {
-    const n = Object.assign(document.createElement('div'), { className: 'node' + (b === gst.rama ? ' on' : ''), title: b === gst.rama ? 'Rama actual' : 'Cambiar a esta rama' });
-    n.textContent = (b === gst.rama ? '✓ ' : '\u2003 ') + b;
-    n.onclick = () => b !== gst.rama && gitSwitch(b);
-    B.append(n);
-  }
-  const R = $('#gfRem'); R.innerHTML = gst.ramas_remotas.length ? '<h4>Remotas</h4>' : '';
-  for (const b of gst.ramas_remotas) {
-    const local = b.split('/').slice(1).join('/'), n = Object.assign(document.createElement('div'), { className: 'node',
-      title: gst.ramas.includes(local) ? `Cambiar a «${local}»` : `Crear «${local}» siguiendo a ${b} y cambiar a ella` });
-    n.textContent = '\u2003 ' + b;
-    n.onclick = () => local !== gst.rama && gitSwitch(local);
-    R.append(n);
-  }
-  api('/api/git/resumen').then(sum => { gfSum = sum; gitFullProjects(); }).catch(() => {});
-  gitFullProjects();
+  gitFullSide();
   const todas = $('#gfAll').checked, key = `${gst.ruta}|${gst.punta}|${todas}`;
   if (key === gfKey) { $('#gfGraph').style.opacity = ''; gfRestore = false; return; }
   gfKey = key;
@@ -2403,13 +2394,37 @@ async function gitFullDraw() {
   catch (e) { $('#gfGraph').innerHTML = `<p class="gfmore">${esc(e.message)}</p>`; $('#gfGraph').style.opacity = ''; return; }
   gitGraphDraw();
 }
-function gitFullProjects() {
-  const P = $('#gfProj'); if (!P) return; P.innerHTML = '';
-  for (const p of side?.proyectos || []) {
-    const n = Object.assign(document.createElement('div'), { className: 'node gfp' + (p.ruta === gst?.ruta ? ' on' : ''), title: p.ruta });
-    n.innerHTML = `<span>${esc(p.nombre)}</span><span class="gfpi">${repoInfoHtml(gfSum.find(x => x.ruta === p.ruta))}</span>`;
-    n.onclick = () => { LS('desklens.git.repo', p.ruta); gfSel = gfL.sel[p.ruta] || null; gfRestore = true; gitLoad(); };
-    P.append(n);
+// Columna izquierda: el proyecto en un desplegable, su estado en palabras y una fila por rama que junta la local y la
+// remota del mismo nombre, con dónde está: al día, por subir/traer, solo en tu PC o solo en el remoto (GitHub…).
+function gitFullSide() {
+  const web = gst.servicio || 'el remoto', n = (k, s, p) => `${k} ${k === 1 ? s : p}`;
+  $('#gfRepo').innerHTML = `<b>${esc(gst.nombre)}</b><span>▾</span>`;
+  $('#gfRepo').onclick = e => { e.stopPropagation(); gitRepoMenu(e.currentTarget); };
+  const sinCommit = gst.preparados.length + gst.cambios.length + gst.conflictos.length;
+  const st = [gst.atras && `↓ ${n(gst.atras, 'commit', 'commits')} por traer`, gst.adelante && `↑ ${n(gst.adelante, 'commit', 'commits')} por subir`,
+    sinCommit && n(sinCommit, 'archivo sin commit', 'archivos sin commit')].filter(Boolean);
+  $('#gfSt').innerHTML = `⎇ ${esc(gst.rama)} · ` + (st.length ? esc(st.join(' · ')) : gst.remota ? `<span class="gbok">✓ Todo al día con ${esc(web)}</span>` : 'sin remoto');
+  $('#gfBrH').textContent = 'Ramas de ' + gst.nombre;
+  const info = new Map((gst.ramas_info || []).map(x => [x.rama, x])), localOf = r => r.split('/').slice(1).join('/');
+  const remoteOnly = [...new Set(gst.ramas_remotas.map(localOf))].filter(b => !gst.ramas.includes(b)).sort();
+  const rows = [gst.rama, ...gst.ramas.filter(b => b !== gst.rama).sort(), ...remoteOnly].filter((b, i, a) => b && a.indexOf(b) === i);
+  const state = b => {
+    if (!gst.ramas.includes(b)) return ['gbweb', `☁ solo en ${web}`, `Clic: traerla de ${web} y cambiar a ella`];
+    const i = info.get(b);
+    if (i?.borrada) return ['gbpc', '💻 ya no está en ' + web, `La rama que seguía (${i.remota}) se borró en ${web}`];
+    if (!i?.remota) return gst.ramas_remotas.some(r => localOf(r) === b) ? ['gbpc', '💻 sin enlazar', `Existe en ${web} con el mismo nombre, pero esta no la sigue`]
+      : ['gbpc', '💻 solo en tu PC', `Aún no está en ${web} (se publica con Push)`];
+    const t = [i.adelante && `↑ ${i.adelante} por subir`, i.atras && `↓ ${i.atras} por traer`].filter(Boolean);
+    return t.length ? ['gbmove', t.join(' · '), `Comparada con ${i.remota}`] : ['gbok', '✓ al día', `Igual que ${i.remota}`];
+  };
+  const B = $('#gfBr'); B.innerHTML = '';
+  for (const b of rows) {
+    const [cls, txt, tip] = state(b), cur = b === gst.rama;
+    const r = Object.assign(document.createElement('div'), { className: 'node gfb' + (cur ? ' on' : ''), title: (cur ? 'Estás en esta rama' : 'Clic: cambiar a esta rama') + '\n' + tip });
+    r.dataset.rama = b;
+    r.innerHTML = `<span class="gbn">${cur ? '● ' : ''}${esc(b)}</span>${cur ? '<span class="gbh">estás aquí</span>' : ''}<span class="gbs ${cls}">${esc(txt)}</span>`;
+    r.onclick = () => !cur && gitSwitch(b);
+    B.append(r);
   }
 }
 // Nombre corto de una rama de %D: sin «HEAD -> » ni el remoto («origin/jeanr» y «jeanr» van juntas)
