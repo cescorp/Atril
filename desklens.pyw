@@ -2632,6 +2632,59 @@ def git_overview(path):
             "preparados": staged, "cambios": changes, "conflictos": conflicts}
 
 
+def git_ignored(path):
+    """Lo que git ignora en el repositorio (una carpeta ignorada entera va como una sola entrada «dir/») y lo que está en
+    un .gitignore pero git ya seguía (ahí el .gitignore no hace nada), cada uno con la regla que lo ignora. Las carpetas
+    van sin tamaño: la ventana lo pide aparte (folder_size) para no esperar a recorrer node_modules y similares."""
+    repo = repo_of(path)
+    out = git_do(repo, "-c", "core.quotePath=false", "status", "--ignored", "--porcelain=v1", "-z", "--untracked-files=normal")
+    rels = [e[3:] for e in out.split("\0") if e.startswith("!! ")]
+    tracked = [r for r in git_do(repo, "-c", "core.quotePath=false", "ls-files", "-ci", "--exclude-standard", "-z").split("\0") if r]
+    rules = {}
+    if rels or tracked:
+        r = subprocess.run(["git", "-C", str(repo), "-c", "core.quotePath=false", "check-ignore", "-v", "-z", "--no-index", "--stdin"],
+                           input="\0".join(rels + tracked).encode("utf-8"), capture_output=True, timeout=60, creationflags=NO_WINDOW)
+        f = r.stdout.decode("utf-8", "replace").split("\0")  # origen, línea, patrón, ruta (y así sucesivamente)
+        for i in range(0, len(f) - 3, 4):
+            if f[i]:
+                rules[f[i + 3]] = {"archivo": f[i], "linea": int(f[i + 1] or 0), "patron": f[i + 2]}
+
+    def item(rel):
+        p = repo / rel.rstrip("/")
+        d = rel.endswith("/")
+        try:
+            size = None if d else p.lstat().st_size
+        except OSError:
+            size = None
+        return {"rel": rel.rstrip("/"), "ruta": str(p), "dir": d, "tam": size, "regla": rules.get(rel)}
+    return {"repositorio": str(repo), "ignorados": [item(r) for r in rels], "seguidos": [item(r) for r in tracked]}
+
+
+def folder_size(path):
+    """Archivos y bytes de una carpeta, recursivo y sin seguir enlaces."""
+    n = size = 0
+    for d, _, files in os.walk(path):
+        for f in files:
+            try:
+                size += os.lstat(os.path.join(d, f)).st_size
+                n += 1
+            except OSError:
+                pass
+    return {"archivos": n, "tam": size}
+
+
+def folder_items(path):
+    """Contenido de una carpeta con el tamaño de cada archivo (las subcarpetas, sin tamaño: se pide con folder_size)."""
+    items = []
+    for e in os.scandir(path):
+        try:
+            d = e.is_dir(follow_symlinks=False)
+            items.append({"nombre": e.name, "ruta": e.path, "dir": d, "tam": None if d else e.stat(follow_symlinks=False).st_size})
+        except OSError:
+            pass
+    return items
+
+
 def git_track(line):
     """Una línea de for-each-ref («rama␟origin/rama␟[ahead 1, behind 2]») → {rama, remota, adelante, atras, borrada}."""
     name, up, track = (line.split("\x1f") + ["", ""])[:3]
@@ -3129,6 +3182,16 @@ class Handler(BaseHTTPRequestHandler):
                 try:
                     return self.send_json(200, git_commit_info(ruta, q.get("hash", "")))
                 except (ValueError, subprocess.TimeoutExpired) as e:
+                    return self.send_json(400, {"error": str(e)})
+            if url.path == "/api/git/ignorados":
+                try:
+                    return self.send_json(200, git_ignored(ruta))
+                except (ValueError, subprocess.TimeoutExpired) as e:
+                    return self.send_json(400, {"error": str(e)})
+            if url.path in ("/api/carpeta/tam", "/api/carpeta/lista"):  # ruta ya comprobada: dentro de lo añadido
+                try:
+                    return self.send_json(200, folder_size(ruta) if url.path == "/api/carpeta/tam" else {"items": folder_items(ruta)})
+                except OSError as e:
                     return self.send_json(400, {"error": str(e)})
             if url.path == "/api/git/grafo":
                 try:

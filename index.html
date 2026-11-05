@@ -204,6 +204,16 @@ body.gitfull #gitfull{grid-row:1;display:grid;grid-template-rows:auto minmax(0,1
 #gitfull.maxd .gfmain{grid-template-rows:0 0 minmax(0,1fr)}#gitfull.maxd .gfdetail{height:auto}
 .gfbar .gfpanes{display:flex;gap:2px;margin-left:8px}.gfbar .gfpanes button{color:var(--faint)}.gfbar .gfpanes button.on{color:var(--accent)}
 .gfgraph h4{display:flex;align-items:center;gap:4px}.gfgraph h4 .sp{flex:1}
+.gftab{border:0;background:none;padding:2px 8px;border-radius:5px;font:inherit;letter-spacing:inherit;text-transform:inherit;color:var(--muted);cursor:pointer}
+.gftab:hover{color:var(--ink)}.gftab.on{background:var(--active);color:var(--ink)}
+.gitot{margin-left:8px;text-transform:none;letter-spacing:0;font-weight:400;font-size:11.5px}
+.gitool{display:flex;gap:12px;align-items:center;padding:4px 10px 6px}.gitool input[type=text],.gitool #giQ{flex:1;max-width:320px;padding:4px 8px;border:1px solid var(--line);border-radius:5px;background:var(--bg);color:var(--ink);font:inherit;font-size:12.5px}
+.gitool label{display:flex;gap:4px;align-items:center;font-size:12px;color:var(--muted)}
+.gitab{width:100%;border-collapse:collapse;font-size:12.5px}.gitab th{position:sticky;top:0;background:var(--paper);text-align:left;font-weight:600;font-size:11.5px;color:var(--muted);padding:4px 10px;border-bottom:1px solid var(--line)}
+.gitab td{padding:3px 10px;border-bottom:1px solid color-mix(in srgb,var(--line) 50%,transparent);white-space:nowrap}.gitab tbody tr{cursor:pointer}.gitab tbody tr:hover{background:var(--hover)}
+.gitab .num{text-align:right;font-variant-numeric:tabular-nums}.gitab .gc{color:var(--muted)}.gitab code{font-size:11.5px;color:var(--ink)}
+.gitab .gin{display:inline-flex;gap:4px;align-items:center}.gitab .gitg{display:inline-block;width:10px;color:var(--muted);font-size:10px}.gitab .gidir bdi{font-weight:500}
+.giwarn{margin:14px 10px 4px;padding:8px 10px;border-radius:6px;background:color-mix(in srgb,#c08a00 12%,transparent);font-size:12.5px}
 .gfside,.gfright{overflow:auto;background:var(--side);min-height:0}.gfside{border-right:1px solid var(--line);padding:6px 6px 12px}
 .gfright{border-left:1px solid var(--line);padding-top:6px}.gfright #gitv{display:flex}
 .gfside h4,.gfgraph h4{margin:10px 6px 4px;font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
@@ -2275,6 +2285,8 @@ function gitBranchMenu(anchor) {
     '-', ['⇣  Pull (traer)', () => gitLong('pull'), gst.remota ? {} : { disabled: true, title: 'La rama no está enlazada a una remota' }],
     ['⇡  Push (subir)', gitPush, gst.remotos.length ? {} : { disabled: true, title: 'Sin remoto' }],
     ['⟳  Fetch (ver novedades del remoto)', () => gitLong('fetch'), gst.remotos.length ? {} : { disabled: true, title: 'Sin remoto' }],
+    ['🙈  Archivos ignorados', () => { if (gitFullOn()) return gitTab('ign'); gfL.tab = 'ign'; gfSave(); gitFullOpen(); },
+      { title: 'Ver qué ignora git (por .gitignore), cuánto pesa y qué regla lo ignora' }],
     ['📦  Recuperar cambios guardados…', () => openMenu(anchor, [{ head: 'Cambios guardados aparte (stash)' }, ...gst.stashes.map(st =>
       [`${st.mensaje.replace(/^On [^:]+: /, '')} · ${st.fecha}`, async () => {
         if (await ask('Recuperar cambios guardados', `¿Poner de nuevo en «${gst.rama}» estos cambios?\n${st.mensaje.replace(/^On [^:]+: /, '')}`,
@@ -2321,7 +2333,7 @@ function gitfullLayout(save = true) {
   const m = gfL.max, L = !gfL.sinIzq && !m, R = !gfL.sinDer && !m;
   B.style.gridTemplateColumns = `${L ? gfL.izq + 'px 5px' : '0 0'} minmax(0,1fr) ${R ? '5px ' + gfL.der + 'px' : '0 0'}`;
   G.classList.toggle('nol', !L); G.classList.toggle('nor', !R);
-  G.classList.toggle('nod', m === 'hist' || (gfL.sinDet && m !== 'det')); G.classList.toggle('maxd', m === 'det');
+  G.classList.toggle('nod', m === 'hist' || gfL.tab === 'ign' || (gfL.sinDet && m !== 'det')); G.classList.toggle('maxd', m === 'det');
   G.style.setProperty('--gfD', gfL.alto + 'px');
   G.querySelectorAll('.gfpanes button').forEach(b => b.classList.toggle('on', !m && !gfL[b.dataset.k]));
   G.querySelectorAll('[data-gfmax]').forEach(b => { const on = m === b.dataset.gfmax;
@@ -2365,7 +2377,7 @@ function gitFullOpen() {
   gitfullGrip(G.querySelector('.gfrs.r'), 'der', (v, dx) => Math.max(240, Math.min(600, v - dx)));
   gitfullGrip(G.querySelector('.gfrs.d'), 'alto', (v, dx, dy) => Math.max(100, Math.min(innerHeight - 200, v - dy)));
   let st; // el scroll del historial se guarda al pararse (no en cada píxel)
-  G.querySelector('#gfGraph').onscroll = e => { clearTimeout(st); st = setTimeout(() => { if (gst && !gfRestore) { gfL.scroll[gst.ruta] = e.target.scrollTop; gfSave(); } }, 300); };
+  G.querySelector('#gfGraph').onscroll = e => { clearTimeout(st); st = setTimeout(() => { if (gst && !gfRestore && gfL.tab !== 'ign') { gfL.scroll[gst.ruta] = e.target.scrollTop; gfSave(); } }, 300); };
   G.querySelector('.gfbar').append(Object.assign(iconBtn('min', 'Salir de la pantalla completa (Esc)', () => gitFullClose()), { id: 'gfClose' }));
   gitvHome ||= { parent: $('#gitv').parentNode, next: $('#gitv').nextSibling };
   G.querySelector('.gfright').append($('#gitv'));
@@ -2480,13 +2492,136 @@ function gitRow(c, lead, msg, cls = '') {
   };
   return row;
 }
+// ---------- pestaña 🙈 Ignorados: lo que git ignora, en árbol, con tamaños y la regla de .gitignore que lo ignora ----------
+// La lista llega enseguida; el tamaño de cada carpeta ignorada se pide aparte (3 a la vez) y la tabla se rellena sola.
+// Las carpetas ignoradas se despliegan pidiendo su contenido al abrirlas.
+let gfIgn = null; // { ruta, data, sizes: Map(ruta → {archivos, tam}|null), kids: Map(ruta → items), open: Set, closedV: Set, q, solo }
+const ignQueue = []; let ignBusy = 0, ignTimer = 0;
+function gitTabsHtml() {
+  const t = gfIgn?.ruta === gst?.ruta && gfIgn.data ? ignTotal() : null;
+  return `<button class="gftab${gfL.tab !== 'ign' ? ' on' : ''}" data-tab="hist">Historial</button>`
+    + `<button class="gftab${gfL.tab === 'ign' ? ' on' : ''}" data-tab="ign" title="Archivos y carpetas que git no sigue por un .gitignore">🙈 Ignorados${
+      t ? ` · ${t.n.toLocaleString()} · ${fmtSize(t.tam)}${t.pend ? '…' : ''}` : ''}</button>`;
+}
+function gitTabsBind(h4) { h4.onclick = e => { const t = e.target.closest('[data-tab]')?.dataset.tab; if (t && t !== (gfL.tab || 'hist')) gitTab(t); }; }
+function gitTab(t) {
+  gfL.tab = t; gitfullLayout();
+  if (t === 'ign') gitIgnoredDraw(); else { gfKey = ''; gitFullDraw(); }
+}
+function ignSize(ruta) {
+  if (gfIgn.sizes.has(ruta)) return;
+  gfIgn.sizes.set(ruta, null); ignQueue.push([gfIgn, ruta]); ignPump();
+}
+function ignPump() {
+  while (ignBusy < 3 && ignQueue.length) {
+    const [ctx, r] = ignQueue.shift(); if (ctx !== gfIgn) continue;
+    ignBusy++;
+    api('/api/carpeta/tam?ruta=' + encodeURIComponent(r)).then(s => ctx.sizes.set(r, s)).catch(() => ctx.sizes.set(r, { archivos: 0, tam: 0, error: true }))
+      .finally(() => { ignBusy--; ignPump(); if (ctx === gfIgn) { clearTimeout(ignTimer); ignTimer = setTimeout(gitIgnRender, 120); } });
+  }
+}
+// Árbol a partir de las rutas: las carpetas intermedias que no están ignoradas enteras son «virtuales» (solo agrupan)
+function ignTree() {
+  const root = { virt: true, dir: true, kids: new Map() };
+  for (const it of gfIgn.data.ignorados) {
+    const parts = it.rel.split('/'); let n = root, rel = '';
+    for (const p of parts.slice(0, -1)) {
+      rel += (rel ? '/' : '') + p;
+      if (!n.kids.has(p)) n.kids.set(p, { name: p, rel, virt: true, dir: true, kids: new Map() });
+      n = n.kids.get(p);
+    }
+    n.kids.set(parts.at(-1), { ...it, name: parts.at(-1) });
+  }
+  return root;
+}
+const ignKids = n => n.virt ? [...n.kids.values()] : (gfIgn.kids.get(n.ruta) || []).map(k => ({ name: k.nombre, ruta: k.ruta, dir: k.dir, tam: k.tam, rel: n.rel + '/' + k.nombre }));
+function ignStats(n) {
+  if (!n.dir) return { n: 1, tam: n.tam || 0, pend: false };
+  if (!n.virt) { const s = gfIgn.sizes.get(n.ruta); return s ? { n: s.archivos, tam: s.tam, pend: false } : { n: 0, tam: 0, pend: true }; }
+  return ignKids(n).map(ignStats).reduce((a, s) => ({ n: a.n + s.n, tam: a.tam + s.tam, pend: a.pend || s.pend }), { n: 0, tam: 0, pend: false });
+}
+const ignTotal = () => ignStats(ignTree());
+async function gitIgnoredDraw() {
+  const G = $('#gfGraph'); G.style.opacity = '';
+  if (gfIgn?.ruta !== gst.ruta) gfIgn = { ruta: gst.ruta, data: null, sizes: new Map(), kids: new Map(), open: new Set(), closedV: new Set(), q: '', solo: false };
+  G.innerHTML = `<h4>${gitTabsHtml()}<span class="gitot" id="giTot"></span><span class="sp"></span></h4>
+    <div class="gitool"><input id="giQ" placeholder="Filtrar por nombre o ruta…" value="${esc(gfIgn.q)}">
+      <label><input type="checkbox" id="giSolo"${gfIgn.solo ? ' checked' : ''}> Solo carpetas</label></div>
+    <table class="gitab"><thead><tr><th>Nombre</th><th class="num">Archivos</th><th class="num">Tamaño</th><th>Ignorado por</th></tr></thead><tbody id="giBody"></tbody></table>
+    <div id="giWarn"></div>`;
+  const h4 = G.querySelector('h4'); h4.append(gitfullMaxBtn('hist')); gitTabsBind(h4); gitfullLayout(false);
+  $('#giQ').oninput = e => { gfIgn.q = e.target.value; gitIgnRender(); };
+  $('#giSolo').onchange = e => { gfIgn.solo = e.target.checked; gitIgnRender(); };
+  if (!gfIgn.data) {
+    const ctx = gfIgn; $('#giBody').innerHTML = '<tr><td colspan="4" class="gc">Buscando lo que git ignora…</td></tr>';
+    try { ctx.data = await api('/api/git/ignorados?ruta=' + encodeURIComponent(ctx.ruta)); }
+    catch (e) { if (ctx === gfIgn) $('#giBody').innerHTML = `<tr><td colspan="4" class="gc">⚠️ ${esc(e.message)}</td></tr>`; return; }
+    if (ctx !== gfIgn || gfL.tab !== 'ign') return;
+    ctx.data.ignorados.filter(x => x.dir).forEach(x => ignSize(x.ruta));
+  }
+  gitIgnRender();
+}
+function gitIgnRender() {
+  const B = $('#giBody'); if (!B || !gfIgn?.data) return;
+  const tot = ignTotal(), plain = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(), words = plain(gfIgn.q).split(/\s+/).filter(Boolean);
+  $('#giTot').textContent = `${tot.n.toLocaleString()} archivo${tot.n === 1 ? '' : 's'} · ${fmtSize(tot.tam)}${tot.pend ? ' · calculando…' : ''}`;
+  const tab = $('#gfGraph h4 [data-tab=ign]'); if (tab) tab.outerHTML = gitTabsHtml().split('</button>')[1] + '</button>';
+  const rows = [], bySize = (a, b) => ignStats(b).tam - ignStats(a).tam || a.name.localeCompare(b.name);
+  const walk = (nodes, depth) => { for (const n of nodes.sort(bySize)) {
+    if (gfIgn.solo && !n.dir) continue;
+    const open = n.virt ? !gfIgn.closedV.has(n.rel) : gfIgn.open.has(n.ruta);
+    if (words.length) { if (words.every(w => plain(n.rel).includes(w))) rows.push([n, 0, true]); }
+    else rows.push([n, depth, open]);
+    if (n.dir && (open || words.length)) walk(ignKids(n), depth + 1);
+  } };
+  walk(ignKids(ignTree()), 0);
+  B.replaceChildren(...rows.map(([n, depth, open]) => {
+    const s = ignStats(n), tr = document.createElement('tr'), r = n.regla;
+    tr.className = n.dir ? 'gidir' : '';
+    tr.innerHTML = `<td><span class="gin" style="padding-left:${depth * 16}px">${n.dir ? `<span class="gitg">${open && !words.length ? '▾' : '▸'}</span>📁` : '<span class="gitg"></span>📄'} `
+      + `<bdi>${esc(words.length ? n.rel : n.name)}${n.dir ? '/' : ''}</bdi></span></td>`
+      + `<td class="num gc">${s.pend ? '…' : n.dir ? s.n.toLocaleString() : ''}</td><td class="num">${s.pend ? '<span class="gc">calculando…</span>' : fmtSize(s.tam)}</td>`
+      + `<td class="gc">${r ? `<a href="#" data-r title="Abrir ${esc(r.archivo)}">${esc(r.archivo)}:${r.linea}</a> <code>${esc(r.patron)}</code>` : n.regla === null && n.dir ? 'todo lo que contiene está ignorado' : ''}</td>`;
+    tr.onclick = async e => {
+      if (e.target.closest('[data-r]')) { e.preventDefault(); return ignOpenRule(r); }
+      if (!n.dir) { gitFullClose(true); return openTab(n.ruta, true); }
+      if (n.virt) { gfIgn.closedV.has(n.rel) ? gfIgn.closedV.delete(n.rel) : gfIgn.closedV.add(n.rel); return gitIgnRender(); }
+      if (gfIgn.open.has(n.ruta)) { gfIgn.open.delete(n.ruta); return gitIgnRender(); }
+      gfIgn.open.add(n.ruta);
+      if (!gfIgn.kids.has(n.ruta)) {
+        gfIgn.kids.set(n.ruta, []); gitIgnRender();
+        try { const ks = (await api('/api/carpeta/lista?ruta=' + encodeURIComponent(n.ruta))).items; gfIgn.kids.set(n.ruta, ks); ks.filter(k => k.dir).forEach(k => ignSize(k.ruta)); }
+        catch (err) { flash('⚠️ ' + err.message); }
+      }
+      gitIgnRender();
+    };
+    tr.oncontextmenu = e => { e.preventDefault(); openMenu({ x: e.clientX, y: e.clientY }, [
+      ...(n.virt ? [] : [['📁  Mostrar en carpeta', () => api('/api/mostrar', { ruta: n.ruta }).catch(err => ask('Mostrar en carpeta', err.message, ['Entendido']))]]),
+      ['⧉  Copiar ruta', () => copyText(n.ruta || n.rel, 'Ruta copiada')]]); };
+    return tr;
+  }));
+  if (!rows.length) B.innerHTML = `<tr><td colspan="4" class="gc">${gfIgn.data.ignorados.length ? 'Nada coincide.' : 'Git no ignora nada en este proyecto.'}</td></tr>`;
+  // en .gitignore pero git ya los seguía: el .gitignore no les afecta (error frecuente)
+  const sg = gfIgn.data.seguidos;
+  $('#giWarn').innerHTML = sg.length ? `<p class="giwarn">⚠ En .gitignore, pero git ya los seguía de antes: el .gitignore no les afecta y siguen subiéndose
+      (para que dejen de seguirse: <code>git rm --cached archivo</code>).</p><table class="gitab"><tbody>${sg.map((x, i) => `<tr data-i="${i}"><td>📄 <bdi>${esc(x.rel)}</bdi></td>
+      <td class="num">${x.tam == null ? '' : fmtSize(x.tam)}</td><td class="gc">${x.regla ? `<a href="#" data-r>${esc(x.regla.archivo)}:${x.regla.linea}</a> <code>${esc(x.regla.patron)}</code>` : ''}</td></tr>`).join('')}</tbody></table>` : '';
+  $('#giWarn').onclick = e => { const tr = e.target.closest('tr[data-i]'); if (!tr) return; e.preventDefault(); const x = sg[+tr.dataset.i];
+    if (e.target.closest('[data-r]')) ignOpenRule(x.regla); else { gitFullClose(true); openTab(x.ruta, true); } };
+}
+// Abre el .gitignore (o .git/info/exclude, o el global) que tiene la regla
+function ignOpenRule(r) {
+  const p = /^([a-zA-Z]:|[\\/])/.test(r.archivo) ? r.archivo : gfIgn.data.repositorio + '\\' + r.archivo.replace(/\//g, '\\');
+  gitFullClose(true); openTab(p, true); flash(`La regla «${r.patron}» está en la línea ${r.linea}`);
+}
 // keep: solo se redibuja la lista (desplegar un merge), sin volver a pedir el detalle ni mover el scroll
 function gitGraphDraw(keep = false) {
+  if (gfL.tab === 'ign') return gitIgnoredDraw(); // la pestaña 🙈 ocupa el sitio del historial
   const G = $('#gfGraph'), cs = gfGraph.commits, top = G.scrollTop; G.innerHTML = ''; G.style.opacity = '';
   if (!cs.length) return G.innerHTML = '<p class="gfmore">Este repositorio aún no tiene commits.</p>';
   const nIn = cs.filter(c => c.lado === 'entrante').length, nOut = cs.filter(c => c.lado === 'saliente').length;
-  G.insertAdjacentHTML('beforeend', `<h4>Historial${gfGraph.remota ? ` · <span style="color:#2f7fd8">↓ ${nIn} por traer</span> · <span style="color:var(--accent)">↑ ${nOut} por subir</span>` : ''}<span class="sp"></span></h4>`);
-  G.querySelector('h4').append(gitfullMaxBtn('hist')); gitfullLayout(false);
+  G.insertAdjacentHTML('beforeend', `<h4>${gitTabsHtml()}${gfGraph.remota ? ` · <span style="color:#2f7fd8">↓ ${nIn} por traer</span> · <span style="color:var(--accent)">↑ ${nOut} por subir</span>` : ''}<span class="sp"></span></h4>`);
+  G.querySelector('h4').append(gitfullMaxBtn('hist')); gitTabsBind(G.querySelector('h4')); gitfullLayout(false);
   const head = c => c.refs.some(f => f.startsWith('HEAD'));
   if (!$('#gfAll').checked) {
     gfLine = gitMainLine(cs);
@@ -3537,7 +3672,7 @@ addEventListener('contextmenu', e => {
 let menuOff = null;
 function closeMenu() { $('#menu')?.remove(); menuOff?.abort(); menuOff = null; }
 
-const fmtSize = n => n < 1024 ? n + ' B' : n < 1048576 ? (n / 1024).toFixed(1) + ' KB' : (n / 1048576).toFixed(1) + ' MB';
+const fmtSize = n => n < 1024 ? n + ' B' : n < 1048576 ? (n / 1024).toFixed(1) + ' KB' : n < 1073741824 ? (n / 1048576).toFixed(1) + ' MB' : (n / 1073741824).toFixed(2) + ' GB';
 
 let renderSeq = 0; // número único de cada render; cada lado guarda el último suyo (panes[i].seq)
 // un render sigue vivo mientras sea el último de su lado: el del otro lado no lo cancela

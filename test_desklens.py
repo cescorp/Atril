@@ -739,6 +739,20 @@ assert.deepStrictEqual(findRefs('Ver 1 Samuel 4:4 y 1 Samuel 8:5, 20; Deuteronom
     assert desklens.git_track("b\x1forigin/b\x1f[gone]")["borrada"] and desklens.git_track("c\x1f\x1f")["remota"] is None
     assert desklens.git_service("remote.origin.url https://github.com/x/y.git") == "GitHub" and desklens.git_service("") is None
     assert desklens.git_service("remote.origin.url //servidor/repo.git") == "el remoto"
+    # pestaña Ignorados: carpeta entera como una entrada, regla que lo ignora, y lo que git ya seguía aunque esté en .gitignore
+    ign = fuera / "ign"; ign.mkdir(); git(ign, "init", "-q")
+    git(ign, "config", "user.name", "T"); git(ign, "config", "user.email", "t@example.com")
+    (ign / "db.php").write_text("x"); git(ign, "add", "-A"); git(ign, "commit", "-q", "-m", "db")
+    (ign / ".gitignore").write_text("# dependencias\nnode_modules/\n.env\ndb.php\n")
+    (ign / "node_modules" / "lib").mkdir(parents=True); (ign / "node_modules" / "lib" / "a.js").write_text("12345")
+    (ign / "node_modules" / "b.js").write_text("123"); (ign / ".env").write_text("CLAVE=1")
+    r = desklens.git_ignored(str(ign))
+    got = {x["rel"]: x for x in r["ignorados"]}
+    assert set(got) == {"node_modules", ".env"} and got["node_modules"]["dir"] and got[".env"]["tam"] == 7
+    assert got["node_modules"]["regla"] == {"archivo": ".gitignore", "linea": 2, "patron": "node_modules/"}
+    assert [(x["rel"], x["regla"]["linea"]) for x in r["seguidos"]] == [("db.php", 4)]
+    assert desklens.folder_size(str(ign / "node_modules")) == {"archivos": 2, "tam": 8}
+    assert sorted((x["nombre"], x["dir"], x["tam"]) for x in desklens.folder_items(str(ign / "node_modules"))) == [("b.js", False, 3), ("lib", True, None)]
     # grafo de la pantalla completa: entrantes y salientes, padres de un merge y +/− líneas por archivo
     (rep / "e.md").write_text("uno\ndos\n"); post("/api/git/accion", {"ruta": str(rep), "accion": "commit", "mensaje": "e", "todo": True})
     git(otro, "pull", "-q", "--no-rebase")  # el otro clon se pone al día con lo sincronizado arriba
