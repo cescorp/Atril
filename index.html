@@ -231,6 +231,13 @@ dialog#dlg.sets.win.uni{width:fit-content;min-width:min(640px,calc(100vw - 32px)
 .chip{display:inline-block;margin:2px 4px 2px 0;padding:2px 9px;border:1px solid var(--line);border-radius:12px;background:var(--bg);font-size:12px;cursor:grab;user-select:none;white-space:nowrap}
 .chip:hover{border-color:var(--accent)}.chip.sug{border-color:#c08a00;border-style:dashed}.chip.ghost{position:fixed;z-index:50;pointer-events:none;box-shadow:0 4px 12px rgba(0,0,0,.2)}
 .unitab tr.drop td{background:color-mix(in srgb,var(--accent) 14%,transparent)}.unitab .unew td{color:var(--faint);font-size:12px;text-align:center;border:1px dashed var(--line)}
+.gsetup{padding:16px 22px 28px;max-width:760px;display:flex;flex-direction:column;gap:14px}.gsetup h3{margin:0;font-size:17px}
+.gstep{border:1px solid var(--line);border-radius:10px;padding:12px 16px;display:flex;flex-direction:column;gap:8px}.gstep.off{opacity:.6}.gstep h4{margin:0;font-size:14px}
+.gform{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px 14px}.gform label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
+.gform input,.gconn input{font:inherit;font-size:13px;padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
+.gchk{display:block;font-size:12.5px;line-height:1.5}.gchk input{vertical-align:-2px;margin-right:6px}.gsact{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.gsact button{flex:none;white-space:nowrap;padding:5px 14px}.gsact code{font-size:11.5px;color:var(--muted)}
+.gconn{margin:8px 6px;padding:10px;border:1px dashed var(--accent);border-radius:8px;display:flex;flex-direction:column;gap:6px;font-size:12.5px}.gconn p{margin:0;font-size:11.5px}
+.gsetbtn{margin:8px 12px}
 .estproj{font:inherit;font-size:12px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:3px 9px;cursor:pointer}.estproj:hover{border-color:var(--accent)}
 .estreset{margin:0;text-align:right}.estreset button{border:0;background:none;color:var(--muted);font-size:12px;cursor:pointer}.estreset button:hover{color:var(--accent)}
 .estbar label{display:flex;gap:6px;align-items:center}.estbar input[type=date],.estbar select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:3px 6px}
@@ -2228,7 +2235,12 @@ function gitDraw() {
   gitSyncDraw(ok);
   L.innerHTML = '';
   if (!gst) return;
-  if (gst.error) return L.innerHTML = `<p class="gnote">${esc(gst.error)}.<br>Elige otro proyecto arriba.</p>`;
+  if (gst.error) {
+    L.innerHTML = `<p class="gnote">${esc(gst.error)}.<br>Elige otro proyecto arriba${gst.ruta && /repositorio git/.test(gst.error) ? ' o empieza a usar git aquí.' : '.'}</p>`;
+    if (gst.ruta && /repositorio git/.test(gst.error)) L.append(Object.assign(button('🌱 Empezar a usar git aquí…', () => gitFullOpen()), { className: 'gsetbtn' }));
+    if (gitFullOn()) gitFullDraw(); // si no, la pantalla completa se quedaba con el proyecto anterior
+    return;
+  }
   gst.stashes ||= []; // servidor anterior a esta función: sin cambios guardados que mostrar
   if (gst.stashes.length) L.insertAdjacentHTML('beforeend', `<p class="gnote">📦 ${gst.stashes.length} cambio${gst.stashes.length === 1 ? '' : 's'} guardado${gst.stashes.length === 1 ? '' : 's'} aparte: ⎇ ▾ › «Recuperar cambios guardados».</p>`);
   if (gst.fusionando) L.insertAdjacentHTML('beforeend', '<p class="gnote">⚠ Fusión en curso: resuelve los conflictos, márcalos con + y haz commit.</p>');
@@ -2377,7 +2389,7 @@ function gitLong(accion, extra = {}) {
   const ruta = gst.ruta;
   const [rm, rb] = String(extra.rama || '').split(/\/(.*)/);
   const cmd = { pull: 'git pull --no-rebase', push: 'git push', fetch: 'git fetch --prune', fusionar: 'git merge --no-edit ' + extra.rama,
-    pull_desde: `git pull --no-rebase ${rm} ${rb}`, push_a: `git push ${rm} HEAD:${rb}`, pull_rama: `git fetch (actualizar ${extra.rama})`, push_rama: `git push ${extra.rama}`,
+    probar: 'git ls-remote --heads origin', pull_desde: `git pull --no-rebase ${rm} ${rb}`, push_a: `git push ${rm} HEAD:${rb}`, pull_rama: `git fetch (actualizar ${extra.rama})`, push_rama: `git push ${extra.rama}`,
     sincronizar: 'git pull --no-rebase' + (gst.adelante ? ' && git push' : '') }[accion];
   // la consola se ve mientras corre y, si terminó bien, se oculta sola (la ejecución queda en su pestaña ✓ para verla);
   // si falló, o si ya estaba abierta antes, se queda como está
@@ -2433,6 +2445,9 @@ function gitBranchMenu(anchor) {
         const n = await ask('Push a', `Nombre de la rama nueva en ${web} (se sube «${gst.rama}» con ese nombre):`, ['Subir', 'Cancelar'], { input: '' });
         if (n?.trim()) gitLong('push_a', { rama: (gst.remotos.includes('origin') ? 'origin' : gst.remotos[0]) + '/' + n.trim() });
       }]]), hasRemote ? { title: `Subir «${gst.rama}» a otra rama remota` } : gitNo('Este repositorio no tiene remoto')],
+    ...(hasRemote ? [] : [['🔗  Conectar con un servidor…', () => { gfL.sinServidor = (gfL.sinServidor || []).filter(r => r !== gst.ruta); gfSave();
+      gitFullOn() ? gitFullDraw() : gitFullOpen(); }, { title: 'GitHub, GitLab, un servidor propio o una carpeta de la red (opcional)' }]]),
+    ['🔑  Iniciar sesión / comprobar acceso', () => gitLong('probar'), hasRemote ? { title: `Si hace falta entrar en ${web}, se abre su ventana (Git Credential Manager); DeskLens no ve la contraseña` } : gitNo('Este repositorio no tiene remoto')],
     ['⟳  Fetch', () => gitLong('fetch'), hasRemote ? { title: `Ver si hay novedades en ${web}, sin traer nada` } : gitNo('Este repositorio no tiene remoto')],
     '-',
     ['⤵  Fusionar otra rama…', () => gitMergeMenu(anchor), gitMergeable().length ? { title: `Traer los cambios de otra rama a «${gst.rama}»` } : gitNo('No hay otras ramas')],
@@ -2524,7 +2539,7 @@ function gitfullGrip(h, key, calc) {
 // Se recuerda si Git quedó a pantalla completa o en el panel (predeterminado: panel). keep: cierre de paso (abrir un
 // archivo, ir a otra vista), que no cambia lo recordado.
 function gitFullOpen() {
-  if (!gst || gst.error) return flash('Elige primero un repositorio git');
+  if (!gst || (gst.error && !gst.ruta)) return flash('Elige primero un proyecto');
   if (gitFullOn()) gitFullClose(true); // ya abierta: devolver #gitv a su sitio antes de rehacerla, o se pierde con el innerHTML
   LS('desklens.git.full', '1');
   const G = $('#gitfull');
@@ -2563,7 +2578,8 @@ function gitFullClose(keep = false) {
 }
 // Dibuja título, proyectos, ramas y (si cambió la punta de la rama o de su remota) el grafo
 async function gitFullDraw() {
-  if (!gitFullOn() || !gst || gst.error) return;
+  if (!gitFullOn() || !gst) return;
+  if (gst.error) return gitSetupDraw(); // sin git: asistente (y nada del proyecto anterior se queda a la vista)
   $('#gfTitle').textContent = `${projLabel(gst.ruta)} · ⎇ ${gst.rama}` + (gst.remota ? ` ↔ ${gst.remota}` : ' (sin remota)');
   $('#gfPull').disabled = !gst.remota; $('#gfPush').disabled = $('#gfFetch').disabled = !gst.remotos.length;
   gitFullSide();
@@ -2573,6 +2589,64 @@ async function gitFullDraw() {
   try { gfGraph = await api(`/api/git/grafo?ruta=${encodeURIComponent(gst.ruta)}&todas=${todas ? 1 : 0}`); }
   catch (e) { $('#gfGraph').innerHTML = `<p class="gfmore">${esc(e.message)}</p>`; $('#gfGraph').style.opacity = ''; return; }
   gitGraphDraw();
+}
+// ---------- proyecto sin git: asistente (① empezar · ② conectar con un servidor, opcional · ③ iniciar sesión, opcional) ----------
+let gfIdent = null; // nombre y correo de git ya configurados en este equipo, para rellenar
+async function gitSetupDraw() {
+  $('#gfTitle').textContent = `${projLabel(gst.ruta)} · sin git`;
+  $('#gfPull').disabled = $('#gfPush').disabled = $('#gfFetch').disabled = true;
+  $('#gfRepo').innerHTML = `<b>${esc(projLabel(gst.ruta))}</b><span>▾</span>`;
+  $('#gfRepo').onclick = e => { e.stopPropagation(); gitRepoMenu(e.currentTarget); };
+  $('#gfSt').textContent = 'Este proyecto no usa git'; $('#gfBrH').textContent = 'Ramas'; $('#gfBr').innerHTML = '';
+  $('#gfDetail').innerHTML = ''; $('#gfConn')?.remove();
+  const G = $('#gfGraph'); G.style.opacity = '';
+  // la vista Git se refresca sola cada 5 s: si el asistente de este proyecto ya está, no se rehace (borraría lo escrito)
+  if (G.querySelector('.gsetup')?.dataset.ruta === gst.ruta) return;
+  gfIdent ||= await api('/api/git/identidad').catch(() => ({ nombre: '', correo: '' }));
+  if (!gst?.error) return; // mientras tanto se eligió otro proyecto
+  G.innerHTML = `<div class="gsetup" data-ruta="${esc(gst.ruta)}">
+    <h3>«${esc(projLabel(gst.ruta))}» todavía no usa git</h3>
+    <p class="ok">Git guarda versiones de tus archivos <b>en tu PC</b>: commits, historial, ramas y comparar versiones funcionan sin servidor.
+      Conectar con GitHub (u otro, o una carpeta de la red) es <b>opcional</b>: sirve para tener copia fuera y compartir, y se puede hacer después.</p>
+    <section class="gstep"><h4>① Empezar a usar git aquí</h4>
+      <div class="gform"><label>Tu nombre <input id="gsN" value="${esc(gfIdent.nombre)}" placeholder="p. ej. Cesar"></label>
+        <label>Tu correo <input id="gsC" value="${esc(gfIdent.correo)}" placeholder="p. ej. tu@correo.com"></label>
+        <label>Rama <input id="gsR" value="main"></label></div>
+      <p class="ok">El nombre y el correo salen en cada commit; se guardan solo para este proyecto.</p>
+      <label class="gchk"><input type="checkbox" id="gsI" checked> Crear un <code>.gitignore</code> con lo habitual (node_modules, vendor, .env, logs…) para no subir lo que no toca</label>
+      <div class="gsact"><button class="primary" id="gsGo">Empezar</button><code id="gsCmd"></code></div></section>
+    <section class="gstep off"><h4>② Conectar con un servidor <small>(opcional, después)</small></h4>
+      <p class="ok">GitHub, GitLab, un servidor propio o una carpeta de la red (<code>\\\\servidor\\repos\\proyecto.git</code>). Aparecerá al empezar.</p></section>
+    <section class="gstep off"><h4>③ Iniciar sesión <small>(opcional, después)</small></h4>
+      <p class="ok">La primera vez que subas, Windows abre la ventana oficial del servidor para entrar (Git Credential Manager, viene con Git). DeskLens no ve ni guarda tu contraseña.</p></section></div>`;
+  const cmd = () => { $('#gsCmd').textContent = `git init -b ${$('#gsR').value.trim() || 'main'} · git add -A · git commit -m "Primer commit"`; };
+  $('#gsR').oninput = cmd; cmd();
+  $('#gsGo').onclick = async () => {
+    const b = $('#gsGo'); b.disabled = true; b.textContent = '⏳ Preparando…';
+    try {
+      const ov = await api('/api/git/iniciar', { ruta: gst.ruta, nombre: $('#gsN').value, correo: $('#gsC').value, rama: $('#gsR').value, gitignore: $('#gsI').checked });
+      gst = { ...ov, ruta: gst.ruta }; gfKey = ''; gfIdent = null;
+      flash('✓ Git listo: primer commit hecho'); gitDraw(); loadSide();
+    } catch (e) { b.disabled = false; b.textContent = 'Empezar'; ask('Empezar a usar git', e.message, ['Entendido']); }
+  };
+}
+// Mientras el repositorio no tenga remoto: recuadro opcional para conectarlo (y subir); «✕ Ahora no» lo esconde para ese proyecto
+function gitConnectBox() {
+  const want = !gst.remotos.length && !(gfL.sinServidor || []).includes(gst.ruta), old = $('#gfConn');
+  if (old && want && old.dataset.ruta === gst.ruta) return; // ya está: el refresco de 5 s no lo rehace (ni le quita el foco)
+  old?.remove();
+  if (!want) return;
+  const box = Object.assign(document.createElement('div'), { id: 'gfConn', className: 'gconn' }); box.dataset.ruta = gst.ruta;
+  box.innerHTML = `<b>② Conectar con un servidor</b> <small>(opcional)</small>
+    <input id="gcU" placeholder="https://github.com/usuario/proyecto.git" title="GitHub, GitLab, un servidor propio o una carpeta de la red (\\\\servidor\\repos\\proyecto.git)">
+    <div class="gsact"><button class="primary small" id="gcGo">Conectar y subir</button><button class="small" id="gcNo" title="Seguir solo con git en este PC (se puede conectar luego desde aquí al volver a mostrarlo: menú ⋯)">Ahora no</button></div>
+    <p class="ok">③ Al subir, si hace falta entrar, se abre la ventana del servidor. DeskLens no ve la contraseña.</p>`;
+  $('#gfSt').after(box);
+  $('#gcGo').onclick = async () => {
+    const url = $('#gcU').value.trim(); if (!url) return $('#gcU').focus();
+    if (await gitDo('conectar', [], { mensaje: url })) { flash('✓ Conectado: subiendo…'); gitLong('push'); }
+  };
+  $('#gcNo').onclick = () => { gfL.sinServidor = [...(gfL.sinServidor || []), gst.ruta]; gfSave(); box.remove(); flash('Seguirás solo con git en este PC'); };
 }
 // Columna izquierda: el proyecto en un desplegable, su estado en palabras y una fila por rama que junta la local y la
 // remota del mismo nombre, con dónde está: al día, por subir/traer, solo en tu PC o solo en el remoto (GitHub…).
@@ -2584,6 +2658,7 @@ function gitFullSide() {
   const st = [gst.atras && `↓ ${n(gst.atras, 'commit', 'commits')} por traer`, gst.adelante && `↑ ${n(gst.adelante, 'commit', 'commits')} por subir`,
     sinCommit && n(sinCommit, 'archivo sin commit', 'archivos sin commit')].filter(Boolean);
   $('#gfSt').innerHTML = `⎇ ${esc(gst.rama)} · ` + (st.length ? esc(st.join(' · ')) : gst.remota ? `<span class="gbok">✓ Todo al día con ${esc(web)}</span>` : 'sin remoto');
+  gitConnectBox();
   $('#gfBrH').innerHTML = `<span>Ramas de ${esc(projLabel(gst.ruta).split(' · ')[0])}</span><span class="sp"></span>`;
   $('#gfBrH').append(Object.assign(button('⋯', e => { e.stopPropagation(); gitBranchMenu(e.currentTarget); }),
     { className: 'ic gfbm', title: `Pull, Push, Fusionar y más para «${gst.rama}»` }));

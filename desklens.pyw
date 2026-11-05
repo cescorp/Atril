@@ -2437,6 +2437,60 @@ def git_root(d):
     return None
 
 
+# ---------- proyecto sin git: empezar a usar git, conectar con un servidor e iniciar sesión ----------
+# La sesión la lleva Git Credential Manager (viene con Git para Windows): en el primer push o al comprobar el acceso abre
+# la ventana oficial del servidor; DeskLens nunca ve ni guarda contraseñas.
+
+GITIGNORE_BASE = """# Lo que no se sube al servidor (creado por DeskLens; edítalo cuando quieras)
+node_modules/
+vendor/
+.env
+.env.*
+!.env.example
+*.log
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+dist/
+build/
+"""
+# servidor: GitHub/GitLab (https, ssh, git@) o una carpeta de la red u otro disco (sin servidor: \\pc\repos\x.git, D:\copias\x.git)
+REMOTE_URL = re.compile(r"^(https?://\S+|ssh://\S+|git@[\w.-]+:\S+|file://\S+|[A-Za-z]:[\\/].+|\\\\[^\\\s]+\\.+)$")
+
+
+def git_identity():
+    """Nombre y correo de git ya configurados en este equipo (para rellenar el formulario); vacíos si no hay."""
+    return {"nombre": git_run(Path.home(), "config", "--global", "user.name"),
+            "correo": git_run(Path.home(), "config", "--global", "user.email")}
+
+
+def git_init(path, nombre, correo, rama="main", gitignore=True):
+    """Empieza a usar git en la carpeta de un proyecto: git init con esa rama, nombre y correo solo para este proyecto,
+    .gitignore con lo habitual (si no había) y un primer commit con todo."""
+    p = Path(path).resolve()
+    if os.path.normcase(str(p)) not in {os.path.normcase(str(Path(r).resolve())) for r in load_config()["proyectos"]}:
+        raise ValueError("Solo en la carpeta de un proyecto de DeskLens")
+    if git_root(p):
+        raise ValueError("Esta carpeta ya usa git")
+    nombre, correo = " ".join(str(nombre or "").split()), str(correo or "").strip()
+    if not nombre or not re.fullmatch(r"[^@\s]+@[^@\s]+", correo):
+        raise ValueError("Escribe tu nombre y un correo válido: salen en cada commit")
+    rama = str(rama or "main").strip()
+    if not re.fullmatch(r"[\w][\w./-]*", rama) or ".." in rama:
+        raise ValueError("Nombre de rama no válido")
+    git_do(p, "init", "-b", rama)
+    git_do(p, "config", "user.name", nombre)
+    git_do(p, "config", "user.email", correo)
+    if gitignore and not (p / ".gitignore").exists():
+        (p / ".gitignore").write_text(GITIGNORE_BASE, encoding="utf-8")
+    git_do(p, "add", "-A", timeout=600)
+    git_do(p, "commit", "-q", "--allow-empty", "-m", "Primer commit", timeout=600)
+    return git_overview(p)
+
+
 def git_run(repo, *args):
     """Ejecuta una orden de git en el repositorio y devuelve su salida, o «» si falla."""
     r = subprocess.run(["git", "-C", str(repo), *args], capture_output=True, timeout=20,
@@ -3113,6 +3167,14 @@ def git_action(path, accion, archivos=(), mensaje="", rama="", todo=False, modo=
         if not git_run(repo, "rev-parse", "-q", "--verify", "HEAD~1"):
             raise ValueError("Es el primer commit del repositorio: no hay uno anterior al que volver")
         git_do(repo, "reset", "--soft", "HEAD~1")
+    elif accion == "conectar":  # mensaje = dirección del servidor; queda como «origin»
+        url = str(mensaje or "").strip()
+        if not REMOTE_URL.match(url):
+            raise ValueError("Dirección no válida: usa la de tu repositorio, p. ej. https://github.com/usuario/proyecto.git")
+        if "origin" in git_run(repo, "remote").split():
+            git_do(repo, "remote", "set-url", "origin", url)
+        else:
+            git_do(repo, "remote", "add", "origin", url)
     elif accion == "cancelar_fusion":  # deja todo como antes de la fusión (o del revert) a medias
         if git_run(repo, "rev-parse", "-q", "--verify", "MERGE_HEAD"):
             git_do(repo, "merge", "--abort")
@@ -3120,7 +3182,7 @@ def git_action(path, accion, archivos=(), mensaje="", rama="", todo=False, modo=
             git_do(repo, "revert", "--abort")
         else:
             raise ValueError("No hay ninguna fusión en curso")
-    elif accion in ("pull", "push", "fetch", "fusionar", "sincronizar", "pull_desde", "push_a", "pull_rama", "push_rama"):
+    elif accion in ("pull", "push", "fetch", "fusionar", "sincronizar", "pull_desde", "push_a", "pull_rama", "push_rama", "probar"):
         ov = git_overview(repo)
         if accion == "sincronizar" and ov["remota"]:  # como VS Code: primero trae y luego sube (si hay algo tuyo)
             cmd = "git pull --no-rebase" + (" && git push" if ov["adelante"] else "")
@@ -3130,6 +3192,10 @@ def git_action(path, accion, archivos=(), mensaje="", rama="", todo=False, modo=
             args = ["pull", "--no-rebase"]
         elif accion == "fetch":
             args = ["fetch", "--prune"]
+        elif accion == "probar":  # iniciar sesión / comprobar el acceso: si hace falta, Git Credential Manager abre su ventana
+            if not ov["remotos"]:
+                raise ValueError("Primero conecta con un servidor")
+            args = ["ls-remote", "--heads", "origin" if "origin" in ov["remotos"] else ov["remotos"][0]]
         elif accion == "fusionar":
             args = ["merge", "--no-edit", git_branch_name(repo, rama)]
         elif accion in ("pull_desde", "push_a"):  # rama = «origin/otra»: traer de ella a la actual o subir la actual a ella
@@ -3386,6 +3452,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json(200, explore(q.get("ruta", load_config().get("ultima", ""))))
             if url.path == "/api/ia":
                 return self.send_json(200, ia_status(refresh=q.get("refrescar") == "1"))
+            if url.path == "/api/git/identidad":
+                return self.send_json(200, git_identity())
             if url.path == "/api/personas":
                 return self.send_json(200, {"personas": load_config().get("personas", [])})
             if url.path == "/api/windows":
@@ -3789,6 +3857,12 @@ class Handler(BaseHTTPRequestHandler):
             cfg["ventana"] = {k: int(data[k]) for k in ("x", "y", "w", "h")}
             save_config(cfg)
             return self.send_json(200, {})
+        if url == "/api/git/iniciar":
+            try:
+                return self.send_json(200, git_init(data.get("ruta", ""), data.get("nombre"), data.get("correo"),
+                                                    data.get("rama") or "main", data.get("gitignore", True)))
+            except (ValueError, OSError, subprocess.TimeoutExpired) as e:
+                return self.send_json(400, {"error": str(e)})
         if url == "/api/personas":
             return self.send_json(200, {"personas": save_people(data.get("personas"))})
         if url == "/api/nombre_proyecto":

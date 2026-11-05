@@ -840,6 +840,26 @@ assert.deepStrictEqual(findRefs('Ver 1 Samuel 4:4 y 1 Samuel 8:5, 20; Deuteronom
                 except OSError:
                     pass
             desklens.WIN_BASE = r"Software\Classes"
+    # proyecto sin git: empezar a usar git aquí, conectar con una carpeta que hace de servidor, subir y comprobar el acceso
+    nuevo = fuera / "sin git"; nuevo.mkdir(); (nuevo / "leeme.md").write_text("hola"); (nuevo / ".env").write_text("CLAVE=1")
+    assert post("/api/git/iniciar", {"ruta": str(nuevo), "nombre": "Ana", "correo": "ana@x.com"})[0] == 400  # no es un proyecto
+    desklens.add_paths("proyectos", [nuevo])
+    assert post("/api/git/iniciar", {"ruta": str(nuevo), "nombre": "Ana", "correo": "sin-arroba"})[0] == 400
+    code, ov = post("/api/git/iniciar", {"ruta": str(nuevo), "nombre": " Ana  Pérez ", "correo": "ana@x.com", "rama": "main", "gitignore": True})
+    assert code == 200 and ov["rama"] == "main" and not ov["cambios"] and (nuevo / ".gitignore").exists()
+    out = lambda cwd, *a: subprocess.check_output(["git", "-C", str(cwd), *a], encoding="utf-8").strip()  # git escribe UTF-8
+    assert out(nuevo, "config", "user.name") == "Ana Pérez" and out(nuevo, "log", "--format=%s") == "Primer commit"
+    assert ".env" not in out(nuevo, "ls-files").split()  # el .gitignore de base no sube .env
+    assert post("/api/git/iniciar", {"ruta": str(nuevo), "nombre": "Ana", "correo": "ana@x.com"})[0] == 400  # ya usa git
+    servidor = fuera / "servidor.git"; git(fuera, "init", "-q", "--bare", str(servidor))
+    assert post("/api/git/accion", {"ruta": str(nuevo), "accion": "conectar", "mensaje": "--upload-pack=calc"})[0] == 400
+    code, ov = post("/api/git/accion", {"ruta": str(nuevo), "accion": "conectar", "mensaje": str(servidor)})
+    assert code == 200 and ov["remotos"] == ["origin"]
+    code, r = post("/api/git/accion", {"ruta": str(nuevo), "accion": "push"})  # sin seguimiento: push -u origin main
+    assert wait_run(r["id"])["codigo"] == 0 and out(servidor, "log", "--format=%s", "main") == "Primer commit"
+    code, r = post("/api/git/accion", {"ruta": str(nuevo), "accion": "probar"})
+    assert r["orden"] == "git ls-remote --heads origin" and wait_run(r["id"])["codigo"] == 0
+    assert desklens.git_identity().keys() == {"nombre", "correo"}
     # pestaña Ignorados: carpeta entera como una entrada, regla que lo ignora, y lo que git ya seguía aunque esté en .gitignore
     ign = fuera / "ign"; ign.mkdir(); git(ign, "init", "-q")
     git(ign, "config", "user.name", "T"); git(ign, "config", "user.email", "t@example.com")
