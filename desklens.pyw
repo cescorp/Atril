@@ -2867,7 +2867,14 @@ def git_action(path, accion, archivos=(), mensaje="", rama="", todo=False, modo=
         if not git_run(repo, "rev-parse", "-q", "--verify", "HEAD~1"):
             raise ValueError("Es el primer commit del repositorio: no hay uno anterior al que volver")
         git_do(repo, "reset", "--soft", "HEAD~1")
-    elif accion in ("pull", "push", "fetch", "fusionar", "sincronizar"):
+    elif accion == "cancelar_fusion":  # deja todo como antes de la fusión (o del revert) a medias
+        if git_run(repo, "rev-parse", "-q", "--verify", "MERGE_HEAD"):
+            git_do(repo, "merge", "--abort")
+        elif git_run(repo, "rev-parse", "-q", "--verify", "REVERT_HEAD"):
+            git_do(repo, "revert", "--abort")
+        else:
+            raise ValueError("No hay ninguna fusión en curso")
+    elif accion in ("pull", "push", "fetch", "fusionar", "sincronizar", "pull_desde", "push_a", "pull_rama", "push_rama"):
         ov = git_overview(repo)
         if accion == "sincronizar" and ov["remota"]:  # como VS Code: primero trae y luego sube (si hay algo tuyo)
             cmd = "git pull --no-rebase" + (" && git push" if ov["adelante"] else "")
@@ -2879,6 +2886,29 @@ def git_action(path, accion, archivos=(), mensaje="", rama="", todo=False, modo=
             args = ["fetch", "--prune"]
         elif accion == "fusionar":
             args = ["merge", "--no-edit", git_branch_name(repo, rama)]
+        elif accion in ("pull_desde", "push_a"):  # rama = «origin/otra»: traer de ella a la actual o subir la actual a ella
+            remote, _, other = str(rama).partition("/")
+            if remote not in ov["remotos"] or not other:
+                raise ValueError("Elige una rama remota (por ejemplo origin/main)")
+            other = git_branch_name(repo, other)
+            args = ["pull", "--no-rebase", remote, other] if accion == "pull_desde" else ["push", remote, f"HEAD:{other}"]
+        elif accion in ("pull_rama", "push_rama"):  # otra rama local, sin cambiarse a ella
+            name = git_branch_name(repo, rama)
+            if name == ov["rama"]:
+                raise ValueError("Es la rama actual: usa Pull o Push")
+            info = next((b for b in ov["ramas_info"] if b["rama"] == name), None)
+            if not info:
+                raise ValueError(f"No existe la rama «{name}» en tu PC")
+            if info["remota"]:
+                remote, _, up = info["remota"].partition("/")
+                # fetch remoto rama:rama solo avanza si no hay commits tuyos sin subir (si los hay, git lo dice)
+                args = ["fetch", remote, f"{up}:{name}"] if accion == "pull_rama" else ["push", remote, f"{name}:{up}"]
+            elif accion == "pull_rama":
+                raise ValueError(f"«{name}» no está enlazada a una rama remota: no hay de dónde traer")
+            elif ov["remotos"]:
+                args = ["push", "-u", "origin" if "origin" in ov["remotos"] else ov["remotos"][0], name]
+            else:
+                raise ValueError("Este repositorio no tiene remoto: añade uno (git remote add origin <url>)")
         elif ov["remota"]:
             args = ["push"]  # (sincronizar sin rama remota también llega aquí: se publica la rama)
         elif ov["remotos"]:  # rama sin seguimiento: se sube al primer remoto (origin) y queda enlazada

@@ -739,6 +739,26 @@ assert.deepStrictEqual(findRefs('Ver 1 Samuel 4:4 y 1 Samuel 8:5, 20; Deuteronom
     assert desklens.git_track("b\x1forigin/b\x1f[gone]")["borrada"] and desklens.git_track("c\x1f\x1f")["remota"] is None
     assert desklens.git_service("remote.origin.url https://github.com/x/y.git") == "GitHub" and desklens.git_service("") is None
     assert desklens.git_service("remote.origin.url //servidor/repo.git") == "el remoto"
+    # menú de ramas: Push a / Pull desde otra rama remota, Pull / Push de otra rama sin cambiarse, Cancelar fusión
+    act = lambda accion, rama: post("/api/git/accion", {"ruta": str(rep), "accion": accion, "rama": rama})
+    code, r = act("push_a", "origin/copia")
+    assert r["orden"] == "git push origin HEAD:copia" and wait_run(r["id"])["codigo"] == 0
+    git(otro, "fetch", "-q"); git(otro, "checkout", "-q", "-b", "copia", "origin/copia")
+    (otro / "g.md").write_text("g\n"); git(otro, "add", "-A"); git(otro, "commit", "-q", "-m", "g"); git(otro, "push", "-q")
+    code, r = act("pull_desde", "origin/copia")
+    assert r["orden"] == "git pull --no-rebase origin copia" and wait_run(r["id"])["codigo"] == 0 and (rep / "g.md").exists()
+    git(rep, "branch", "lado")
+    code, r = act("push_rama", "lado")  # sin remota: se publica y queda enlazada
+    assert r["orden"] == "git push -u origin lado" and wait_run(r["id"])["codigo"] == 0
+    git(otro, "fetch", "-q"); git(otro, "checkout", "-q", "-b", "lado", "origin/lado")
+    (otro / "h.md").write_text("h\n"); git(otro, "add", "-A"); git(otro, "commit", "-q", "-m", "h"); git(otro, "push", "-q")
+    code, r = act("pull_rama", "lado")  # actualiza «lado» sin dejar «main»
+    assert r["orden"] == "git fetch origin lado:lado" and wait_run(r["id"])["codigo"] == 0
+    out = lambda cwd, *a: subprocess.check_output(["git", "-C", str(cwd), *a], text=True).strip()
+    assert out(rep, "rev-parse", "lado") == out(otro, "rev-parse", "HEAD") and out(rep, "rev-parse", "--abbrev-ref", "HEAD") == "main"
+    assert act("pull_rama", "main")[0] == 400 and act("push_a", "nada/x")[0] == 400 and act("push_a", "origin/-x")[0] == 400
+    assert act("cancelar_fusion", "")[0] == 400  # no hay fusión en curso
+    git(otro, "checkout", "-q", "main")
     # pestaña Ignorados: carpeta entera como una entrada, regla que lo ignora, y lo que git ya seguía aunque esté en .gitignore
     ign = fuera / "ign"; ign.mkdir(); git(ign, "init", "-q")
     git(ign, "config", "user.name", "T"); git(ign, "config", "user.email", "t@example.com")

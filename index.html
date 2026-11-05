@@ -184,7 +184,8 @@ body:not(.noside):not(.vsearch):not(.vgit) #ribbon [data-v=e],body.vsearch:not(.
 .gline{display:flex;align-items:center;gap:6px;min-width:0}
 .gline>button:not(.small){min-width:0;flex:1;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12.5px;padding:3px 8px}
 /* Sincronizar: en color si hay commits por traer o subir (como «Sync Changes» de VS Code) */
-#gSyncBtn{width:100%;font-weight:500}
+#gSyncBtn{width:100%;font-weight:500}.gsyncrow{display:flex;gap:6px}.gsyncrow #gSyncBtn{flex:1;min-width:0}#gMergeBtn{flex:none}
+#gfBrH{display:flex;align-items:center}#gfBrH .sp{flex:1}#gfBrH .gfbm{width:24px;height:20px;padding:0;font-size:15px;line-height:1}
 #gSyncBtn.pending{color:var(--accent);border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent)}
 /* Git a pantalla completa: proyectos y ramas · grafo y detalle del commit · cambios y commit (#gitv se muda aquí).
    Ocupa la fila de las pestañas (la consola sigue visible para pull/push); la barra lateral y la IA se ocultan. */
@@ -815,7 +816,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
       <div class="gline"><button id="gBranch" title="Rama: cambiar, crear, fusionar, pull y push"></button></div>
       <textarea id="gMsg" rows="2" placeholder="Mensaje del commit (Ctrl+Enter)" spellcheck="true"></textarea>
       <button id="gCommit" class="primary">✓ Commit</button>
-      <button id="gSyncBtn"></button>
+      <div class="gsyncrow"><button id="gSyncBtn"></button><button id="gMergeBtn"></button></div>
       <div class="gnote" id="gChecked"></div>
       <div id="glist"></div>
     </div>
@@ -2184,9 +2185,25 @@ function gitSyncDraw(ok) {
     : !gst.remota ? `Subir «${gst.rama}» al remoto y enlazarla` : pend ? `${gst.atras} commit(s) por traer y ${gst.adelante} por subir (${gst.remota}): primero trae y luego sube`
     : `Sin nada por traer ni subir respecto a ${gst.remota}. Clic: comprobar ahora`;
   if (ok && !gst.remotos.length) B.disabled = true;
+  const M = $('#gMergeBtn'), mid = ok && gst.fusionando;
+  M.disabled = !ok || (!mid && !gitMergeable().length);
+  M.classList.toggle('pending', !!mid);
+  M.textContent = mid ? '⤵ Fusión en curso' : '⤵ Fusionar…';
+  M.title = mid ? 'Hay una fusión a medias: termínala con commit o cancélala' : ok ? `Traer los cambios de otra rama a «${gst.rama}»` : '';
   const t = ok && gst.comprobado, m = t ? Math.round((Date.now() / 1000 - t) / 60) : null;
   C.textContent = !ok || !gst.remotos.length ? '' : m === null ? 'Remoto sin comprobar' : m < 1 ? 'Comprobado ahora' : m < 60 ? `Comprobado hace ${m} min`
     : `Comprobado ${new Date(t * 1000).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}`;
+}
+function gitMergeBtn(e) {
+  e.stopPropagation();
+  if (!gst.fusionando) return gitMergeMenu(e.currentTarget);
+  openMenu(e.currentTarget, [{ head: 'Fusión en curso' },
+    ['✓  Terminar', () => { $('#gMsg').focus(); flash('Resuelve los conflictos, márcalos con + y haz commit'); },
+      { title: 'Resuelve cada archivo en «Conflictos», prepáralo con + y haz commit: eso termina la fusión' }],
+    ['✕  Cancelar fusión', async () => {
+      if (await ask('Cancelar fusión', 'Todo vuelve a como estaba antes de fusionar. Se pierde lo que hayas resuelto de los conflictos.',
+        ['Cancelar fusión', 'Seguir'], { danger: true }) === 'Cancelar fusión' && await gitDo('cancelar_fusion')) flash('Fusión cancelada');
+    }, { title: 'Volver a como estaba antes de empezar a fusionar' }]]);
 }
 async function gitSync() {
   if (!gst.remota) return gitPush(); // publicar la rama
@@ -2259,7 +2276,9 @@ async function gitCommit() {
 // pull, push, fetch y merge: en la consola (su salida en vivo); al terminar, la vista y el árbol se ponen al día
 function gitLong(accion, extra = {}) {
   const ruta = gst.ruta;
+  const [rm, rb] = String(extra.rama || '').split(/\/(.*)/);
   const cmd = { pull: 'git pull --no-rebase', push: 'git push', fetch: 'git fetch --prune', fusionar: 'git merge --no-edit ' + extra.rama,
+    pull_desde: `git pull --no-rebase ${rm} ${rb}`, push_a: `git push ${rm} HEAD:${rb}`, pull_rama: `git fetch (actualizar ${extra.rama})`, push_rama: `git push ${extra.rama}`,
     sincronizar: 'git pull --no-rebase' + (gst.adelante ? ' && git push' : '') }[accion];
   launch(() => api('/api/git/accion', { ruta, accion, ...extra }), `git ${accion} · ${gst.nombre}`, cmd,
     gst.repositorio, ruta, () => { gitLoad(); loadSide(); });
@@ -2271,31 +2290,72 @@ async function gitPush() {
   if (await ask('Push', `¿Subir ${what}?`, ['Subir', 'Cancelar']) === 'Subir') gitLong('push');
 }
 // Menú de la rama: cambiar, crear, fusionar otra en esta, fetch y deshacer el último commit (si no está subido)
+// Menú de la rama actual (botón ⎇ de la vista Git, ⋯ de «Ramas de X» y clic derecho sobre ella). Nombres cortos; lo que
+// hace cada opción va en su title. Fuera de la pantalla completa empieza por la lista para cambiar de rama.
+const gitWeb = () => gst.servicio || 'el remoto';
+const gitNo = title => ({ disabled: true, title });
+// Ramas que se pueden fusionar en la actual: las otras locales y las que solo están en el remoto
+const gitMergeable = () => [...gst.ramas.filter(b => b !== gst.rama),
+  ...gst.ramas_remotas.filter(r => !gst.ramas.includes(r.split('/').slice(1).join('/')))];
+async function gitMerge(b) {
+  if (await ask('Fusionar', `¿Traer los cambios de «${b}» a «${gst.rama}»? Si hay conflictos, aparecen en la lista para resolverlos.`,
+    ['Fusionar', 'Cancelar']) === 'Fusionar') gitLong('fusionar', { rama: b });
+}
+function gitMergeMenu(anchor) {
+  const bs = gitMergeable();
+  if (!bs.length) return flash('No hay otras ramas que fusionar');
+  openMenu(anchor, [{ head: `Fusionar en «${gst.rama}»` }, ...bs.map(b => [b, () => gitMerge(b), { title: `Traer los cambios de «${b}» a «${gst.rama}»` }])]);
+}
 function gitBranchMenu(anchor) {
-  const others = gst.ramas.filter(b => b !== gst.rama);
-  openMenu(anchor, [{ head: 'Cambiar de rama' },
-    ...gst.ramas.map(b => [(b === gst.rama ? '✓ ' : '\u2003 ') + b, () => b !== gst.rama && gitSwitch(b)]),
-    '-', ['＋  Nueva rama…', async () => {
+  const web = gitWeb(), up = gst.remota, rem = gst.ramas_remotas, hasRemote = gst.remotos.length > 0;
+  const remoteList = (head, verb, fn) => openMenu(anchor, [{ head }, ...rem.map(r => [r, () => fn(r), { title: `${verb} ${r}` }])]);
+  openMenu(anchor, [
+    ...(gitFullOn() ? [{ head: `${gst.rama} · estás aquí` }]
+      : [{ head: 'Cambiar de rama' }, ...gst.ramas.map(b => [(b === gst.rama ? '✓ ' : '  ') + b, () => b !== gst.rama && gitSwitch(b)]), '-']),
+    ['⇣  Pull', () => gitLong('pull'), up ? { title: `Traer los cambios de ${up}` } : gitNo('La rama no está enlazada a una rama remota')],
+    ['⇣  Pull desde…', () => remoteList(`Traer a «${gst.rama}» los cambios de…`, 'Traer a la rama actual los cambios de', async r => {
+      if (await ask('Pull desde', `¿Traer a «${gst.rama}» los cambios de ${r}?`, ['Traer', 'Cancelar']) === 'Traer') gitLong('pull_desde', { rama: r });
+    }), rem.length ? { title: `Traer los cambios de otra rama remota a «${gst.rama}»` } : gitNo('No hay ramas remotas')],
+    ['⇡  Push', gitPush, hasRemote ? { title: up ? `Subir tus commits a ${up}` : `Publicar «${gst.rama}» en ${web}` } : gitNo('Este repositorio no tiene remoto')],
+    ['⇡  Push a…', () => openMenu(anchor, [{ head: `Subir «${gst.rama}» a…` },
+      ...rem.map(r => [r, async () => {
+        if (await ask('Push a', `¿Subir «${gst.rama}» a ${r}?`, ['Subir', 'Cancelar']) === 'Subir') gitLong('push_a', { rama: r });
+      }, { title: `Subir la rama actual a ${r}` }]),
+      ['＋  Otra rama nueva…', async () => {
+        const n = await ask('Push a', `Nombre de la rama nueva en ${web} (se sube «${gst.rama}» con ese nombre):`, ['Subir', 'Cancelar'], { input: '' });
+        if (n?.trim()) gitLong('push_a', { rama: (gst.remotos.includes('origin') ? 'origin' : gst.remotos[0]) + '/' + n.trim() });
+      }]]), hasRemote ? { title: `Subir «${gst.rama}» a otra rama remota` } : gitNo('Este repositorio no tiene remoto')],
+    ['⟳  Fetch', () => gitLong('fetch'), hasRemote ? { title: `Ver si hay novedades en ${web}, sin traer nada` } : gitNo('Este repositorio no tiene remoto')],
+    '-',
+    ['⤵  Fusionar otra rama…', () => gitMergeMenu(anchor), gitMergeable().length ? { title: `Traer los cambios de otra rama a «${gst.rama}»` } : gitNo('No hay otras ramas')],
+    ['＋  Nueva rama aquí…', async () => {
       const rama = await ask('Nueva rama', `Se crea desde «${gst.rama}» y pasas a ella:`, ['Crear', 'Cancelar'], { input: '' });
       if (rama?.trim()) gitDo('nueva_rama', [], { rama: rama.trim() });
-    }],
-    ['⤵  Fusionar otra rama en esta…', () => openMenu(anchor, [{ head: `Fusionar en «${gst.rama}»` }, ...others.map(b => [b, async () => {
-      if (await ask('Fusionar', `¿Fusionar «${b}» en «${gst.rama}»? Si hay conflictos, aparecen en la lista para resolverlos.`, ['Fusionar', 'Cancelar']) === 'Fusionar') gitLong('fusionar', { rama: b });
-    }])]), others.length ? {} : { disabled: true, title: 'No hay otras ramas' }],
-    '-', ['⇣  Pull (traer)', () => gitLong('pull'), gst.remota ? {} : { disabled: true, title: 'La rama no está enlazada a una remota' }],
-    ['⇡  Push (subir)', gitPush, gst.remotos.length ? {} : { disabled: true, title: 'Sin remoto' }],
-    ['⟳  Fetch (ver novedades del remoto)', () => gitLong('fetch'), gst.remotos.length ? {} : { disabled: true, title: 'Sin remoto' }],
-    ['🙈  Archivos ignorados', () => { if (gitFullOn()) return gitTab('ign'); gfL.tab = 'ign'; gfSave(); gitFullOpen(); },
-      { title: 'Ver qué ignora git (por .gitignore), cuánto pesa y qué regla lo ignora' }],
-    ['📦  Recuperar cambios guardados…', () => openMenu(anchor, [{ head: 'Cambios guardados aparte (stash)' }, ...gst.stashes.map(st =>
+    }, { title: `Crear una rama desde «${gst.rama}» y pasar a ella` }],
+    ['📦  Recuperar guardados…', () => openMenu(anchor, [{ head: 'Cambios guardados aparte (stash)' }, ...gst.stashes.map(st =>
       [`${st.mensaje.replace(/^On [^:]+: /, '')} · ${st.fecha}`, async () => {
         if (await ask('Recuperar cambios guardados', `¿Poner de nuevo en «${gst.rama}» estos cambios?\n${st.mensaje.replace(/^On [^:]+: /, '')}`,
           ['Recuperar', 'Cancelar']) === 'Recuperar' && await gitDo('recuperar_stash', [], { rama: st.id })) flash('✓ Cambios recuperados');
-      }, { title: st.id }])]), gst.stashes.length ? {} : { disabled: true, title: 'No hay cambios guardados aparte' }],
-    '-', ['↶  Deshacer el último commit', async () => {
+      }, { title: st.id }])]), gst.stashes.length ? { title: 'Volver a poner cambios que se guardaron aparte (stash)' } : gitNo('No hay cambios guardados aparte')],
+    ['↶  Deshacer último commit', async () => {
       if (await ask('Deshacer el último commit', 'El commit se quita y sus cambios vuelven a «Preparados». Solo se puede si aún no lo has subido.',
         ['Deshacer commit', 'Cancelar'], { danger: true }) === 'Deshacer commit') gitDo('deshacer_commit');
-    }]]);
+    }, { title: 'Quitar el último commit si aún no está subido; sus cambios vuelven a «Preparados»' }],
+    ['🙈  Archivos ignorados', () => { if (gitFullOn()) return gitTab('ign'); gfL.tab = 'ign'; gfSave(); gitFullOpen(); },
+      { title: 'Ver qué ignora git (por .gitignore), cuánto pesa y qué regla lo ignora' }]]);
+}
+// Clic derecho sobre otra rama del panel izquierdo: cambiar, fusionar en la actual, y Pull/Push sin cambiarse a ella
+function gitOtherBranchMenu(anchor, b, estado) {
+  const web = gitWeb(), local = gst.ramas.includes(b), i = (gst.ramas_info || []).find(x => x.rama === b);
+  const src = local ? b : gst.ramas_remotas.find(r => r.split('/').slice(1).join('/') === b) || b; // solo remota: se fusiona origin/b
+  openMenu(anchor, [{ head: `${b} · ${estado}` },
+    ['⎇  Cambiar a esta rama', () => gitSwitch(b), { title: local ? `Pasar a trabajar en «${b}»` : `Traerla de ${web} y pasar a trabajar en ella` }],
+    ['⤵  Fusionar en ' + gst.rama, () => gitMerge(src), { title: `Traer los cambios de «${b}» a «${gst.rama}» (la rama actual)` }],
+    '-',
+    ['⇣  Pull', () => gitLong('pull_rama', { rama: b }), !local ? gitNo(`Aún no está en tu PC: «Cambiar a esta rama» la trae`)
+      : i?.remota ? { title: `Actualizar «${b}» con ${i.remota} sin cambiarte a ella` } : gitNo('No está enlazada a una rama remota: no hay de dónde traer')],
+    ['⇡  Push', () => gitLong('push_rama', { rama: b }), !local ? gitNo(`Ya está solo en ${web}`) : !gst.remotos.length ? gitNo('Este repositorio no tiene remoto')
+      : { title: i?.remota ? `Subir «${b}» a ${i.remota} sin cambiarte a ella` : `Aún no está en ${web}: se publica y queda enlazada` }]]);
 }
 // Estado de un proyecto en HTML: rama en gris · ↓ por traer en azul · ↑ por subir en morado · al día en verde ·
 // cambios en ámbar · «sin git» atenuado (selector de repositorio y lista de proyectos a pantalla completa)
@@ -2416,7 +2476,9 @@ function gitFullSide() {
   const st = [gst.atras && `↓ ${n(gst.atras, 'commit', 'commits')} por traer`, gst.adelante && `↑ ${n(gst.adelante, 'commit', 'commits')} por subir`,
     sinCommit && n(sinCommit, 'archivo sin commit', 'archivos sin commit')].filter(Boolean);
   $('#gfSt').innerHTML = `⎇ ${esc(gst.rama)} · ` + (st.length ? esc(st.join(' · ')) : gst.remota ? `<span class="gbok">✓ Todo al día con ${esc(web)}</span>` : 'sin remoto');
-  $('#gfBrH').textContent = 'Ramas de ' + gst.nombre;
+  $('#gfBrH').innerHTML = `<span>Ramas de ${esc(gst.nombre)}</span><span class="sp"></span>`;
+  $('#gfBrH').append(Object.assign(button('⋯', e => { e.stopPropagation(); gitBranchMenu(e.currentTarget); }),
+    { className: 'ic gfbm', title: `Pull, Push, Fusionar y más para «${gst.rama}»` }));
   const info = new Map((gst.ramas_info || []).map(x => [x.rama, x])), localOf = r => r.split('/').slice(1).join('/');
   const remoteOnly = [...new Set(gst.ramas_remotas.map(localOf))].filter(b => !gst.ramas.includes(b)).sort();
   const rows = [gst.rama, ...gst.ramas.filter(b => b !== gst.rama).sort(), ...remoteOnly].filter((b, i, a) => b && a.indexOf(b) === i);
@@ -2432,10 +2494,11 @@ function gitFullSide() {
   const B = $('#gfBr'); B.innerHTML = '';
   for (const b of rows) {
     const [cls, txt, tip] = state(b), cur = b === gst.rama;
-    const r = Object.assign(document.createElement('div'), { className: 'node gfb' + (cur ? ' on' : ''), title: (cur ? 'Estás en esta rama' : 'Clic: cambiar a esta rama') + '\n' + tip });
+    const r = Object.assign(document.createElement('div'), { className: 'node gfb' + (cur ? ' on' : ''), title: (cur ? 'Estás en esta rama' : 'Clic: cambiar a esta rama') + ' · clic derecho: más opciones\n' + tip });
     r.dataset.rama = b;
     r.innerHTML = `<span class="gbn">${cur ? '● ' : ''}${esc(b)}</span>${cur ? '<span class="gbh">estás aquí</span>' : ''}<span class="gbs ${cls}">${esc(txt)}</span>`;
     r.onclick = () => !cur && gitSwitch(b);
+    r.oncontextmenu = e => { e.preventDefault(); const at = { x: e.clientX, y: e.clientY }; cur ? gitBranchMenu(at) : gitOtherBranchMenu(at, b, txt); };
     B.append(r);
   }
 }
@@ -2784,7 +2847,7 @@ function gitImageCompare(f, c) {
 function gitInit() {
   $('#gRepo').onclick = e => { e.stopPropagation(); gitRepoMenu(e.currentTarget); };
   $('#gBranch').onclick = e => { e.stopPropagation(); gitBranchMenu(e.currentTarget); };
-  $('#gSyncBtn').onclick = gitSync;
+  $('#gSyncBtn').onclick = gitSync; $('#gMergeBtn').onclick = gitMergeBtn;
   $('#gCommit').onclick = gitCommit;
   $('#gMsg').onkeydown = e => { if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); gitCommit(); } };
   $('#gbtns').append(iconBtn('refresh', 'Actualizar', () => gitLoad()), iconBtn('max', 'Git a pantalla completa: historial, ramas y proyectos', gitFullOpen));
