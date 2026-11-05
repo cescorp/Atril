@@ -2280,8 +2280,16 @@ function gitLong(accion, extra = {}) {
   const cmd = { pull: 'git pull --no-rebase', push: 'git push', fetch: 'git fetch --prune', fusionar: 'git merge --no-edit ' + extra.rama,
     pull_desde: `git pull --no-rebase ${rm} ${rb}`, push_a: `git push ${rm} HEAD:${rb}`, pull_rama: `git fetch (actualizar ${extra.rama})`, push_rama: `git push ${extra.rama}`,
     sincronizar: 'git pull --no-rebase' + (gst.adelante ? ' && git push' : '') }[accion];
+  // la consola se ve mientras corre y, si terminó bien, se oculta sola (la ejecución queda en su pestaña ✓ para verla);
+  // si falló, o si ya estaba abierta antes, se queda como está
+  const wasOpen = !$('#panel').hidden;
   launch(() => api('/api/git/accion', { ruta, accion, ...extra }), `git ${accion} · ${gst.nombre}`, cmd,
-    gst.repositorio, ruta, () => { gitLoad(); loadSide(); });
+    gst.repositorio, ruta, r => {
+      gitLoad(); loadSide();
+      if (r.codigo !== 0) return flash(`✗ git ${accion} falló: mira la consola`);
+      flash(`✓ git ${accion} terminado · los detalles, en la consola`);
+      if (!wasOpen) setTimeout(() => { if (curRun === r && !runsUI.some(x => !x.fin) && maxZone !== 'con') showPanel(false); }, 1500);
+    });
 }
 async function gitPush() {
   const n = gst.adelante;
