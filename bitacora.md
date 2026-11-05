@@ -8,6 +8,12 @@ Entradas nuevas arriba. Formato: `## AAAA-MM-DD · título` + 2–4 líneas (qu�
 - **Cómo trabaja el usuario:** escribe en español. **Antes de construir algo nuevo, dibujarlo en texto y esperar su «ok».** No instalar nada sin acuerdo. Ahorrar tokens. Prefiere lo simple: rechazó un panel de IA con modos (ver 2026-11-02).
 - **Para verificar sin tocar su DeskLens:** levantar `desklens.Handler` en el puerto 8799 con `CONFIG`, `CONV_DIR`, `RECOVERY_DIR` e `INDEX_DB` en una carpeta temporal y hacer captura con Edge sin ventana (`--headless=new --screenshot`). Así se probó cada paso. Ojo: en Windows dos servidores pueden escuchar el mismo puerto sin error; si hay otra sesión probando, usa otro puerto.
 
+## 2026-11-04 · «Ver» del detalle del commit: Disco (actual) a la izquierda
+Pedido del usuario: al pulsar «Ver» en un archivo del detalle del commit, el comparador abre con 💾 Disco (actual) a la izquierda y ese commit a la derecha (antes: el commit anterior ↔ este). Las imágenes siguen con su antes/después.
+
+## 2026-11-04 · Día/Semana/Mes en el título del gráfico
+El usuario preguntó qué agrupa Día/Semana/Mes: solo el gráfico de barras (los demás bloques usan todo el periodo Desde–Hasta). Estaba en la barra de arriba y parecía afectar a todo: ahora va en el título del bloque («Commits por [Día|Semana|Mes] [por autor|por rama]»); la barra fija queda con lo que afecta a todo (fechas, rama, autor, proyectos). Nota: un autor con 0 commits pero con horas es porque en el periodo solo hizo merges (cuentan como actividad para las horas por tiempo, no como commits ni líneas).
+
 ## 2026-11-04 · «Unir autores»: ancho según los proyectos
 Captura del usuario: con un solo proyecto la casilla del nombre ocupaba toda la ventana. Ahora el diálogo mide lo que su tabla necesita (`fit-content`, entre 640 y 1200 px), la columna Persona tiene 240 px como máximo y cada proyecto al menos 150 px; el texto de ayuda no lo estira. Pie con plurales correctos («1 persona · 1 nombre»). Probado con 1 y con 3 proyectos.
 

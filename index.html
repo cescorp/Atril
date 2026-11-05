@@ -3250,10 +3250,11 @@ async function gitCommitDetail(c) {
         + (f.mas == null ? '<td class="num gc" colspan="2">binario</td>' : `<td class="num"><i>+${f.mas}</i></td><td class="num"><em>−${f.menos}</em></td>`)
         + `<td class="num gc">${f.tam == null ? '—' : fmtSize(f.tam)}</td><td class="gact2"></td>`;
       const img = IMG_EXT.has(f.ext), canSee = f.mas != null || img;
+      // «Ver»: a la izquierda el archivo tal como está ahora en el disco, a la derecha este commit (pedido del usuario)
       const ver = button('Ver', () => img ? gitImageCompare(f, c) : compareDialog(f.ruta, { cols: 2, picks: [
-        c.padres[0] ? { id: c.padres[0], label: `Antes de «${msgParts(c.mensaje)[0]}»`, title: c.padres[0] } : { id: 'disco', label: 'Disco', title: '' },
+        { id: 'disco', label: '💾 Disco (actual)', title: '' },
         { id: c.hash, label: `${msgParts(c.mensaje)[0]} · ${fmtWhen(c.ts)}`, title: `${c.corto} · ${c.mensaje}` }] }));
-      ver.className = 'small'; ver.disabled = !canSee; ver.title = img ? 'Imagen antes y después, lado a lado' : canSee ? 'Antes ↔ este commit' : 'Archivo binario: no se compara como texto';
+      ver.className = 'small'; ver.disabled = !canSee; ver.title = img ? 'Imagen antes y después, lado a lado' : canSee ? 'Disco (actual) ↔ este commit' : 'Archivo binario: no se compara como texto';
       const abrir = button('Abrir', () => { gitFullClose(true); openTab(f.ruta, true); });
       abrir.className = 'small'; abrir.disabled = f.estado === 'D' || c.lado === 'entrante'; // entrante: aún no está en tu disco
       abrir.title = abrir.disabled ? 'No está en tu disco (borrado o aún sin traer)' : 'Abrir el archivo tal como está ahora';
