@@ -205,7 +205,7 @@ body.gitfull #gitfull{grid-row:1;display:grid;grid-template-rows:auto minmax(0,1
 #gitfull.maxd .gfgraph,#gitfull.maxd .gfrs.d{display:none}
 #gitfull.maxd .gfmain{grid-template-rows:0 0 minmax(0,1fr)}#gitfull.maxd .gfdetail{height:auto}
 .gfbar .gfpanes{display:flex;gap:2px;margin-left:8px}.gfbar .gfpanes button{color:var(--faint)}.gfbar .gfpanes button.on{color:var(--accent)}
-.gfgraph h4{display:flex;align-items:center;gap:4px}.gfgraph h4 .sp{flex:1}
+.gfgraph h4{display:flex;align-items:center;gap:4px;flex-wrap:wrap}.gfgraph h4 .sp{flex:1}
 .gftab{border:0;background:none;padding:2px 8px;border-radius:5px;font:inherit;letter-spacing:inherit;text-transform:inherit;color:var(--muted);cursor:pointer}
 .gftab:hover{color:var(--ink)}.gftab.on{background:var(--active);color:var(--ink)}
 .gitot{margin-left:8px;text-transform:none;letter-spacing:0;font-weight:400;font-size:11.5px}
@@ -218,13 +218,13 @@ body.gitfull #gitfull{grid-row:1;display:grid;grid-template-rows:auto minmax(0,1
 .est{padding:4px 14px 24px;display:flex;flex-direction:column;gap:18px}
 .estbar{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;font-size:12.5px;color:var(--muted)}
 .estbar label{display:flex;gap:6px;align-items:center}.estbar input[type=date],.estbar select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:3px 6px}
-.est .seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}.est .seg button{border:0;border-radius:0;background:none;padding:3px 9px;font-size:12px;color:var(--muted)}
+.est .seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:6px;overflow:hidden}.est .seg button{white-space:nowrap}.est .seg button{border:0;border-radius:0;background:none;padding:3px 9px;font-size:12px;color:var(--muted)}
 .est .seg button.on{background:var(--active);color:var(--ink);font-weight:600}.est .seg.sm button{padding:1px 7px;font-size:11px}
-.esttiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.esttiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
 .esttiles .tile{border:1px solid var(--line);border-radius:8px;padding:8px 12px;display:flex;flex-direction:column;gap:2px;min-width:0}
-.esttiles small{font-size:11.5px;color:var(--muted)}.esttiles b{font-size:22px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums;white-space:nowrap}
+.esttiles small{font-size:11.5px;color:var(--muted)}.esttiles .tile{overflow:hidden}.esttiles b{font-size:22px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums;display:flex;flex-wrap:wrap;column-gap:8px;line-height:1.2}
 .esttiles .hrs b.h2{font-size:16px;margin-top:2px}.esttab th small{font-weight:400;color:var(--faint)}
-.esttiles b i{font-style:normal;color:#2e8b57;font-size:17px}.esttiles b em{font-style:normal;color:#c0392b;font-size:17px}.esttiles span{font-size:11.5px;color:var(--faint)}
+.esttiles b i{font-style:normal;color:#2e8b57;font-size:17px;white-space:nowrap}.esttiles b em{font-style:normal;color:#c0392b;font-size:17px;white-space:nowrap}.esttiles span{font-size:11.5px;color:var(--faint)}
 .est section h5{margin:0 0 8px;font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .est section h5 small{text-transform:none;letter-spacing:0;font-weight:400;color:var(--faint)}
 .estsvg{display:block;max-width:100%}.estsvg .grid{stroke:var(--line);stroke-width:1}.estsvg .ax{font-size:10.5px;fill:var(--muted)}.estsvg path:hover{opacity:.8}
