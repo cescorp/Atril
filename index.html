@@ -925,6 +925,21 @@ const api = (url, body) => fetch(url, body === undefined ? { headers: H } :
     if (!r.ok) throw Object.assign(new Error(d.error), { data: d }); return d; // data: código y detalles del servidor
   });
 const RESTART = 'DeskLens se actualizó y el servidor que sigue en marcha es el anterior. Cierra todas las ventanas de DeskLens, espera unos segundos y vuelve a abrirlo.';
+// «Reiniciar ahora»: el servidor viejo se cierra y lanza el nuevo (/api/reiniciar); la ventana espera a que responda
+// el nuevo (sin el aviso de reinicio) y se recarga. Un servidor anterior a esta función responde 404: queda el texto.
+async function restartServer() {
+  const corriendo = runsUI.some(r => !r.fin);
+  if (await ask('Hay que reiniciar DeskLens', 'DeskLens se actualizó y el servidor que sigue en marcha es el anterior. ' +
+    '«Reiniciar ahora» lo cambia por el nuevo y recarga esta ventana (unos segundos).' + (corriendo ? ' Se detendrán los programas que se están ejecutando en la consola.' : ''),
+    ['Reiniciar ahora', 'Más tarde']) !== 'Reiniciar ahora') return;
+  try { await api('/api/reiniciar', {}); } catch (e) { return ask('Hay que reiniciar DeskLens', e.message, ['Entendido']); }
+  flash('Reiniciando DeskLens…');
+  for (let i = 0; i < 40; i++) { // hasta ~20 s
+    await new Promise(r => setTimeout(r, 500));
+    try { const st = await (await fetch('/api/estado', { headers: H })).json(); if (!st.reiniciar) return location.reload(); } catch {}
+  }
+  ask('Hay que reiniciar DeskLens', 'El servidor nuevo no respondió. Cierra todas las ventanas de DeskLens y vuelve a abrirlo.', ['Entendido']);
+}
 const sepOf = p => /^[A-Za-z]:|^\\\\/.test(p) ? '\\' : '/'; // C:\… o \\servidor → \ ; /home/… → /
 const pjoin = (dir, name) => dir.replace(/[\\/]+$/, '') + sepOf(dir) + name;
 const under = (path, dir) => { // ¿path está dentro de dir (o es dir)? sin distinguir mayúsculas ni separador
@@ -1016,7 +1031,7 @@ let side = { proyectos: [], sueltos: [] };
 // Las carpetas que estaban abiertas (mapa `tree`) se vuelven a desplegar antes de marcar el archivo actual.
 async function loadSide() {
   const st = side = await api('/api/estado');
-  if (st.reiniciar && !loadSide.warned) { loadSide.warned = true; ask('Hay que reiniciar DeskLens', RESTART, ['Entendido']); } // una vez por sesión
+  if (st.reiniciar && !loadSide.warned) { loadSide.warned = true; restartServer(); } // una vez por sesión
   const P = $('#projects'); P.innerHTML = '';
   if (!st.proyectos.length) P.innerHTML = '<p class="ok" style="margin:0 8px">Pulsa + para añadir una carpeta.</p>';
   const pending = [];
@@ -3754,7 +3769,7 @@ async function winDialog() {
   const d = $('#dlg'); d.className = 'sets win'; d.oninput = d.onchange = null; d.onclose = null;
   const draw = st => {
     const reg = new Set(st.registradas), on = st.registradas.length > 0 || st.menu;
-    d.innerHTML = `<header><b>Abrir archivos con DeskLens desde Windows</b></header>
+    d.innerHTML = `<header><b>Abrir archivos con DeskLens desde Windows</b><button class="ic" data-x title="Cerrar (Esc)" style="margin-left:auto">✕</button></header>
       <div class="wbody"><p class="ok">Elige qué tipos de archivo pueden abrirse con DeskLens. Aparecerá en «Abrir con» del Explorador;
         para que sea el programa de siempre, pulsa «Hacer predeterminado…» y marca «Usar siempre esta aplicación».</p>
       <div class="wexts">${st.lista.map(e => `<label><input type="checkbox" value="${e}" ${reg.has(e) || (!on && ['.txt', '.md', '.log', '.json', '.csv'].includes(e)) ? 'checked' : ''}> ${e}</label>`).join('')}</div>
@@ -3762,6 +3777,7 @@ async function winDialog() {
       <p class="wstate">${on ? `✓ Registrado: ${st.registradas.join(' ') || 'ninguna extensión'}${st.menu ? ' · clic derecho' : ''}` : 'Aún no está registrado en Windows.'}</p>
       <p class="ok wcmd" title="Lo que Windows ejecuta al abrir un archivo con DeskLens">${esc(st.orden)}</p></div>
       <footer><span class="ok">Solo para tu usuario · se deshace con «Quitar de Windows»</span><div class="exp-actions"></div></footer>`;
+    d.querySelector('[data-x]').onclick = () => d.close();
     const exts = () => [...d.querySelectorAll('.wexts input:checked')].map(i => i.value);
     const call = async (url, body, msg) => { try { const r = await api(url, body); if (msg) flash(msg); return r; } catch (e) { ask('Abrir desde Windows', e.message, ['Entendido']); } };
     d.querySelector('.exp-actions').append(
@@ -3857,14 +3873,19 @@ const isDirty = e => e.text !== e.orig;
 // Pestaña de vista previa (como VS Code): un clic abre el archivo en una pestaña en cursiva que el siguiente
 // clic reemplaza. Se fija (deja de reemplazarse) con doble clic o en cuanto se modifica.
 let previewTab = null;
-try { ({ tabs, cur, previewTab = null } = JSON.parse(localStorage.getItem('desklens.tabs')) || { tabs: [], cur: null }); } catch {}
+// Pestañas de ESTA ventana en sessionStorage (cada ventana tiene las suyas y sobreviven a recargarla); la última que
+// cambia también las deja en localStorage para la próxima vez que se abra DeskLens. ?nueva: otra ventana pedida con
+// «Abrir otra ventana» (⚙ Ajustes) empieza vacía, solo con los archivos que la abrieron.
+const NEW_WIN = new URLSearchParams(location.search).has('nueva');
+const tabStore = k => { try { return sessionStorage.getItem(k) ?? (NEW_WIN ? null : localStorage.getItem(k)); } catch { return null; } };
+try { ({ tabs, cur, previewTab = null } = JSON.parse(tabStore('desklens.tabs')) || { tabs: [], cur: null }); } catch {}
 
 // ---------- vista dividida ----------
 // panes[i]: estado de cada lado. tabs/cur/previewTab (y editorCM, curFile, pdfCtl, findP) son siempre los del
 // lado activo: activatePane() los guarda en su pane y carga los del otro sin volver a dibujar ninguno.
 const panes = [{ el: paneEl }];
 let active = 0, savedSplit = null; // savedSplit: se lee antes de que el arranque vuelva a guardar las pestañas
-try { savedSplit = JSON.parse(localStorage.getItem('desklens.split') || 'null'); } catch {}
+try { savedSplit = JSON.parse(tabStore('desklens.split') || 'null'); } catch {}
 const syncPane = () => {
   Object.assign(panes[active], { tabs, cur, previewTab });
   try { Object.assign(panes[active], { editorCM, curFile, pdfCtl, findP }); } catch {} // aún sin declarar mientras carga el script
@@ -3873,10 +3894,10 @@ const otherShows = path => panes.some((p, i) => i !== active && p.cur === path);
 const persist = () => {
   syncPane();
   const st = p => ({ tabs: p.tabs, cur: p.cur, previewTab: p.previewTab });
-  try {
-    localStorage.setItem('desklens.tabs', JSON.stringify(st(panes[0])));
-    localStorage.setItem('desklens.split', panes[1] ? JSON.stringify({ ...st(panes[1]), active }) : '');
-  } catch {}
+  const t = JSON.stringify(st(panes[0])), sp = panes[1] ? JSON.stringify({ ...st(panes[1]), active }) : '';
+  // esta ventana · la próxima vez que se abra DeskLens (una ventana nueva aún vacía no borra lo guardado por otra)
+  for (const store of [() => sessionStorage, ...(NEW_WIN && !tabs.length ? [] : [() => localStorage])])
+    try { store().setItem('desklens.tabs', t); store().setItem('desklens.split', sp); } catch {}
 };
 // Cambia el lado activo de la vista dividida: guarda tabs/cur/previewTab y el estado de su vista en su
 // pane y carga los del otro, sin volver a dibujar (cada lado conserva su DOM). Si el lado mostraba un
@@ -6906,6 +6927,7 @@ addEventListener('keydown', e => {
 
 const abrir = new URLSearchParams(location.search).get('abrir');
 if (abrir) { abrir.split('|').forEach(p => tabs.includes(p) || tabs.push(p)); cur = abrir.split('|')[0]; persist(); history.replaceState(null, '', '/'); }
+else if (NEW_WIN) { persist(); history.replaceState(null, '', '/'); } // ventana nueva vacía: sus pestañas (ninguna) quedan en ella
 if (cur) { hist.push(cur); hi = 0; }
 try { if (localStorage.getItem('desklens.ia')) document.body.classList.add('ia'); } catch {}
 // render después: las migas necesitan los proyectos; antes, ajustes y lo que haya que recuperar

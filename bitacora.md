@@ -8,6 +8,13 @@ Entradas nuevas arriba. Formato: `## AAAA-MM-DD · título` + 2–4 líneas (qu�
 - **Cómo trabaja el usuario:** escribe en español. **Antes de construir algo nuevo, dibujarlo en texto y esperar su «ok».** No instalar nada sin acuerdo. Ahorrar tokens. Prefiere lo simple: rechazó un panel de IA con modos (ver 2026-11-02).
 - **Para verificar sin tocar su DeskLens:** levantar `desklens.Handler` en el puerto 8799 con `CONFIG`, `CONV_DIR`, `RECOVERY_DIR` e `INDEX_DB` en una carpeta temporal y hacer captura con Edge sin ventana (`--headless=new --screenshot`). Así se probó cada paso. Ojo: en Windows dos servidores pueden escuchar el mismo puerto sin error; si hay otra sesión probando, usa otro puerto.
 
+## 2026-11-05 · Una ventana o varias
+⚙ Ajustes › General › «Al abrir DeskLens o un archivo con DeskLens ya abierto»: «Usar la misma ventana» (predeterminado: el icono trae al frente la ventana abierta y un archivo se añade como pestaña, vía `hand_to_running`, también sin archivos) u «Abrir otra ventana, con sus propias pestañas» (`?nueva=1`). Las pestañas de cada ventana van en sessionStorage; la última que cambia las deja en localStorage para la próxima vez (una ventana nueva aún vacía no lo pisa). Antes todas compartían `desklens.tabs` y una ventana nueva salía idéntica a la otra. Probado con una copia en el 8798: misma ventana (no abre otra; el archivo llega como pestaña) y varias (cada una con sus pestañas).
+
+## 2026-11-05 · «Reiniciar ahora» y nunca dos servidores en el mismo puerto
+El aviso «Hay que reiniciar DeskLens» salía siempre: al abrir DeskLens o un archivo desde Windows con alguna ventana abierta, el puerto estaba ocupado y la ventana nueva iba al servidor viejo, que nunca se cerraba. Ahora el aviso trae «Reiniciar ahora»: `/api/reiniciar` cierra el servidor y, ya fuera del puerto, lanza `desklens.pyw --reiniciar --sin-ventana` (reintenta el puerto ~10 s); la ventana espera a que el nuevo responda sin aviso y se recarga. Y `Server.allow_reuse_address = not WINDOWS`: con SO_REUSEADDR Windows dejaba escuchar a dos DeskLens en el mismo puerto. Probado con una copia en el 8798: el segundo arranque se retira, el reinicio cambia de proceso y la ventana se recarga sola.
+Abrir desde Windows un archivo que ya está en un proyecto ya no lo duplica en «Sueltos» (`sin_duplicar_sueltos`, también al arrancar).
+
 ## 2026-11-04 · «Ver» del detalle del commit: Disco (actual) a la izquierda
 Pedido del usuario: al pulsar «Ver» en un archivo del detalle del commit, el comparador abre con 💾 Disco (actual) a la izquierda y ese commit a la derecha (antes: el commit anterior ↔ este). Las imágenes siguen con su antes/después.
 

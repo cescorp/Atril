@@ -51,6 +51,15 @@ with tempfile.TemporaryDirectory() as tmp:
     suelto.write_text("ok")
     desklens.add_paths("proyectos", [proj])
     desklens.add_paths("sueltos", [suelto])
+    # un archivo de un proyecto abierto desde Windows no se duplica como suelto; y al añadir un proyecto que contiene
+    # sueltos, esos salen de «Sueltos» (nunca el mismo archivo dos veces en la barra)
+    desklens.add_paths("sueltos", [proj / "utf8.md"])
+    assert desklens.load_config()["sueltos"] == [str(suelto.resolve())]
+    (fuera / "sub").mkdir(); (fuera / "sub" / "x.txt").write_text("x")
+    desklens.add_paths("sueltos", [fuera / "sub" / "x.txt"])
+    desklens.add_paths("proyectos", [fuera / "sub"])
+    assert desklens.load_config()["sueltos"] == [str(suelto.resolve())]
+    cfg = desklens.load_config(); cfg["proyectos"].remove(str((fuera / "sub").resolve())); desklens.save_config(cfg)
 
     # permisos: proyecto y suelto sí; lo demás no, ni con ../
     assert desklens.allowed(proj / "utf8.md") and desklens.allowed(suelto)

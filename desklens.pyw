@@ -191,13 +191,25 @@ def set_ajustes(data):
     return current
 
 
+def sin_duplicar_sueltos(cfg):
+    """Quita de «sueltos» los archivos que están dentro de algún proyecto. Devuelve True si quitó alguno."""
+    roots = [Path(r).resolve() for r in cfg["proyectos"]]
+    keep = [s for s in cfg["sueltos"] if not any(Path(s).resolve().is_relative_to(r) for r in roots)]
+    changed = len(keep) != len(cfg["sueltos"])
+    cfg["sueltos"] = keep
+    return changed
+
+
 def add_paths(kind, paths):
-    """Añade carpetas («proyectos») o archivos («sueltos») a config.json, sin repetir, y despierta al indexador."""
+    """Añade carpetas («proyectos») o archivos («sueltos») a config.json, sin repetir, y despierta al indexador.
+    Un archivo que ya está dentro de un proyecto no se añade como suelto (ya se ve en su proyecto), y al añadir un
+    proyecto salen de «Sueltos» los archivos que quedan dentro de él: nunca aparece el mismo archivo dos veces."""
     cfg = load_config()
     for p in paths:
         p = str(Path(p).resolve())
         if p not in cfg[kind]:
             cfg[kind].append(p)
+    sin_duplicar_sueltos(cfg)
     save_config(cfg)
     idx_wake.set()  # el índice incorpora lo nuevo enseguida
 
@@ -1474,6 +1486,10 @@ def edge_path(choice=None):
 
 
 # ⚙ Ajustes › General: con qué se abre DeskLens. Solo se ofrecen los navegadores instalados (se miran al arrancar).
+# ⚙ Ajustes › General: con DeskLens ya abierto, abrirlo otra vez (icono o archivo desde Windows) usa su ventana o abre otra
+SETTINGS.insert(1, ("ventanas", "General", "Al abrir DeskLens o un archivo con DeskLens ya abierto", "misma",
+                    [("misma", "Usar la misma ventana (el archivo se añade como pestaña)"),
+                     ("varias", "Abrir otra ventana, con sus propias pestañas")], None))
 SETTINGS.insert(1, ("navegador", "General", "Navegador de la ventana de DeskLens (se aplica al reabrir DeskLens)", "auto",
                     [("auto", "Automático (" + " › ".join(n for b, n, *_ in BROWSERS if b in browsers()) + ")" if browsers()
                       else "Automático"),
@@ -3487,6 +3503,13 @@ class Handler(BaseHTTPRequestHandler):
         Cada acción vuelve a comprobar que la ruta está dentro de lo añadido a DeskLens."""
         global last_ping, bye_at
         url = urlparse(self.path).path
+        if url == "/api/reiniciar":  # «Reiniciar ahora»: este servidor se cierra y main() lanza el nuevo
+            if not self.guard():
+                return
+            reiniciar.set()
+            self.send_json(200, {})
+            threading.Thread(target=self.server.shutdown, daemon=True).start()  # tras responder
+            return
         if url in ("/api/ping", "/api/adios"):  # sendBeacon no puede enviar cabeceras
             if not self.guard(need_header=False):
                 return
@@ -3987,6 +4010,16 @@ def open_window(url):
     webbrowser.open(url)
 
 
+class Server(ThreadingHTTPServer):
+    """En Windows, SO_REUSEADDR (lo que pone http.server) deja que un segundo DeskLens escuche en el MISMO puerto que
+    otro ya abierto, y las peticiones se reparten entre los dos (uno viejo, uno nuevo). Sin él, el segundo no puede
+    abrir el puerto y usa el que ya está, como debe ser."""
+    allow_reuse_address = not WINDOWS
+
+
+reiniciar = threading.Event()  # /api/reiniciar: al cerrarse, este proceso lanza un DeskLens nuevo
+
+
 def main():
     """Arranque: los archivos pasados como argumento (arrastrados sobre el icono o abiertos desde Windows) se añaden
     como sueltos; si DeskLens ya está abierto en ese puerto, se abren en pestañas de su ventana (o, si no tiene ventana,
@@ -3994,17 +4027,29 @@ def main():
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     files = [str(Path(a).resolve()) for a in args if Path(a).is_file()]
     if files:
-        add_paths("sueltos", files)
+        add_paths("sueltos", files)  # los que ya están en un proyecto no se duplican como sueltos
+    else:
+        cfg = load_config()
+        if sin_duplicar_sueltos(cfg):  # duplicados de versiones anteriores: fuera al arrancar
+            save_config(cfg)
     port = ajuste("puerto")
     url = f"http://127.0.0.1:{port}/" + ("?abrir=" + quote("|".join(files)) if files else "")
-    try:
-        server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
-    except OSError:
-        server = None  # ya hay un DeskLens abierto: sus archivos van a su ventana o, si no la tiene, se abre otra
-        if files and hand_to_running(port, files):
+    server = None
+    # --reiniciar: lo lanza el DeskLens anterior al cerrarse; espera a que el puerto quede libre (unos segundos como mucho)
+    for _ in range(40 if "--reiniciar" in sys.argv else 1):
+        try:
+            server = Server(("127.0.0.1", port), Handler)
+            break
+        except OSError:
+            time.sleep(0.25)
+    if not server:  # ya hay un DeskLens abierto
+        if ajuste("ventanas") == "varias":  # otra ventana, que empieza solo con estos archivos (?nueva)
+            url += ("&" if files else "?") + "nueva=1"
+        elif hand_to_running(port, files):  # misma ventana: los archivos van a la abierta, que pasa al frente
             if WINDOWS:
                 win_focus_window()
             return
+        # (sin ninguna ventana viva, o un DeskLens anterior: se abre una)
     if "--sin-ventana" not in sys.argv:
         open_window(url)
     if server:
@@ -4014,6 +4059,10 @@ def main():
         server.serve_forever()
         for r in runs.values():  # al cerrar la ventana no quedan programas corriendo
             r.kill()
+        if reiniciar.is_set():  # «Reiniciar ahora»: se suelta el puerto y arranca el DeskLens nuevo (sin abrir otra ventana)
+            server.server_close()
+            subprocess.Popen([sys.executable, str(ROOT / "desklens.pyw"), "--reiniciar", "--sin-ventana"], cwd=str(ROOT),
+                             creationflags=NO_WINDOW, start_new_session=True)
 
 
 if __name__ == "__main__":
