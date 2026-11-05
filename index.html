@@ -194,15 +194,23 @@ body.gitfull #gitfull{grid-row:1;display:grid;grid-template-rows:auto minmax(0,1
 .gfbar{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--line);background:var(--side)}
 .gfbar b{font-size:13px}.gfbar .gft{font-size:12.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .gfbar .sp{flex:1}.gfbar label{display:flex;align-items:center;gap:4px;font-size:12px;color:var(--muted)}
-.gfbody{display:grid;grid-template-columns:220px minmax(0,1fr) 330px;min-height:0}
+.gfbody{display:grid;grid-template-columns:220px 5px minmax(0,1fr) 5px 330px;min-height:0} /* gitfullLayout pone los anchos */
+.gfside{grid-column:1}.gfrs.l{grid-column:2}.gfmain{grid-column:3}.gfrs.r{grid-column:4}.gfright{grid-column:5}
+.gfrs{cursor:col-resize;min-height:0;min-width:0}.gfrs:hover,.gfrs.drag{background:var(--accent)}
+.gfrs.d{grid-row:2;height:5px;cursor:row-resize}.gfmain:has(.gfdetail:empty) .gfrs.d{display:none}
+#gitfull.nol .gfside,#gitfull.nol .gfrs.l,#gitfull.nor .gfright,#gitfull.nor .gfrs.r,#gitfull.nod .gfdetail,#gitfull.nod .gfrs.d,
+#gitfull.maxd .gfgraph,#gitfull.maxd .gfrs.d{display:none}
+#gitfull.maxd .gfmain{grid-template-rows:0 0 minmax(0,1fr)}#gitfull.maxd .gfdetail{height:auto}
+.gfbar .gfpanes{display:flex;gap:2px;margin-left:8px}.gfbar .gfpanes button{color:var(--faint)}.gfbar .gfpanes button.on{color:var(--accent)}
+.gfgraph h4{display:flex;align-items:center;gap:4px}.gfgraph h4 .sp{flex:1}
 .gfside,.gfright{overflow:auto;background:var(--side);min-height:0}.gfside{border-right:1px solid var(--line);padding:6px 6px 12px}
 .gfright{border-left:1px solid var(--line);padding-top:6px}.gfright #gitv{display:flex}
 .gfside h4,.gfgraph h4{margin:10px 6px 4px;font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
 .gfside .node{font-size:12.5px}.gfside .node.on{font-weight:600;color:var(--ink)}
 .gfside .gfp{flex-direction:column;align-items:flex-start;gap:1px}.gfside .gfp .gfpi{font-size:11px}
-.gfmain{display:grid;grid-template-rows:minmax(0,1fr) auto;grid-template-columns:minmax(0,1fr);min-width:0;min-height:0} /* sin la columna explícita, el grafo ensancha la central */
+.gfmain{display:grid;grid-template-rows:minmax(0,1fr) auto auto;grid-template-columns:minmax(0,1fr);min-width:0;min-height:0} /* sin la columna explícita, el grafo ensancha la central */
 body.gitfull #gitv .shead{display:none} /* la barra de arriba ya dice «Git» */
-.gfgraph{overflow:auto;min-height:0}
+.gfgraph{overflow:auto;min-height:0;grid-row:1}
 .gfrow{display:flex;align-items:center;gap:8px;height:28px;padding-right:10px;cursor:pointer;font-size:12.5px;white-space:nowrap;border-left:3px solid transparent}
 .gfrow:hover{background:var(--hover)}.gfrow.on{background:var(--active)}
 .gfrow[data-lado=entrante]{border-left-color:#2f7fd8}.gfrow[data-lado=saliente]{border-left-color:var(--accent)}
@@ -211,7 +219,7 @@ body.gitfull #gitv .shead{display:none} /* la barra de arriba ya dice «Git» */
 .gfrow .gl{flex:none;font-size:11px;font-weight:600}.gfrow[data-lado=entrante] .gl{color:#2f7fd8}.gfrow[data-lado=saliente] .gl{color:var(--accent)}
 .gref{flex:none;font-size:10.5px;padding:0 6px;border-radius:8px;border:1px solid var(--line);color:var(--muted)}
 .gref.head{border-color:var(--accent);color:var(--accent)}.gref.rem{border-style:dashed}
-.gfdetail{border-top:1px solid var(--line);max-height:45vh;overflow:auto;padding:8px 12px;background:var(--side)}
+.gfdetail{grid-row:3;border-top:1px solid var(--line);height:var(--gfD,300px);overflow:auto;padding:8px 12px;background:var(--side)}
 .gfdetail:empty{display:none}.gdh{font-size:13px;margin-bottom:6px}.gdt{display:flex;align-items:center;gap:6px}.gdt .sp{flex:1}
 .gdbody{margin:4px 0;font:12.5px/1.45 Inter,sans-serif;white-space:pre-wrap;color:var(--muted);max-height:9em;overflow:auto}
 .gdm{font-size:11.5px;color:var(--muted);margin-top:3px;display:flex;flex-wrap:wrap;align-items:center;gap:4px}.gdm .mail{color:var(--faint)}
@@ -885,6 +893,7 @@ const I = {
   down: '<path d="m6 9 6 6 6-6"/>',
   panelLeft: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/>',
   panelRight: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/>',
+  panelBottom: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 14h18"/>',
   max: '<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>',
   min: '<path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7"/>',
   lines: '<path d="M4 6h16M4 10h16M4 14h12M4 18h9"/>',
@@ -2278,6 +2287,38 @@ async function gitRepoMenu(anchor) {
 // La columna derecha es la propia vista Git (#gitv), que se muda aquí mientras dura y vuelve a la barra al salir.
 const gitFullOn = () => document.body.classList.contains('gitfull');
 let gfGraph = null, gfKey = '', gfSel = null, gfSum = [], gitvHome = null;
+// Disposición de la pantalla de Git, que se recuerda: anchos de las columnas, alto del detalle, paneles ocultos, panel
+// ampliado y, por repositorio, el commit elegido y el scroll del historial. (Aquí aún no existe LS: va más abajo.)
+const GF_DEF = { izq: 220, der: 330, alto: 300 };
+let gfL = (() => { try { return { ...GF_DEF, sel: {}, scroll: {}, ...JSON.parse(localStorage.getItem('desklens.git.disposicion') || '{}') }; }
+  catch { return { ...GF_DEF, sel: {}, scroll: {} }; } })(), gfRestore = false;
+const gfSave = () => LS('desklens.git.disposicion', JSON.stringify(gfL));
+// Aplica gfL: columnas (ocultas = 0), clases de lo oculto o ampliado, alto del detalle y el estado de los botones
+function gitfullLayout(save = true) {
+  const G = $('#gitfull'), B = G.querySelector('.gfbody'); if (!B) return;
+  const m = gfL.max, L = !gfL.sinIzq && !m, R = !gfL.sinDer && !m;
+  B.style.gridTemplateColumns = `${L ? gfL.izq + 'px 5px' : '0 0'} minmax(0,1fr) ${R ? '5px ' + gfL.der + 'px' : '0 0'}`;
+  G.classList.toggle('nol', !L); G.classList.toggle('nor', !R);
+  G.classList.toggle('nod', m === 'hist' || (gfL.sinDet && m !== 'det')); G.classList.toggle('maxd', m === 'det');
+  G.style.setProperty('--gfD', gfL.alto + 'px');
+  G.querySelectorAll('.gfpanes button').forEach(b => b.classList.toggle('on', !m && !gfL[b.dataset.k]));
+  G.querySelectorAll('[data-gfmax]').forEach(b => { const on = m === b.dataset.gfmax;
+    b.innerHTML = svg(on ? 'min' : 'max'); b.title = on ? 'Volver a como estaba (Esc)' : `Ampliar ${b.dataset.gfmax === 'hist' ? 'el historial' : 'el detalle'} a toda la pantalla de Git`; });
+  if (save) gfSave();
+}
+function gitfullMaxBtn(z) { const b = iconBtn('max', '', () => { gfL.max = gfL.max === z ? null : z; gitfullLayout(); }); b.dataset.gfmax = z; return b; }
+// Borde que se arrastra (ancho izquierdo, derecho o alto del detalle); doble clic: tamaño original
+function gitfullGrip(h, key, calc) {
+  h.title = 'Arrastra para cambiar el tamaño · doble clic: el original';
+  h.onmousedown = e => {
+    e.preventDefault(); const x0 = e.clientX, y0 = e.clientY, v0 = gfL[key];
+    h.classList.add('drag'); document.body.classList.add('dragging');
+    const mv = ev => { gfL[key] = Math.round(calc(v0, ev.clientX - x0, ev.clientY - y0)); gitfullLayout(false); };
+    addEventListener('mousemove', mv);
+    addEventListener('mouseup', () => { removeEventListener('mousemove', mv); h.classList.remove('drag'); document.body.classList.remove('dragging'); gfSave(); }, { once: true });
+  };
+  h.ondblclick = () => { gfL[key] = GF_DEF[key]; gitfullLayout(); };
+}
 // Se recuerda si Git quedó a pantalla completa o en el panel (predeterminado: panel). keep: cierre de paso (abrir un
 // archivo, ir a otra vista), que no cambia lo recordado.
 function gitFullOpen() {
@@ -2289,8 +2330,19 @@ function gitFullOpen() {
       <label title="Ver también las demás ramas locales y remotas"><input type="checkbox" id="gfAll"> Todas las ramas</label>
       <button class="small" id="gfPull" title="git pull">⇣ Pull</button><button class="small" id="gfPush" title="git push">⇡ Push</button>
       <button class="small" id="gfFetch" title="Ver si hay novedades en el remoto">⟳ Fetch</button></div>
-    <div class="gfbody"><div class="gfside"><h4>Proyectos</h4><div id="gfProj"></div><h4>Ramas</h4><div id="gfBr"></div><div id="gfRem"></div></div>
-      <div class="gfmain"><div class="gfgraph" id="gfGraph"></div><div class="gfdetail" id="gfDetail"></div></div><div class="gfright"></div></div>`;
+    <div class="gfbody"><div class="gfside"><h4>Proyectos</h4><div id="gfProj"></div><h4>Ramas</h4><div id="gfBr"></div><div id="gfRem"></div></div><div class="gfrs l"></div>
+      <div class="gfmain"><div class="gfgraph" id="gfGraph"></div><div class="gfrs d"></div><div class="gfdetail" id="gfDetail"></div></div>
+      <div class="gfrs r"></div><div class="gfright"></div></div>`;
+  // ◧ ⬓ ◨: ocultar o mostrar proyectos y ramas, el detalle del commit y la columna de commit y cambios
+  const panes = Object.assign(document.createElement('span'), { className: 'gfpanes' });
+  for (const [k, ic, t] of [['sinIzq', 'panelLeft', 'proyectos y ramas'], ['sinDet', 'panelBottom', 'el detalle del commit'], ['sinDer', 'panelRight', 'commit y cambios']])
+    { const b = iconBtn(ic, `Mostrar u ocultar ${t}`, () => { gfL[k] = !gfL[k]; gfL.max = null; gitfullLayout(); }); b.dataset.k = k; panes.append(b); }
+  G.querySelector('.gft').after(panes);
+  gitfullGrip(G.querySelector('.gfrs.l'), 'izq', (v, dx) => Math.max(150, Math.min(500, v + dx)));
+  gitfullGrip(G.querySelector('.gfrs.r'), 'der', (v, dx) => Math.max(240, Math.min(600, v - dx)));
+  gitfullGrip(G.querySelector('.gfrs.d'), 'alto', (v, dx, dy) => Math.max(100, Math.min(innerHeight - 200, v - dy)));
+  let st; // el scroll del historial se guarda al pararse (no en cada píxel)
+  G.querySelector('#gfGraph').onscroll = e => { clearTimeout(st); st = setTimeout(() => { if (gst && !gfRestore) { gfL.scroll[gst.ruta] = e.target.scrollTop; gfSave(); } }, 300); };
   G.querySelector('.gfbar').append(Object.assign(iconBtn('min', 'Salir de la pantalla completa (Esc)', () => gitFullClose()), { id: 'gfClose' }));
   gitvHome ||= { parent: $('#gitv').parentNode, next: $('#gitv').nextSibling };
   G.querySelector('.gfright').append($('#gitv'));
@@ -2298,7 +2350,8 @@ function gitFullOpen() {
   $('#gfAll').onchange = e => { LS('desklens.git.todas', e.target.checked ? '1' : ''); gfKey = ''; gitFullDraw(); };
   $('#gfPull').onclick = () => gitLong('pull'); $('#gfPush').onclick = gitPush; $('#gfFetch').onclick = () => gitLong('fetch');
   document.body.classList.add('gitfull', 'vgit');
-  gfKey = ''; gfSel = null; gitFullDraw();
+  gitfullLayout(false);
+  gfKey = ''; gfSel = gfL.sel[gst.ruta] || null; gfRestore = true; gitFullDraw();
 }
 function gitFullClose(keep = false) {
   if (!keep) LS('desklens.git.full', '');
@@ -2328,7 +2381,7 @@ async function gitFullDraw() {
   api('/api/git/resumen').then(sum => { gfSum = sum; gitFullProjects(); }).catch(() => {});
   gitFullProjects();
   const todas = $('#gfAll').checked, key = `${gst.ruta}|${gst.punta}|${todas}`;
-  if (key === gfKey) { $('#gfGraph').style.opacity = ''; return; }
+  if (key === gfKey) { $('#gfGraph').style.opacity = ''; gfRestore = false; return; }
   gfKey = key;
   try { gfGraph = await api(`/api/git/grafo?ruta=${encodeURIComponent(gst.ruta)}&todas=${todas ? 1 : 0}`); }
   catch (e) { $('#gfGraph').innerHTML = `<p class="gfmore">${esc(e.message)}</p>`; $('#gfGraph').style.opacity = ''; return; }
@@ -2339,7 +2392,7 @@ function gitFullProjects() {
   for (const p of side?.proyectos || []) {
     const n = Object.assign(document.createElement('div'), { className: 'node gfp' + (p.ruta === gst?.ruta ? ' on' : ''), title: p.ruta });
     n.innerHTML = `<span>${esc(p.nombre)}</span><span class="gfpi">${repoInfoHtml(gfSum.find(x => x.ruta === p.ruta))}</span>`;
-    n.onclick = () => { LS('desklens.git.repo', p.ruta); gfSel = null; gitLoad(); };
+    n.onclick = () => { LS('desklens.git.repo', p.ruta); gfSel = gfL.sel[p.ruta] || null; gfRestore = true; gitLoad(); };
     P.append(n);
   }
 }
@@ -2390,7 +2443,10 @@ function gitRow(c, lead, msg, cls = '') {
   row.dataset.lado = c.lado; row.dataset.hash = c.hash;
   row.innerHTML = lead + `<span class="gl">${c.lado === 'entrante' ? '↓' : c.lado === 'saliente' ? '↑' : ''}</span>${refs}`
     + `<span class="gm">${msg ?? esc(c.mensaje)}</span><span class="ga">${esc(c.autor)}</span><span class="gfdate" title="${esc(c.fecha)}">${esc(fmtWhen(c.ts))}</span>`;
-  row.onclick = () => { gfSel = c.hash; $('#gfGraph').querySelectorAll('.gfrow.on').forEach(e => e.classList.remove('on')); row.classList.add('on'); gitCommitDetail(c); };
+  row.onclick = () => {
+    gfSel = gfL.sel[gst.ruta] = c.hash; gfL.sinDet = false; gitfullLayout(); // elegir un commit vuelve a mostrar su detalle
+    $('#gfGraph').querySelectorAll('.gfrow.on').forEach(e => e.classList.remove('on')); row.classList.add('on'); gitCommitDetail(c);
+  };
   return row;
 }
 // keep: solo se redibuja la lista (desplegar un merge), sin volver a pedir el detalle ni mover el scroll
@@ -2398,7 +2454,8 @@ function gitGraphDraw(keep = false) {
   const G = $('#gfGraph'), cs = gfGraph.commits, top = G.scrollTop; G.innerHTML = ''; G.style.opacity = '';
   if (!cs.length) return G.innerHTML = '<p class="gfmore">Este repositorio aún no tiene commits.</p>';
   const nIn = cs.filter(c => c.lado === 'entrante').length, nOut = cs.filter(c => c.lado === 'saliente').length;
-  G.insertAdjacentHTML('beforeend', `<h4>Historial${gfGraph.remota ? ` · <span style="color:#2f7fd8">↓ ${nIn} por traer</span> · <span style="color:var(--accent)">↑ ${nOut} por subir</span>` : ''}</h4>`);
+  G.insertAdjacentHTML('beforeend', `<h4>Historial${gfGraph.remota ? ` · <span style="color:#2f7fd8">↓ ${nIn} por traer</span> · <span style="color:var(--accent)">↑ ${nOut} por subir</span>` : ''}<span class="sp"></span></h4>`);
+  G.querySelector('h4').append(gitfullMaxBtn('hist')); gitfullLayout(false);
   const head = c => c.refs.some(f => f.startsWith('HEAD'));
   if (!$('#gfAll').checked) {
     gfLine = gitMainLine(cs);
@@ -2438,6 +2495,7 @@ function gitGraphDraw(keep = false) {
   }
   if (gfGraph.mas) G.insertAdjacentHTML('beforeend', '<p class="gfmore">Se muestran los 300 commits más recientes.</p>');
   if (keep) return G.scrollTop = top;
+  G.scrollTop = gfRestore ? gfL.scroll[gst.ruta] || 0 : top; gfRestore = false;
   const sel = gfSel && cs.find(c => c.hash === gfSel); if (sel) gitCommitDetail(sel); else $('#gfDetail').innerHTML = '';
 }
 // Detalle de un commit: cabecera completa (mensaje entero, hash con copiar, autor y email, fecha absoluta y relativa,
@@ -2478,7 +2536,7 @@ async function gitCommitDetail(c) {
   const mas = files.reduce((a, f) => a + (f.mas || 0), 0), menos = files.reduce((a, f) => a + (f.menos || 0), 0), bin = files.filter(f => f.mas == null).length;
   const chips = [...info.ramas.map(b => `<span class="gref${b.includes('/') ? ' rem' : ''}">${esc(b)}</span>`), ...info.etiquetas.map(t => `<span class="gref">🏷 ${esc(t)}</span>`)].join('');
   D.innerHTML = `<div class="gdh"><div class="gdt"><b>${esc(titulo)}</b><span class="sp"></span>
-      <button class="small" data-copy title="Copiar el hash completo\n${esc(info.hash)}">⧉ ${esc(info.hash.slice(0, 7))}</button><button class="small" data-more title="Más acciones">⋯</button></div>
+      <button class="small" data-copy title="Copiar el hash completo\n${esc(info.hash)}">⧉ ${esc(info.hash.slice(0, 7))}</button><button class="small" data-more title="Más acciones">⋯</button><span data-pane></span></div>
     ${cuerpo ? `<pre class="gdbody">${esc(cuerpo)}</pre>` : ''}
     <div class="gdm">👤 ${esc(info.autor)} <span class="mail">&lt;${esc(info.email)}&gt;</span> · ${fecha.toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })} (${fmtRel(info.fecha)})
       ${info.aplico ? ` · aplicado por ${esc(info.aplico)}` : ''} · ${info.padres.length ? `padre${info.padres.length > 1 ? 's' : ''} ${info.padres.map(p => `<a href="#" data-p="${p}">${p.slice(0, 7)}</a>`).join(' + ')}` : 'primer commit'}
@@ -2488,6 +2546,8 @@ async function gitCommitDetail(c) {
       <input type="search" placeholder="Filtrar archivos…" spellcheck="false"></div></div>
     <table class="gdtab"><thead><tr></tr></thead><tbody></tbody></table>`;
   D.querySelector('[data-copy]').onclick = () => copyText(info.hash, 'Hash copiado');
+  D.querySelector('[data-pane]').replaceWith(gitfullMaxBtn('det'), iconBtn('x', 'Ocultar el detalle (vuelve al elegir un commit)', () => { gfL.sinDet = true; if (gfL.max === 'det') gfL.max = null; gitfullLayout(); }));
+  gitfullLayout(false);
   D.querySelector('[data-more]').onclick = e => gitCommitMenu(e.currentTarget, c, info);
   D.querySelectorAll('[data-p]').forEach(a => a.onclick = e => { e.preventDefault(); gitSelectCommit(a.dataset.p); });
   const cols = [['estado', 'Estado'], ['rel', 'Archivo'], ['dir', 'Carpeta'], ['ext', 'Tipo'], ['mas', '+'], ['menos', '−'], ['tam', 'Tamaño'], ['', '']];
@@ -2562,7 +2622,7 @@ function gitInit() {
   $('#gCommit').onclick = gitCommit;
   $('#gMsg').onkeydown = e => { if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); gitCommit(); } };
   $('#gbtns').append(iconBtn('refresh', 'Actualizar', () => gitLoad()), iconBtn('max', 'Git a pantalla completa: historial, ramas y proyectos', gitFullOpen));
-  addEventListener('keydown', e => { if (e.key === 'Escape' && gitFullOn() && !modalOpen() && !$('#menu')) { e.preventDefault(); gitFullClose(); } });
+  addEventListener('keydown', e => { if (e.key === 'Escape' && gitFullOn() && !modalOpen() && !$('#menu')) { e.preventDefault(); if (gfL.max) { gfL.max = null; gitfullLayout(); } else gitFullClose(); } });
   // al volver a la ventana y cada 5 s con la vista visible (no durante una acción, un menú o una pregunta)
   addEventListener('focus', () => gitOn() && gitLoad());
   setInterval(() => { if (gitOn() && !document.hidden && !gbusy && !$('#menu') && !modalOpen()) gitLoad(); }, 5000);
@@ -5201,8 +5261,9 @@ $('#grip').onmousedown = e => {
   const mv = ev => { $('#panel').style.height = Math.max(120, Math.min(innerHeight - 160, h0 + y0 - ev.clientY)) + 'px'; };
   document.body.classList.add('dragging');
   addEventListener('mousemove', mv);
-  addEventListener('mouseup', () => { removeEventListener('mousemove', mv); document.body.classList.remove('dragging'); }, { once: true });
+  addEventListener('mouseup', () => { removeEventListener('mousemove', mv); document.body.classList.remove('dragging'); LS('desklens.conH', $('#panel').offsetHeight); }, { once: true });
 };
+try { const h = localStorage.getItem('desklens.conH'); if (h) $('#panel').style.height = h + 'px'; } catch {}
 
 // ---------- IA: un solo chat. DeskLens prepara el contexto con Python, sin gastar tokens ----------
 let iaState = { ias: [], pref: { limite: 2000, carga: {} } }, rulesInfo = null, sel = null, curFile = null, editorCM = null;
@@ -5987,6 +6048,7 @@ function paintMax(b) {
 // ⤢ Pantalla completa de una zona (documento, IA o consola); Esc vuelve. CodeMirror necesita refresh al cambiar de tamaño.
 function setMax(zone) {
   maxZone = zone;
+  LS('desklens.max', zone === 'con' ? '' : zone); // la consola no: al abrir DeskLens no hay nada ejecutándose
   document.body.classList.remove('max-doc', 'max-ia', 'max-con');
   if (zone) document.body.classList.add('max-' + zone);
   document.querySelectorAll('button[data-zone]').forEach(paintMax);
@@ -6105,6 +6167,7 @@ try { if (localStorage.getItem('desklens.ia')) document.body.classList.add('ia')
 // render después: las migas necesitan los proyectos; antes, ajustes y lo que haya que recuperar
 loadSide().finally(async () => {
   await loadSettings(); await recoverAll(); await render();
+  const mz = LS('desklens.max'); if (mz === 'doc' || (mz === 'ia' && document.body.classList.contains('ia'))) setMax(mz); // zona ampliada de la última vez
   const sp = savedSplit; // vista dividida de la última vez
   if (sp?.tabs) {
     const grip = Object.assign(document.createElement('div'), { id: 'splitGrip', title: 'Arrastra para cambiar el ancho · doble clic: mitad y mitad' });
