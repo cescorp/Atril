@@ -850,6 +850,16 @@ assert.deepStrictEqual(findRefs('Ver 1 Samuel 4:4 y 1 Samuel 8:5, 20; Deuteronom
     assert any(len(c["padres"]) == 2 for c in g["commits"])  # el merge de sincronizar
     e = next(c for c in g["commits"] if c["mensaje"] == "e")
     assert e["n"] == 1 and all(isinstance(c["n"], int) for c in g["commits"])  # archivos cambiados por commit
+    # 📊 Estadística: todos los commits con autor, hora, rama y líneas por archivo; los merges no suman líneas; se guarda
+    desklens.STATS_DIR = tmp / "estadistica"
+    st = desklens.git_stats(str(rep), budget=30)
+    total = int(subprocess.check_output(["git", "-C", str(rep), "rev-list", "--all", "--count"], text=True))
+    assert st["pendientes"] == 0 and len(st["commits"]) == total
+    ce = next(c for c in st["commits"] if c[0] == e["hash"][:10])
+    assert ce[1] and ce[2] == e["ts"] and ce[4] is False and ce[5] == [["e.md", 2, 0]] and ce[3]
+    assert all(c[5] == [] for c in st["commits"] if c[4])  # merges: sin líneas
+    assert list((tmp / "estadistica").glob("*.json"))  # calculado una vez y guardado
+    assert desklens.git_stats(str(rep), budget=0)["pendientes"] == 0  # la 2.ª vez ya no calcula nada
     code, d = get(port, f"/api/git/archivos?ruta={urllib.request.quote(str(rep))}&hash={e['hash']}")
     assert [(f["rel"], f["mas"], f["menos"]) for f in json.loads(d)["archivos"]] == [("e.md", 2, 0)]
     # cambiar de rama con cambios sin commit: 409 con los archivos; «apartar» los guarda en el stash y

@@ -104,6 +104,8 @@ SETTINGS = [
     ("bitacora_conservar", "Bitácora", "Entradas que se quedan al archivar", 20, 1, 1000),
     ("git_cache_seg", "Git", "Volver a consultar git cada (segundos)", 10, 1, 3600),
     ("git_fetch_min", "Git", "Buscar novedades en los remotos cada (minutos; 0 = nunca)", 5, 0, 1440),
+    ("est_pausa_min", "Git", "Estadística: pausa máxima dentro de una sesión de trabajo (minutos; más, es otra sesión)", 120, 10, 1440),
+    ("est_previo_min", "Git", "Estadística: tiempo de trabajo antes del primer commit de cada sesión (minutos)", 30, 0, 480),
     ("ia_espera_seg", "IA", "Tiempo máximo de espera de una respuesta (segundos)", 600, 30, 3600),
     ("ia_explicar_lineas", "IA", "Líneas de la consola que envía «Explicar error»", 40, 5, 500),
     ("ia_pdf_en_adelante", "IA", "Páginas que toma «página N en adelante»", 10, 1, 100),
@@ -2754,6 +2756,90 @@ def folder_items(path):
     return items
 
 
+# ---------- 📊 Estadística de git: cada commit con su autor, hora, rama y líneas (la ventana agrupa y calcula) ----------
+# Las líneas por archivo (numstat) son lo caro: se calculan una vez por commit (un commit no cambia) y se guardan en
+# historial/estadistica; cada petición calcula como mucho ~1,5 s de lo que falte y dice cuántos quedan («pendientes»).
+
+STATS_DIR = ROOT / "historial" / "estadistica"
+INTEGRATION = ("main", "master", "produccion", "production", "calidad", "develop", "dev")  # ramas de integración
+
+
+def stats_branches(repo, commits):
+    """Rama de cada commit: la de la cadena de 1.er padre que lo alcanza primero, en este orden:
+    1) una rama de trabajo que está justo donde una de integración (main = pruebas tras un fast-forward: lo hecho en
+    «pruebas» cuenta en «pruebas»); 2) las de integración (main/master primero); 3) el resto, de la más reciente a la más
+    vieja, que así solo se quedan con lo suyo (una rama nueva sacada de main no se lleva la historia de main).
+    origin/x y x son la misma. Lo que entró por un merge de una rama ya borrada toma el nombre del mensaje del merge.
+    ponytail: aproximación (git no guarda en qué rama se hizo un commit)."""
+    tips, remotes = {}, tuple(r + "/" for r in git_run(repo, "remote").split())
+    for ln in git_run(repo, "for-each-ref", "--sort=-committerdate", "--format=%(refname:short)\x1f%(objectname)",
+                      "refs/heads", "refs/remotes").splitlines():
+        name, _, h = ln.partition("\x1f")
+        short = name.split("/", 1)[1] if name.startswith(remotes) else name
+        if short != "HEAD" and not short.endswith("/HEAD") and name + "/" not in remotes:  # «origin» = origin/HEAD
+            tips.setdefault(short, h)
+    integ = {tips[b] for b in tips if b in INTEGRATION}
+    rank = lambda b: (0 if b not in INTEGRATION and tips[b] in integ else 1 if b in ("main", "master")
+                      else 2 if b in INTEGRATION else 3)
+    order = sorted(tips, key=rank)  # estable: dentro de cada grupo, de la más reciente a la más vieja
+    by = {c["hash"]: c for c in commits}
+    owner = {}
+
+    def claim(h, name):
+        while h in by and h not in owner:
+            owner[h] = name
+            h = (by[h]["padres"] or [None])[0]
+    for b in order:
+        claim(tips[b], b)
+    for c in commits:  # ramas ya borradas: por el mensaje del merge que las trajo
+        for p in c["padres"][1:]:
+            m = re.match(r"Merge (?:remote-tracking )?branch '([^']+)'|Merge pull request #\d+ from [^/\s]+/(\S+)", c["mensaje"])
+            claim(p, (m.group(1) or m.group(2)).split("/")[-1] if m else "(sin rama)")
+    return owner
+
+
+def git_stats(path, budget=1.5):
+    """Todos los commits de todas las ramas (también las remotas) con autor, fecha, rama y, si ya están calculadas,
+    las líneas por archivo. Los merges no suman líneas (repetirían lo que trajo la otra rama)."""
+    repo = repo_of(path)
+    out = git_do(repo, "-c", "core.quotePath=false", "log", "--all", "--format=%x1e%H%x1f%an%x1f%at%x1f%P%x1f%s")
+    commits = []
+    for rec in out.split("\x1e"):
+        if rec.strip():
+            h, an, at, parents, subject = (rec.strip("\n").split("\x1f") + [""] * 5)[:5]
+            commits.append({"hash": h, "autor": an, "ts": int(at or 0), "padres": parents.split(), "mensaje": subject})
+    STATS_DIR.mkdir(parents=True, exist_ok=True)
+    cache_file = STATS_DIR / (hashlib.sha1(os.path.normcase(str(repo)).encode()).hexdigest()[:16] + ".json")
+    try:
+        cache = json.loads(cache_file.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        cache = {}
+    todo = [c["hash"] for c in commits if len(c["padres"]) < 2 and c["hash"] not in cache]
+    start, changed = time.time(), False
+    while todo and time.time() - start < budget:
+        batch, todo = todo[:150], todo[150:]
+        txt = git_run(repo, "-c", "core.quotePath=false", "show", "--numstat", "--format=%x1e%H", "-M", *batch)
+        for rec in txt.split("\x1e"):
+            head, _, body = rec.strip("\n").partition("\n")
+            if head.strip():
+                files = []
+                for ln in body.splitlines():
+                    a, d, *rest = ln.split("\t") + ["", ""]
+                    if rest[0]:
+                        name = re.sub(r"\{[^{}]* => ([^{}]*)\}", r"\1", rest[0]).replace("//", "/").split(" => ")[-1]
+                        files.append([name, int(a) if a.isdigit() else -1, int(d) if d.isdigit() else -1])  # -1: binario
+                cache[head.strip()] = files
+                changed = True
+    if changed:
+        tmp = cache_file.with_suffix(".tmp")
+        tmp.write_text(json.dumps(cache, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(cache_file)
+    owner = stats_branches(repo, commits)
+    return {"repositorio": str(repo), "pendientes": len(todo),
+            "commits": [[c["hash"][:10], c["autor"], c["ts"], owner.get(c["hash"], "(sin rama)"), len(c["padres"]) > 1,
+                         [] if len(c["padres"]) > 1 else cache.get(c["hash"])] for c in commits]}
+
+
 def git_track(line):
     """Una línea de for-each-ref («rama␟origin/rama␟[ahead 1, behind 2]») → {rama, remota, adelante, atras, borrada}."""
     name, up, track = (line.split("\x1f") + ["", ""])[:3]
@@ -3285,6 +3371,11 @@ class Handler(BaseHTTPRequestHandler):
             if url.path == "/api/git/commit":
                 try:
                     return self.send_json(200, git_commit_info(ruta, q.get("hash", "")))
+                except (ValueError, subprocess.TimeoutExpired) as e:
+                    return self.send_json(400, {"error": str(e)})
+            if url.path == "/api/git/estadistica":
+                try:
+                    return self.send_json(200, git_stats(ruta))
                 except (ValueError, subprocess.TimeoutExpired) as e:
                     return self.send_json(400, {"error": str(e)})
             if url.path == "/api/git/ignorados":

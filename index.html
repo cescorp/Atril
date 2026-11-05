@@ -215,6 +215,30 @@ body.gitfull #gitfull{grid-row:1;display:grid;grid-template-rows:auto minmax(0,1
 .gitab td{padding:3px 10px;border-bottom:1px solid color-mix(in srgb,var(--line) 50%,transparent);white-space:nowrap}.gitab tbody tr{cursor:pointer}.gitab tbody tr:hover{background:var(--hover)}
 .gitab .num{text-align:right;font-variant-numeric:tabular-nums}.gitab .gc{color:var(--muted)}.gitab code{font-size:11.5px;color:var(--ink)}
 .gitab .gin{display:inline-flex;gap:4px;align-items:center}.gitab .gitg{display:inline-block;width:10px;color:var(--muted);font-size:10px}.gitab .gidir bdi{font-weight:500}
+.est{padding:4px 14px 24px;display:flex;flex-direction:column;gap:18px}
+.estbar{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;font-size:12.5px;color:var(--muted)}
+.estbar label{display:flex;gap:6px;align-items:center}.estbar input[type=date],.estbar select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:3px 6px}
+.est .seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}.est .seg button{border:0;border-radius:0;background:none;padding:3px 9px;font-size:12px;color:var(--muted)}
+.est .seg button.on{background:var(--active);color:var(--ink);font-weight:600}.est .seg.sm button{padding:1px 7px;font-size:11px}
+.esttiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.esttiles .tile{border:1px solid var(--line);border-radius:8px;padding:8px 12px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.esttiles small{font-size:11.5px;color:var(--muted)}.esttiles b{font-size:22px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums;white-space:nowrap}
+.esttiles b i{font-style:normal;color:#2e8b57;font-size:17px}.esttiles b em{font-style:normal;color:#c0392b;font-size:17px}.esttiles span{font-size:11.5px;color:var(--faint)}
+.est section h5{margin:0 0 8px;font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.est section h5 small{text-transform:none;letter-spacing:0;font-weight:400;color:var(--faint)}
+.estsvg{display:block;max-width:100%}.estsvg .grid{stroke:var(--line);stroke-width:1}.estsvg .ax{font-size:10.5px;fill:var(--muted)}.estsvg path:hover{opacity:.8}
+.estleg{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--ink);margin-bottom:6px}.estleg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.esttip[hidden]{display:none}.esttip{position:fixed;z-index:30;pointer-events:none;background:var(--paper);color:var(--ink);border:1px solid var(--line);border-radius:6px;box-shadow:0 6px 18px rgba(0,0,0,.15);padding:6px 9px;font-size:12px;line-height:1.45}
+.heat{display:grid;grid-template-columns:34px repeat(24,minmax(10px,1fr));gap:2px;max-width:760px;font-size:10.5px;color:var(--muted)}
+.heat i{height:16px;border-radius:3px}.heat i.z{background:color-mix(in srgb,var(--line) 45%,transparent)!important}.heat .hx{text-align:left}.heat .hy{align-self:center}
+.esthint{margin:6px 0 0;font-size:12px;color:var(--muted)}.esthint b{color:var(--ink)}
+.esttab{width:100%;border-collapse:collapse;font-size:12.5px}.esttab th{text-align:left;font-weight:600;font-size:11.5px;color:var(--muted);padding:4px 8px;border-bottom:1px solid var(--line)}
+.esttab td{padding:4px 8px;border-bottom:1px solid color-mix(in srgb,var(--line) 50%,transparent);white-space:nowrap}.esttab tbody tr{cursor:pointer}.esttab tbody tr:hover{background:var(--hover)}.esttab tr.on{background:var(--active)}
+.esttab .num{text-align:right;font-variant-numeric:tabular-nums}.esttab .add{color:#2e8b57}.esttab .del{color:#c0392b}.esttab .gc{color:var(--muted)}.esttab .ot{max-width:220px;overflow:hidden;text-overflow:ellipsis}
+.esttab .sw{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:7px;vertical-align:-1px}
+.esttab .pc{width:34%;min-width:160px}.esttab .pcn{display:inline-block;width:3.2em;text-align:right;margin-right:8px;font-variant-numeric:tabular-nums}
+.esttab .pcbar{display:inline-block;width:calc(100% - 4.2em);height:10px;border-radius:5px;background:color-mix(in srgb,var(--line) 55%,transparent);vertical-align:-1px;overflow:hidden}
+.esttab .pcbar i{display:block;height:100%;border-radius:5px}.esttab .fp{max-width:420px;overflow:hidden;text-overflow:ellipsis;direction:rtl;text-align:left}
 .giwarn{margin:14px 10px 4px;padding:8px 10px;border-radius:6px;background:color-mix(in srgb,#c08a00 12%,transparent);font-size:12.5px}
 .gfside,.gfright{overflow:auto;background:var(--side);min-height:0}.gfside{border-right:1px solid var(--line);padding:6px 6px 12px}
 .gfright{border-left:1px solid var(--line);padding-top:6px}.gfright #gitv{display:flex}
@@ -2429,7 +2453,7 @@ function gitfullLayout(save = true) {
   const m = gfL.max, L = !gfL.sinIzq && !m, R = !gfL.sinDer && !m;
   B.style.gridTemplateColumns = `${L ? gfL.izq + 'px 5px' : '0 0'} minmax(0,1fr) ${R ? '5px ' + gfL.der + 'px' : '0 0'}`;
   G.classList.toggle('nol', !L); G.classList.toggle('nor', !R);
-  G.classList.toggle('nod', m === 'hist' || gfL.tab === 'ign' || (gfL.sinDet && m !== 'det')); G.classList.toggle('maxd', m === 'det');
+  G.classList.toggle('nod', m === 'hist' || gfL.tab === 'ign' || gfL.tab === 'est' || (gfL.sinDet && m !== 'det')); G.classList.toggle('maxd', m === 'det');
   G.style.setProperty('--gfD', gfL.alto + 'px');
   G.querySelectorAll('.gfpanes button').forEach(b => b.classList.toggle('on', !m && !gfL[b.dataset.k]));
   G.querySelectorAll('[data-gfmax]').forEach(b => { const on = m === b.dataset.gfmax;
@@ -2600,14 +2624,15 @@ let gfIgn = null; // { ruta, data, sizes: Map(ruta → {archivos, tam}|null), ki
 const ignQueue = []; let ignBusy = 0, ignTimer = 0;
 function gitTabsHtml() {
   const t = gfIgn?.ruta === gst?.ruta && gfIgn.data ? ignTotal() : null;
-  return `<button class="gftab${gfL.tab !== 'ign' ? ' on' : ''}" data-tab="hist">Historial</button>`
+  return `<button class="gftab${!['ign', 'est'].includes(gfL.tab) ? ' on' : ''}" data-tab="hist">Historial</button>`
     + `<button class="gftab${gfL.tab === 'ign' ? ' on' : ''}" data-tab="ign" title="Archivos y carpetas que git no sigue por un .gitignore">🙈 Ignorados${
-      t ? ` · ${t.n.toLocaleString()} · ${fmtSize(t.tam)}${t.pend ? '…' : ''}` : ''}</button>`;
+      t ? ` · ${t.n.toLocaleString()} · ${fmtSize(t.tam)}${t.pend ? '…' : ''}` : ''}</button>`
+    + `<button class="gftab${gfL.tab === 'est' ? ' on' : ''}" data-tab="est" title="Quién envía más, cuándo se trabaja y horas estimadas, por autor y por rama">📊 Estadística</button>`;
 }
 function gitTabsBind(h4) { h4.onclick = e => { const t = e.target.closest('[data-tab]')?.dataset.tab; if (t && t !== (gfL.tab || 'hist')) gitTab(t); }; }
 function gitTab(t) {
   gfL.tab = t; gitfullLayout();
-  if (t === 'ign') gitIgnoredDraw(); else { gfKey = ''; gitFullDraw(); }
+  if (t === 'ign') gitIgnoredDraw(); else if (t === 'est') gitStatsDraw(); else { gfKey = ''; gitFullDraw(); }
 }
 function ignSize(ruta) {
   if (gfIgn.sizes.has(ruta)) return;
@@ -2715,9 +2740,197 @@ function ignOpenRule(r) {
   const p = /^([a-zA-Z]:|[\\/])/.test(r.archivo) ? r.archivo : gfIgn.data.repositorio + '\\' + r.archivo.replace(/\//g, '\\');
   gitFullClose(true); openTab(p, true); flash(`La regla «${r.patron}» está en la línea ${r.linea}`);
 }
+// ---------- pestaña 📊 Estadística: quién envía más, cuándo se trabaja y cuántas horas (≈), por autor y por rama ----------
+// El servidor da cada commit (autor, hora, rama, líneas por archivo); aquí se filtra por fechas, rama y autor y se agrupa.
+// Las líneas se calculan una vez por commit: mientras falten, se vuelve a pedir y la pantalla dice cuántos quedan.
+// Colores: paleta categórica validada (8 tonos; claro y oscuro), fija por entidad (por su total de siempre, no por el
+// filtro), y un 8.º «Otros» gris. Horas ≈ por sesiones: commits de un autor con menos de «pausa» entre sí son una sesión;
+// a cada sesión se suma el tiempo previo al primer commit (⚙ Ajustes › Git).
+const EST_CAT = { light: ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6'],
+  dark: ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9'] };
+const EST_SEQ = ['#cde2fb', '#9ec5f4', '#6da7ec', '#3987e5', '#256abf', '#184f95', '#0d366b']; // azul, de poco a mucho
+const EST_OTHER = '#8f8f8f';
+// archivos que no son trabajo escrito a mano: no suman líneas
+const EST_SKIP = /(^|\/)(package-lock\.json|composer\.lock|yarn\.lock|pnpm-lock\.yaml|[^/]+\.min\.(js|css))$|(^|\/)(vendor|node_modules|dist|build)\//i;
+const DAYS_ES = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+let gfSt = null; // { ruta, data, commits, err }
+const estDark = () => matchMedia('(prefers-color-scheme: dark)').matches;
+const estDay = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const estParse = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+const estMonday = d => { const x = new Date(d); x.setDate(x.getDate() - (x.getDay() + 6) % 7); return x; };
+function estPreset(p) {
+  const t = new Date(), y = t.getFullYear();
+  const from = p === 'hoy' ? t : p === 'semana' ? estMonday(t) : p === 'mes' ? new Date(y, t.getMonth(), 1)
+    : p === 'anio' ? new Date(y, 0, 1) : new Date(Math.min(...(gfSt?.commits || []).map(c => c.ts * 1000), t.getTime()));
+  return { desde: estDay(from), hasta: estDay(t), preset: p };
+}
+const estF = () => (gfL.est ||= { ...estPreset('mes'), grupo: 'semana', rama: '', autor: '', ver: 'commits', serie: 'autor' });
+const fmtH = h => h < 1 ? `${Math.round(h * 60)} min` : `${(h < 10 ? Math.round(h * 10) / 10 : Math.round(h)).toLocaleString()} h`;
+const fmtN = n => n.toLocaleString();
+// horas ≈ por sesiones de cada autor
+function estHours(cs) {
+  const pausa = (AJ?.est_pausa_min ?? 120) * 60, previo = (AJ?.est_previo_min ?? 30) * 60, by = new Map();
+  for (const c of cs) (by.get(c.autor) || by.set(c.autor, []).get(c.autor)).push(c.ts);
+  let secs = 0;
+  for (const ts of by.values()) {
+    ts.sort((a, b) => a - b);
+    let s0 = ts[0], last = ts[0];
+    for (const t of ts.slice(1)) { if (t - last > pausa) { secs += last - s0 + previo; s0 = t; } last = t; }
+    secs += last - s0 + previo;
+  }
+  return secs / 3600;
+}
+const estLines = c => (c.files || []).reduce((a, [f, ad, de]) => EST_SKIP.test(f) || ad < 0 ? a : [a[0] + ad, a[1] + de], [0, 0]);
+async function gitStatsDraw() {
+  const G = $('#gfGraph'); G.style.opacity = '';
+  if (gfSt?.ruta !== gst.ruta || gfSt.punta !== gst.punta) gfSt = { ruta: gst.ruta, punta: gst.punta, data: null };
+  G.innerHTML = `<h4>${gitTabsHtml()}<span class="sp"></span></h4><div class="est" id="est"></div>`;
+  const h4 = G.querySelector('h4'); h4.append(gitfullMaxBtn('hist')); gitTabsBind(h4); gitfullLayout(false);
+  if (!gfSt.data) {
+    const ctx = gfSt;
+    $('#est').innerHTML = '<p class="gfmore">Leyendo los commits de todas las ramas…</p>';
+    for (;;) { // las líneas de los commits nuevos se calculan por tandas: se repite hasta que no quede ninguno
+      let r; try { r = await api('/api/git/estadistica?ruta=' + encodeURIComponent(ctx.ruta)); }
+      catch (e) { if (ctx === gfSt) $('#est').innerHTML = `<p class="gfmore">⚠️ ${esc(e.message)}</p>`; return; }
+      if (ctx !== gfSt || gfL.tab !== 'est') return;
+      ctx.data = r;
+      ctx.commits = r.commits.map(([h, autor, ts, rama, merge, files]) => ({ h, autor, ts, rama, merge, files }));
+      if (!r.pendientes) break;
+      $('#est').innerHTML = `<p class="gfmore">Contando las líneas de cada commit (solo la primera vez): faltan ${r.pendientes} de ${r.commits.length}…</p>`;
+    }
+    // color fijo por autor y por rama: según sus commits de siempre (no cambia al filtrar)
+    const rankOf = key => { const n = new Map(); gfSt.commits.forEach(c => !c.merge && n.set(c[key], (n.get(c[key]) || 0) + 1));
+      return new Map([...n].sort((a, b) => b[1] - a[1]).map(([k], i) => [k, i])); };
+    gfSt.rank = { autor: rankOf('autor'), rama: rankOf('rama') };
+  }
+  estRender();
+}
+const estColor = (key, name) => { const i = gfSt.rank[key].get(name); return i != null && i < 7 ? EST_CAT[estDark() ? 'dark' : 'light'][i] : EST_OTHER; };
+function estRender() {
+  const E = $('#est'); if (!E || !gfSt?.commits) return;
+  if ($('#estTip')) $('#estTip').hidden = true; // el globo del gráfico anterior
+  const f = estF(), all = gfSt.commits;
+  const t0 = estParse(f.desde).getTime() / 1000, t1 = estParse(f.hasta).getTime() / 1000 + 86400;
+  const pick = (a, b) => all.filter(c => c.ts >= a && c.ts < b && (!f.rama || c.rama === f.rama) && (!f.autor || c.autor === f.autor));
+  const cs = pick(t0, t1), work = cs.filter(c => !c.merge), prev = pick(t0 - (t1 - t0), t0).filter(c => !c.merge);
+  const lines = work.reduce((a, c) => { const [x, y] = estLines(c); return [a[0] + x, a[1] + y]; }, [0, 0]);
+  const files = new Set(work.flatMap(c => (c.files || []).map(x => x[0])));
+  const days = new Set(cs.map(c => estDay(new Date(c.ts * 1000)))), nDays = Math.round((t1 - t0) / 86400);
+  const hours = cs.length ? estHours(cs) : 0, diff = prev.length ? Math.round((work.length - prev.length) / prev.length * 100) : null;
+  const opts = (key, label) => `<option value="">${label}</option>` + [...gfSt.rank[key].keys()].map(n => `<option ${f[key] === n ? 'selected' : ''}>${esc(n)}</option>`).join('');
+  E.innerHTML = `<div class="estbar">
+      <label>Desde <input type="date" id="esD" value="${f.desde}"></label><label>Hasta <input type="date" id="esH" value="${f.hasta}"></label>
+      <span class="seg">${[['hoy', 'Hoy'], ['semana', 'Esta semana'], ['mes', 'Este mes'], ['anio', 'Este año'], ['todo', 'Todo']].map(([k, n]) => `<button data-p="${k}" class="${f.preset === k ? 'on' : ''}">${n}</button>`).join('')}</span>
+      <span class="seg" title="Agrupar el gráfico">${[['dia', 'Día'], ['semana', 'Semana'], ['mes', 'Mes']].map(([k, n]) => `<button data-g="${k}" class="${f.grupo === k ? 'on' : ''}">${n}</button>`).join('')}</span>
+      <select id="esR">${opts('rama', 'Todas las ramas')}</select><select id="esA">${opts('autor', 'Todos los autores')}</select></div>
+    <div class="esttiles">
+      <div class="tile"><small>Commits</small><b>${fmtN(work.length)}</b><span>${diff == null ? '' : `${diff >= 0 ? '↑' : '↓'} ${Math.abs(diff)} % que el periodo anterior`}${cs.length - work.length ? ` · ${cs.length - work.length} merge${cs.length - work.length === 1 ? '' : 's'}` : ''}</span></div>
+      <div class="tile"><small>Archivos</small><b>${fmtN(files.size)}</b><span>distintos</span></div>
+      <div class="tile" title="Sin archivos generados (lock, .min, vendor, node_modules) ni binarios"><small>Líneas</small><b><i>+${fmtN(lines[0])}</i> <em>−${fmtN(lines[1])}</em></b><span>sin generados ni binarios</span></div>
+      <div class="tile" title="Estimado por sesiones: commits de un autor con menos de ${AJ?.est_pausa_min ?? 120} min entre sí son una sesión, y a cada una se suman ${AJ?.est_previo_min ?? 30} min previos (⚙ Ajustes › Git). Git no guarda cuánto se trabajó."><small>Horas ≈</small><b>${fmtH(hours)}</b><span>estimado por tiempo ⓘ</span></div>
+      <div class="tile"><small>Días activos</small><b>${days.size}</b><span>de ${nDays}</span></div></div>
+    <section><h5>Commits por ${f.grupo === 'dia' ? 'día' : f.grupo} <span class="seg sm">${[['autor', 'por autor'], ['rama', 'por rama']].map(([k, n]) => `<button data-s="${k}" class="${f.serie === k ? 'on' : ''}">${n}</button>`).join('')}</span></h5><div id="esChart"></div></section>
+    <section><h5>¿Cuándo se trabaja? <small>commits por día de la semana y hora</small></h5><div id="esHeat"></div></section>
+    <section><h5>Quién envía más <small>todas las ramas, también las remotas</small> <span class="seg sm">${[['commits', 'Commits'], ['lineas', 'Líneas'], ['horas', 'Horas']].map(([k, n]) => `<button data-v="${k}" class="${f.ver === k ? 'on' : ''}">${n}</button>`).join('')}</span></h5><div id="esAut"></div></section>
+    <section><h5>Por rama <small>cada commit en la rama donde se hizo (aproximado)</small></h5><div id="esRam"></div></section>
+    <section><h5>Archivos más cambiados</h5><div id="esFiles"></div></section>`;
+  const set = o => { Object.assign(f, o); gfSave(); estRender(); };
+  E.querySelector('#esD').onchange = e => e.target.value && set({ desde: e.target.value, preset: '' });
+  E.querySelector('#esH').onchange = e => e.target.value && set({ hasta: e.target.value, preset: '' });
+  E.querySelector('#esR').onchange = e => set({ rama: e.target.value });
+  E.querySelector('#esA').onchange = e => set({ autor: e.target.value });
+  E.onclick = e => { const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.p) set(estPreset(b.dataset.p)); else if (b.dataset.g) set({ grupo: b.dataset.g });
+    else if (b.dataset.s) set({ serie: b.dataset.s }); else if (b.dataset.v) set({ ver: b.dataset.v }); };
+  estChart(work, f, t0, t1); estHeat(cs); estTable('#esAut', 'autor', cs, f); estTable('#esRam', 'rama', cs, f); estFiles(work);
+}
+// tooltip compartido de los gráficos
+function estTip(el, html) {
+  let T = $('#estTip'); if (!T) T = document.body.appendChild(Object.assign(document.createElement('div'), { id: 'estTip', className: 'esttip' }));
+  el.onmousemove = e => { T.innerHTML = html; T.hidden = false; T.style.left = Math.min(e.clientX + 12, innerWidth - T.offsetWidth - 8) + 'px'; T.style.top = (e.clientY + 14) + 'px'; };
+  el.onmouseleave = () => { T.hidden = true; };
+}
+// barras apiladas por periodo (día, semana o mes), una capa por autor o rama (7 + «Otros»)
+function estChart(work, f, t0, t1) {
+  const C = $('#esChart'), key = f.serie, keyOf = d => f.grupo === 'dia' ? estDay(d) : f.grupo === 'semana' ? estDay(estMonday(d)) : estDay(d).slice(0, 7);
+  const buckets = [];
+  for (let d = estParse(f.desde); d.getTime() / 1000 < t1; d.setDate(d.getDate() + 1)) { const k = keyOf(d); if (buckets.at(-1) !== k) buckets.push(k); }
+  if (buckets.length > 400) return C.innerHTML = '<p class="gfmore">Demasiados días para verlos uno a uno: agrupa por semana o mes.</p>';
+  const series = [...new Set(work.map(c => c[key]))].sort((a, b) => (gfSt.rank[key].get(a) ?? 99) - (gfSt.rank[key].get(b) ?? 99));
+  const shown = series.slice(0, 7), label = n => shown.includes(n) ? n : 'Otros';
+  const grid = new Map(buckets.map(b => [b, new Map()]));
+  for (const c of work) { const m = grid.get(keyOf(new Date(c.ts * 1000))); if (m) m.set(label(c[key]), (m.get(label(c[key])) || 0) + 1); }
+  const names = [...shown, ...(series.length > 7 ? ['Otros'] : [])], max = Math.max(1, ...[...grid.values()].map(m => [...m.values()].reduce((a, b) => a + b, 0)));
+  const W = Math.max(300, C.clientWidth || 600), H = 180, L = 34, B = 22, slot = (W - L) / buckets.length, bw = Math.min(24, Math.max(3, slot - 2));
+  const step = max <= 5 ? 1 : max <= 10 ? 2 : max <= 25 ? 5 : max <= 50 ? 10 : Math.ceil(max / 5 / 10) * 10, top = Math.ceil(max / step) * step;
+  const y = v => H - B - (v / top) * (H - B - 8);
+  let svg = '';
+  for (let v = 0; v <= top; v += step) svg += `<line x1="${L}" x2="${W}" y1="${y(v)}" y2="${y(v)}" class="grid"/><text x="${L - 6}" y="${y(v) + 4}" class="ax" text-anchor="end">${v}</text>`;
+  const fmtB = b => f.grupo === 'mes' ? new Date(b + '-01T00:00').toLocaleDateString([], { month: 'short', year: '2-digit' })
+    : estParse(b).toLocaleDateString([], { day: 'numeric', month: 'short' });
+  const every = Math.ceil(buckets.length / Math.max(1, Math.floor((W - L) / 64)));
+  buckets.forEach((b, i) => {
+    const x = L + i * slot + (slot - bw) / 2, m = grid.get(b);
+    let acc = 0;
+    names.forEach((n, j) => {
+      const v = m.get(n) || 0; if (!v) return;
+      const last = !names.slice(j + 1).some(k => m.get(k)), y0 = y(acc), y1 = y(acc + v) + (last ? 0 : 2); acc += v; // 2 px de aire entre capas
+      const hgt = Math.max(1, y0 - y1), r = last ? Math.min(4, bw / 2, hgt) : 0;
+      svg += `<path data-b="${i}" data-n="${esc(n)}" fill="${n === 'Otros' ? EST_OTHER : estColor(key, n)}" d="M${x} ${y0}V${y1 + r}${r ? `q0 ${-r} ${r} ${-r}h${bw - 2 * r}q${r} 0 ${r} ${r}` : `h${bw}`}V${y0}Z"/>`;
+    });
+    if (i % every === 0) svg += `<text x="${L + i * slot + slot / 2}" y="${H - 6}" class="ax" text-anchor="middle">${esc(fmtB(b))}</text>`;
+  });
+  C.innerHTML = (names.length > 1 ? `<div class="estleg">${names.map(n => `<span><i style="background:${n === 'Otros' ? EST_OTHER : estColor(key, n)}"></i>${esc(n)}</span>`).join('')}</div>` : '')
+    + `<svg width="${W}" height="${H}" class="estsvg">${svg}</svg>`;
+  C.querySelectorAll('path').forEach(p => { const b = buckets[+p.dataset.b], m = grid.get(b), tot = [...m.values()].reduce((a, v) => a + v, 0);
+    estTip(p, `<b>${esc(fmtB(b))}</b> · ${tot} commit${tot === 1 ? '' : 's'}<br>${[...m].sort((a, c) => c[1] - a[1]).map(([n, v]) => `${n === p.dataset.n ? '<b>' : ''}${esc(n)}: ${v}${n === p.dataset.n ? '</b>' : ''}`).join('<br>')}`); });
+}
+// mapa de calor día de la semana × hora
+function estHeat(cs) {
+  const H = $('#esHeat'), m = Array.from({ length: 7 }, () => Array(24).fill(0));
+  for (const c of cs) { const d = new Date(c.ts * 1000); m[(d.getDay() + 6) % 7][d.getHours()]++; }
+  const max = Math.max(0, ...m.flat());
+  if (!max) return H.innerHTML = '<p class="gfmore">Sin commits en este periodo.</p>';
+  let best = [0, 0]; m.forEach((r, i) => r.forEach((v, j) => { if (v > m[best[0]][best[1]]) best = [i, j]; }));
+  // de poco a mucho: en claro, de claro a oscuro; en oscuro al revés (lo poco se acerca al fondo, lo mucho resalta)
+  const seq = estDark() ? [...EST_SEQ].reverse() : EST_SEQ;
+  const cell = v => v ? seq[Math.min(seq.length - 1, Math.floor(v / max * (seq.length - 0.01)))] : 'transparent';
+  H.innerHTML = `<div class="heat"><span></span>${Array.from({ length: 24 }, (_, h) => `<span class="hx">${h % 3 ? '' : h + 'h'}</span>`).join('')}
+    ${m.map((r, i) => `<span class="hy">${DAYS_ES[i]}</span>${r.map((v, h) => `<i data-d="${i}" data-h="${h}" style="background:${cell(v)}"${v ? '' : ' class="z"'}></i>`).join('')}`).join('')}</div>
+    <p class="esthint">Hora con más trabajo: <b>${DAYS_ES[best[0]].toLowerCase()} de ${best[1]} a ${best[1] + 1} h</b> (${m[best[0]][best[1]]} commits) · más intenso = más commits</p>`;
+  H.querySelectorAll('i').forEach(i => { const v = m[i.dataset.d][i.dataset.h]; estTip(i, `<b>${DAYS_ES[i.dataset.d]} ${i.dataset.h}:00–${+i.dataset.h + 1}:00</b><br>${v} commit${v === 1 ? '' : 's'}`); });
+}
+// tabla con barra de %: por autor o por rama; «ver» elige si el % es de commits, líneas u horas; clic: filtrar
+function estTable(sel, key, cs, f) {
+  const by = new Map();
+  for (const c of cs) (by.get(c[key]) || by.set(c[key], []).get(c[key])).push(c);
+  const rows = [...by].map(([n, list]) => { const w = list.filter(c => !c.merge), l = w.reduce((a, c) => { const [x, y] = estLines(c); return [a[0] + x, a[1] + y]; }, [0, 0]);
+    return { n, commits: w.length, mas: l[0], menos: l[1], horas: estHours(list), ultimo: Math.max(...list.map(c => c.ts)), otras: key === 'autor' ? [...new Set(w.map(c => c.rama))] : [...new Set(w.map(c => c.autor))] }; });
+  const val = r => f.ver === 'lineas' ? r.mas + r.menos : f.ver === 'horas' ? r.horas : r.commits, tot = rows.reduce((a, r) => a + val(r), 0) || 1;
+  rows.sort((a, b) => val(b) - val(a));
+  const T = $(sel);
+  if (!rows.length) return T.innerHTML = '<p class="gfmore">Sin commits en este periodo.</p>';
+  T.innerHTML = `<table class="esttab"><thead><tr><th>${key === 'autor' ? 'Autor' : 'Rama'}</th><th class="pc">% de ${f.ver === 'lineas' ? 'líneas' : f.ver}</th><th class="num">Commits</th><th class="num">+líneas</th><th class="num">−líneas</th><th class="num">Horas ≈</th><th>Último</th><th>${key === 'autor' ? 'Ramas' : 'Autores'}</th></tr></thead><tbody>${rows.map(r => {
+    const pc = val(r) / tot * 100;
+    return `<tr data-n="${esc(r.n)}" class="${f[key] === r.n ? 'on' : ''}" title="Clic: ver solo «${esc(r.n)}» (otra vez: quitar el filtro)"><td><i class="sw" style="background:${estColor(key, r.n)}"></i>${esc(r.n)}</td>
+      <td class="pc"><span class="pcn">${pc < 1 && pc > 0 ? '<1' : Math.round(pc)} %</span><span class="pcbar"><i style="width:${pc}%;background:${estColor(key, r.n)}"></i></span></td>
+      <td class="num">${fmtN(r.commits)}</td><td class="num add">+${fmtN(r.mas)}</td><td class="num del">−${fmtN(r.menos)}</td><td class="num">${fmtH(r.horas)}</td>
+      <td class="gc">${esc(fmtWhen(r.ultimo))}</td><td class="gc ot">${esc(r.otras.slice(0, 4).join(', '))}${r.otras.length > 4 ? '…' : ''}</td></tr>`; }).join('')}</tbody></table>`;
+  T.querySelector('tbody').onclick = e => { const tr = e.target.closest('tr'); if (!tr) return; f[key] = f[key] === tr.dataset.n ? '' : tr.dataset.n; gfSave(); estRender(); };
+}
+function estFiles(work) {
+  const n = new Map();
+  for (const c of work) for (const [p] of c.files || []) if (!EST_SKIP.test(p)) n.set(p, (n.get(p) || 0) + 1);
+  const top = [...n].sort((a, b) => b[1] - a[1]).slice(0, 10), max = top[0]?.[1] || 1, F = $('#esFiles');
+  F.innerHTML = top.length ? `<table class="esttab"><tbody>${top.map(([p, v]) => `<tr data-p="${esc(p)}" title="Clic: abrir ${esc(p)}"><td class="fp"><bdi>${esc(p)}</bdi></td>
+    <td class="pc"><span class="pcbar"><i style="width:${v / max * 100}%;background:${EST_CAT[estDark() ? 'dark' : 'light'][0]}"></i></span></td><td class="num">${v} ${v === 1 ? 'vez' : 'veces'}</td></tr>`).join('')}</tbody></table>`
+    : '<p class="gfmore">Sin commits en este periodo.</p>';
+  F.onclick = e => { const tr = e.target.closest('tr[data-p]'); if (!tr) return; gitFullClose(true); openTab(gfSt.data.repositorio + '\\' + tr.dataset.p.replace(/\//g, '\\'), true); };
+}
 // keep: solo se redibuja la lista (desplegar un merge), sin volver a pedir el detalle ni mover el scroll
 function gitGraphDraw(keep = false) {
-  if (gfL.tab === 'ign') return gitIgnoredDraw(); // la pestaña 🙈 ocupa el sitio del historial
+  if (gfL.tab === 'ign') return gitIgnoredDraw(); // las pestañas 🙈 y 📊 ocupan el sitio del historial
+  if (gfL.tab === 'est') return gitStatsDraw();
   const G = $('#gfGraph'), cs = gfGraph.commits, top = G.scrollTop; G.innerHTML = ''; G.style.opacity = '';
   if (!cs.length) return G.innerHTML = '<p class="gfmore">Este repositorio aún no tiene commits.</p>';
   const nIn = cs.filter(c => c.lado === 'entrante').length, nOut = cs.filter(c => c.lado === 'saliente').length;
