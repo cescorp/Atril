@@ -223,6 +223,12 @@ body.gitfull #gitfull{grid-row:1;display:grid;grid-template-rows:auto minmax(0,1
 .estblocks .fold{border:0;background:none;padding:0 2px;color:var(--muted);font-size:11px;cursor:pointer}
 .estblocks section.dropb::before,.estblocks section.dropa::after{content:"";position:absolute;left:0;right:0;height:3px;border-radius:2px;background:var(--accent)}
 .estblocks section.dropb::before{top:-9px}.estblocks section.dropa::after{bottom:-9px}
+dialog#dlg.sets.win.uni{width:min(1200px,calc(100vw - 32px))}
+.unitab{overflow:auto;max-height:calc(100vh - 260px)}.unitab td{vertical-align:top;white-space:normal}.unitab tbody tr{cursor:default}
+.unitab .uname{font:inherit;font-weight:600;width:100%;min-width:140px;padding:3px 6px;border:1px solid var(--line);border-radius:5px;background:var(--bg);color:var(--ink)}
+.chip{display:inline-block;margin:2px 4px 2px 0;padding:2px 9px;border:1px solid var(--line);border-radius:12px;background:var(--bg);font-size:12px;cursor:grab;user-select:none;white-space:nowrap}
+.chip:hover{border-color:var(--accent)}.chip.sug{border-color:#c08a00;border-style:dashed}.chip.ghost{position:fixed;z-index:50;pointer-events:none;box-shadow:0 4px 12px rgba(0,0,0,.2)}
+.unitab tr.drop td{background:color-mix(in srgb,var(--accent) 14%,transparent)}.unitab .unew td{color:var(--faint);font-size:12px;text-align:center;border:1px dashed var(--line)}
 .estproj{font:inherit;font-size:12px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:3px 9px;cursor:pointer}.estproj:hover{border-color:var(--accent)}
 .estreset{margin:0;text-align:right}.estreset button{border:0;background:none;color:var(--muted);font-size:12px;cursor:pointer}.estreset button:hover{color:var(--accent)}
 .estbar label{display:flex;gap:6px;align-items:center}.estbar input[type=date],.estbar select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:3px 6px}
@@ -2807,8 +2813,9 @@ function estRitmo() {
 const estRutas = () => { const sel = (gfL.estProy || []).filter(r => side?.proyectos?.some(p => p.ruta === r));
   return sel.length > 1 ? sel : [gst.ruta]; };
 const estUnion = () => estRutas().length > 1;
-// «Unir autores»: nombres distintos de la misma persona (jramos = Jean Ramos); se aplica al cargar y al cambiarlo
-const estAlias = n => (gfL.estAlias || {})[n] || n;
+// «Unir autores»: personas con sus firmas de git (config.json › personas); se aplica al cargar y al cambiarlo
+let gfPersonas = null;
+const estAlias = n => { for (const p of gfPersonas || []) if (p.firmas.includes(n)) return p.nombre; return n; };
 function estApplyAlias() {
   for (const c of gfSt.commits) c.autor = estAlias(c.autor0);
   const rankOf = key => { const n = new Map(); gfSt.commits.forEach(c => !c.merge && n.set(c[key], (n.get(c[key]) || 0) + 1));
@@ -2819,6 +2826,7 @@ async function gitStatsDraw() {
   const G = $('#gfGraph'); G.style.opacity = '';
   const rutas = estRutas(), key = rutas.join('|') + '|' + gst.punta;
   if (gfSt?.key !== key) gfSt = { key, rutas, data: null };
+  if (!gfPersonas) gfPersonas = (await api('/api/personas').catch(() => ({ personas: [] }))).personas;
   G.innerHTML = `<h4>${gitTabsHtml()}<span class="sp"></span></h4><div class="est" id="est"></div>`;
   const h4 = G.querySelector('h4'); h4.append(gitfullMaxBtn('hist')); gitTabsBind(h4); gitfullLayout(false);
   if (!gfSt.data) {
@@ -2957,20 +2965,76 @@ function estProjMenu(anchor) {
     gfL.estProy = [...sel]; gfL.est && (gfL.est.rama = '', gfL.est.proy = ''); gfSave(); gitStatsDraw().then(() => estProjMenu($('#esP')));
   }, { title: p.ruta }]), '-', ['Solo el proyecto actual', () => { gfL.estProy = []; gfSave(); gitStatsDraw(); }, sel.size > 1 ? {} : { disabled: true }]]);
 }
-// «👥 Unir autores»: cada nombre que aparece puede marcarse como la misma persona que otro
+// «👥 Unir autores»: una fila por persona y una columna por proyecto; en cada casilla, el nombre con que firma ahí.
+// Se une arrastrando un nombre a otra fila (o clic en él: «Mover a…»); el nombre a mostrar se escribe. Al abrir, los
+// nombres sin persona se juntan con el que se parece (💡: mayúsculas, tildes, números o uno que empieza como otro).
+// Se guarda en config.json (/api/personas): sobrevive a cerrar DeskLens y a cambiar de navegador.
+const estNorm = n => n.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z]/g, '');
+const estSimilar = (a, b) => { const x = estNorm(a), y = estNorm(b); return x && (x === y || (x.length >= 4 && y.length >= 4 && (x.startsWith(y) || y.startsWith(x)))); };
 function estAliasDialog() {
-  const names = [...new Set(gfSt.commits.map(c => c.autor0))].sort((a, b) => a.localeCompare(b)), alias = { ...(gfL.estAlias || {}) };
-  const d = $('#dlg'); d.className = 'sets win'; d.oninput = d.onchange = null; d.onclose = null;
-  d.innerHTML = `<header><b>Unir autores</b></header><div class="wbody"><p class="ok">Si una persona firma con nombres distintos (en otro PC u otro proyecto), elige con qué nombre se cuenta. Se aplica a todos los proyectos.</p>
-    <table class="esttab"><thead><tr><th>Nombre en git</th><th>Se cuenta como</th></tr></thead><tbody>${names.map(n => `<tr><td>${esc(n)}</td><td><select data-n="${esc(n)}">
-      <option value="">(él mismo)</option>${names.filter(m => m !== n).map(m => `<option ${alias[n] === m ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select></td></tr>`).join('')}</tbody></table></div>
-    <footer><span class="ok">${names.length} nombres en ${gfSt.rutas.length} proyecto${gfSt.rutas.length === 1 ? '' : 's'}</span><div class="exp-actions"></div></footer>`;
-  d.querySelector('.exp-actions').append(Object.assign(button('Guardar', () => {
-    const a = {}; d.querySelectorAll('select[data-n]').forEach(s => { if (s.value) a[s.dataset.n] = s.value; });
-    for (const k of Object.keys(a)) { let v = a[k], seen = new Set([k]); while (a[v] && !seen.has(v)) { seen.add(v); v = a[v]; } a[k] = v; } // A→B→C = A→C
-    gfL.estAlias = a; gfSave(); d.close(); estApplyAlias(); if (gfL.est) gfL.est.autor = ''; estRender(); flash('✓ Autores unidos');
-  }), { className: 'primary' }), button('Cancelar', () => d.close()));
-  d.showModal();
+  const info = new Map(); // firma → { n, proy: Map(proyecto → commits), ramas: Set, ultimo }
+  for (const c of gfSt.commits) {
+    const i = info.get(c.autor0) || info.set(c.autor0, { n: 0, proy: new Map(), ramas: new Set(), ultimo: 0 }).get(c.autor0);
+    i.n++; i.proy.set(c.proy, (i.proy.get(c.proy) || 0) + 1); i.ramas.add(c.rama); i.ultimo = Math.max(i.ultimo, c.ts);
+  }
+  const projs = gfSt.rutas.map(r => projLabel(r));
+  // personas guardadas + las firmas nuevas (sugeridas con la más parecida o como persona propia)
+  let people = (gfPersonas || []).map(p => ({ nombre: p.nombre, firmas: [...p.firmas], sug: new Set() }));
+  const owner = f => people.find(p => p.firmas.includes(f));
+  for (const f of [...info.keys()].sort((a, b) => info.get(b).n - info.get(a).n)) {
+    if (owner(f)) continue;
+    const like = people.find(p => p.firmas.some(g => info.has(g) && estSimilar(f, g)));
+    if (like) { like.firmas.push(f); like.sug.add(f); } else people.push({ nombre: f, firmas: [f], sug: new Set() });
+  }
+  const d = $('#dlg'); d.className = 'sets win uni'; d.oninput = d.onchange = null; d.onclose = null;
+  const commitsOf = p => p.firmas.reduce((a, f) => a + (info.get(f)?.n || 0), 0);
+  const draw = () => {
+    people = people.filter(p => p.firmas.length);
+    const shown = people.filter(p => p.firmas.some(f => info.has(f))).sort((a, b) => commitsOf(b) - commitsOf(a));
+    d.innerHTML = `<header><b>Unir autores</b></header><div class="wbody">
+      <p class="ok">Cada fila es una persona. En cada proyecto, el nombre con el que firma en git. <b>Arrastra un nombre a otra fila</b> si es la misma persona
+        (o haz clic en él para elegir). Escribe a la izquierda cómo quieres verla en la Estadística.</p>
+      <div class="unitab"><table class="esttab"><thead><tr><th>Persona <small>(se muestra como)</small></th>${projs.map(n => `<th>${esc(n)}</th>`).join('')}</tr></thead>
+      <tbody>${shown.map(p => `<tr data-i="${people.indexOf(p)}"><td><input class="uname" value="${esc(p.nombre)}" data-i="${people.indexOf(p)}"></td>${projs.map(pr =>
+        `<td>${p.firmas.filter(f => info.get(f)?.proy.has(pr)).map(f => { const i = info.get(f);
+          return `<span class="chip${p.sug.has(f) ? ' sug' : ''}" data-f="${esc(f)}" title="${esc(f)} en ${esc(pr)}: ${i.proy.get(pr)} commit${i.proy.get(pr) === 1 ? '' : 's'} · último ${esc(fmtWhen(i.ultimo))}\nRamas: ${esc([...i.ramas].slice(0, 6).join(', '))}${p.sug.has(f) ? '\n💡 Junto por parecido: si no es la misma persona, arrástralo a «otra persona»' : ''}\nArrastra a otra fila o haz clic para moverlo">${p.sug.has(f) ? '💡 ' : ''}${esc(f)}</span>`; }).join('')}</td>`).join('')}</tr>`).join('')}
+      <tr data-new class="unew"><td colspan="${projs.length + 1}">＋ Suelta aquí un nombre para separarlo como otra persona</td></tr></tbody></table></div>
+      ${projs.length < 2 ? '<p class="ok">Solo se ve el proyecto actual: para ver aquí todos, elige varios en «📁 Proyectos».</p>' : ''}</div>
+      <footer><span class="ok">${shown.length} personas · ${info.size} nombres en ${projs.length} proyecto${projs.length === 1 ? '' : 's'} · se guarda en config.json</span><div class="exp-actions"></div></footer>`;
+    d.querySelectorAll('.uname').forEach(i => i.oninput = () => { people[+i.dataset.i].nombre = i.value; });
+    d.querySelector('.exp-actions').append(Object.assign(button('Guardar', async () => {
+      try { gfPersonas = (await api('/api/personas', { personas: people.map(p => ({ nombre: p.nombre.trim() || p.firmas[0], firmas: p.firmas })) })).personas; }
+      catch (e) { return ask('Unir autores', e.message, ['Entendido']); }
+      d.close(); estApplyAlias(); if (gfL.est) gfL.est.autor = ''; estRender(); flash('✓ Autores unidos (guardado)');
+    }), { className: 'primary' }), button('Cancelar', () => d.close()));
+  };
+  const move = (f, to) => { // to: índice de persona, o 'new'
+    const from = owner(f); if (!from) return;
+    from.firmas = from.firmas.filter(x => x !== f); from.sug.delete(f);
+    if (to === 'new') people.push({ nombre: f, firmas: [f], sug: new Set() }); else people[to].firmas.push(f);
+    draw();
+  };
+  // arrastrar un nombre con el ratón (como los bloques: sin el arrastrar del navegador); sin moverse = clic → menú
+  d.onmousedown = e => {
+    const chip = e.target.closest('.chip'); if (!chip || e.button !== 0) return;
+    e.preventDefault();
+    const f = chip.dataset.f, x0 = e.clientX, y0 = e.clientY; let ghost = null, over = null;
+    const mv = ev => {
+      if (!ghost && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 4) return;
+      ghost ||= document.body.appendChild(Object.assign(document.createElement('span'), { className: 'chip ghost', textContent: f }));
+      Object.assign(ghost.style, { left: ev.clientX + 8 + 'px', top: ev.clientY + 6 + 'px' });
+      over?.classList.remove('drop'); over = document.elementFromPoint(ev.clientX, ev.clientY)?.closest('.unitab tbody tr'); over?.classList.add('drop');
+    };
+    addEventListener('mousemove', mv);
+    addEventListener('mouseup', () => {
+      removeEventListener('mousemove', mv); over?.classList.remove('drop');
+      if (!ghost) return openMenu(chip, [{ head: `«${f}» es de…` }, ...people.filter(p => !p.firmas.includes(f) && p.firmas.some(g => info.has(g)))
+        .map(p => [p.nombre, () => move(f, people.indexOf(p))]), '-', ['＋ Otra persona', () => move(f, 'new')]]);
+      ghost.remove();
+      if (over?.dataset.new != null) move(f, 'new'); else if (over?.dataset.i != null && people[+over.dataset.i] !== owner(f)) move(f, +over.dataset.i);
+    }, { once: true });
+  };
+  draw(); d.showModal();
 }
 // tooltip compartido de los gráficos
 function estTip(el, html) {

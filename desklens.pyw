@@ -64,6 +64,23 @@ def project_label(root, cfg):
     return {"nombre": mine, "carpeta": Path(root).name or root, "lugar": lugar}
 
 
+def save_people(people):
+    """«Unir autores» de la Estadística: [{nombre, firmas: [nombres en git]}], en config.json (sobrevive a cerrar DeskLens
+    y a cambiar de navegador). Una firma solo puede ser de una persona; las personas de una sola firma con su mismo
+    nombre no se guardan (son lo de siempre)."""
+    out, seen = [], set()
+    for p in people if isinstance(people, list) else []:
+        name = " ".join(str(p.get("nombre", "")).split())[:80]
+        sigs = [f for f in dict.fromkeys(str(x).strip() for x in p.get("firmas", [])) if f and f not in seen]
+        seen.update(sigs)
+        if name and sigs and not (len(sigs) == 1 and sigs[0] == name):
+            out.append({"nombre": name, "firmas": sigs})
+    cfg = load_config()
+    cfg["personas"] = out
+    save_config(cfg)
+    return out
+
+
 def set_project_name(root, name):
     """Nombre del proyecto en DeskLens (la carpeta no cambia); vacío: vuelve el de la carpeta."""
     cfg = load_config()
@@ -3327,6 +3344,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json(200, explore(q.get("ruta", load_config().get("ultima", ""))))
             if url.path == "/api/ia":
                 return self.send_json(200, ia_status(refresh=q.get("refrescar") == "1"))
+            if url.path == "/api/personas":
+                return self.send_json(200, {"personas": load_config().get("personas", [])})
             if url.path == "/api/windows":
                 return self.send_json(200, win_state())
             if url.path == "/api/pendientes":  # archivos que otra instancia pidió abrir aquí
@@ -3719,6 +3738,8 @@ class Handler(BaseHTTPRequestHandler):
             cfg["ventana"] = {k: int(data[k]) for k in ("x", "y", "w", "h")}
             save_config(cfg)
             return self.send_json(200, {})
+        if url == "/api/personas":
+            return self.send_json(200, {"personas": save_people(data.get("personas"))})
         if url == "/api/nombre_proyecto":
             try:
                 set_project_name(data.get("ruta", ""), data.get("nombre", ""))

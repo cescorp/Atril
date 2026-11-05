@@ -759,6 +759,12 @@ assert.deepStrictEqual(findRefs('Ver 1 Samuel 4:4 y 1 Samuel 8:5, 20; Deuteronom
     assert act("pull_rama", "main")[0] == 400 and act("push_a", "nada/x")[0] == 400 and act("push_a", "origin/-x")[0] == 400
     assert act("cancelar_fusion", "")[0] == 400  # no hay fusión en curso
     git(otro, "checkout", "-q", "main")
+    # «Unir autores»: personas con sus firmas en config.json; una firma, una sola persona; las triviales no se guardan
+    code, r = post("/api/personas", {"personas": [{"nombre": " César ", "firmas": ["CesarE", "cesare", "CesarE"]},
+                                                   {"nombre": "Otro", "firmas": ["cesare", "x"]}, {"nombre": "solo", "firmas": ["solo"]}]})
+    assert code == 200 and r["personas"] == [{"nombre": "César", "firmas": ["CesarE", "cesare"]}, {"nombre": "Otro", "firmas": ["x"]}]
+    assert json.loads(get(port, "/api/personas")[1])["personas"] == r["personas"] and desklens.load_config()["personas"] == r["personas"]
+    post("/api/personas", {"personas": []})
     # proyectos con el mismo nombre: «lugar» los distingue; un nombre propio en DeskLens manda y la carpeta no cambia
     cfg = {"proyectos": [r"G:\Trabajo\hesis", r"D:\Respaldos\hesis", r"G:\otro"]}
     assert desklens.project_label(r"G:\Trabajo\hesis", cfg) == {"nombre": "hesis", "carpeta": "hesis", "lugar": "…\\Trabajo"}
