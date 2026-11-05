@@ -216,7 +216,14 @@ body.gitfull #gitfull{grid-row:1;display:grid;grid-template-rows:auto minmax(0,1
 .gitab .num{text-align:right;font-variant-numeric:tabular-nums}.gitab .gc{color:var(--muted)}.gitab code{font-size:11.5px;color:var(--ink)}
 .gitab .gin{display:inline-flex;gap:4px;align-items:center}.gitab .gitg{display:inline-block;width:10px;color:var(--muted);font-size:10px}.gitab .gidir bdi{font-weight:500}
 .est{padding:4px 14px 24px;display:flex;flex-direction:column;gap:18px}
-.estbar{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;font-size:12.5px;color:var(--muted)}
+.estbar{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;font-size:12.5px;color:var(--muted);position:sticky;top:0;z-index:3;background:var(--paper);padding:8px 0;border-bottom:1px solid var(--line)}
+.estblocks{display:flex;flex-direction:column;gap:14px}.estblocks section{position:relative;border-radius:8px;padding:4px 6px}
+.estblocks section.pleg h5{margin:0;opacity:.75}.estblocks section.dragging{opacity:.45}
+.estblocks .grip{cursor:grab;color:var(--faint);font-size:15px;line-height:1;user-select:none;padding:0 2px}.estblocks .grip:hover{color:var(--accent)}
+.estblocks .fold{border:0;background:none;padding:0 2px;color:var(--muted);font-size:11px;cursor:pointer}
+.estblocks section.dropb::before,.estblocks section.dropa::after{content:"";position:absolute;left:0;right:0;height:3px;border-radius:2px;background:var(--accent)}
+.estblocks section.dropb::before{top:-9px}.estblocks section.dropa::after{bottom:-9px}
+.estreset{margin:0;text-align:right}.estreset button{border:0;background:none;color:var(--muted);font-size:12px;cursor:pointer}.estreset button:hover{color:var(--accent)}
 .estbar label{display:flex;gap:6px;align-items:center}.estbar input[type=date],.estbar select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:3px 6px}
 .est .seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:6px;overflow:hidden}.est .seg button{white-space:nowrap}.est .seg button{border:0;border-radius:0;background:none;padding:3px 9px;font-size:12px;color:var(--muted)}
 .est .seg button.on{background:var(--active);color:var(--ink);font-weight:600}.est .seg.sm button{padding:1px 7px;font-size:11px}
@@ -2823,6 +2830,7 @@ const estColor = (key, name) => { const i = gfSt.rank[key].get(name); return i !
 function estRender() {
   const E = $('#est'); if (!E || !gfSt?.commits) return;
   if ($('#estTip')) $('#estTip').hidden = true; // el globo del gráfico anterior
+  const G = $('#gfGraph'), keepTop = G.scrollTop; // al cambiar de fechas cada bloque se redibuja en su sitio
   const f = estF(), all = gfSt.commits;
   const t0 = estParse(f.desde).getTime() / 1000, t1 = estParse(f.hasta).getTime() / 1000 + 86400;
   const pick = (a, b) => all.filter(c => c.ts >= a && c.ts < b && (!f.rama || c.rama === f.rama) && (!f.autor || c.autor === f.autor));
@@ -2838,7 +2846,7 @@ function estRender() {
       <span class="seg">${[['hoy', 'Hoy'], ['semana', 'Esta semana'], ['mes', 'Este mes'], ['anio', 'Este año'], ['todo', 'Todo']].map(([k, n]) => `<button data-p="${k}" class="${f.preset === k ? 'on' : ''}">${n}</button>`).join('')}</span>
       <span class="seg" title="Agrupar el gráfico">${[['dia', 'Día'], ['semana', 'Semana'], ['mes', 'Mes']].map(([k, n]) => `<button data-g="${k}" class="${f.grupo === k ? 'on' : ''}">${n}</button>`).join('')}</span>
       <select id="esR">${opts('rama', 'Todas las ramas')}</select><select id="esA">${opts('autor', 'Todos los autores')}</select></div>
-    <div class="esttiles">
+    ${estBlocks(f, `<div class="esttiles">
       <div class="tile"><small>Commits</small><b>${fmtN(work.length)}</b><span>${diff == null ? '' : `${diff >= 0 ? '↑' : '↓'} ${Math.abs(diff)} % que el periodo anterior`}${cs.length - work.length ? ` · ${cs.length - work.length} merge${cs.length - work.length === 1 ? '' : 's'}` : ''}</span></div>
       <div class="tile"><small>Archivos</small><b>${fmtN(files.size)}</b><span>distintos</span></div>
       <div class="tile" title="Sin archivos generados (lock, .min, vendor, node_modules) ni binarios"><small>Líneas</small><b><i>+${fmtN(lines[0])}</i> <em>−${fmtN(lines[1])}</em></b><span>sin generados ni binarios</span></div>
@@ -2847,21 +2855,70 @@ function estRender() {
 · por tiempo: commits de un autor con menos de ${AJ?.est_pausa_min ?? 120} min entre sí son una sesión, y a cada una se suman ${AJ?.est_previo_min ?? 30} min previos;
 · por cambios: palabras escritas ÷ ${fmtN(Math.round(estRitmo()))} por hora (${AJ?.est_ritmo > 0 ? 'fijado en Ajustes' : 'calibrado con todo el historial del proyecto'}).
 Si se parecen, el número es fiable. Se ajustan en ⚙ Ajustes › Git."><small>Horas ≈</small><b>${fmtH(hours)}</b><span>por tiempo ⓘ</span><b class="h2">${fmtH(hoursW)}</b><span>por cambios · ${fmtN(Math.round(estRitmo()))} pal/h</span></div>
-      <div class="tile"><small>Días activos</small><b>${days.size}</b><span>de ${nDays}</span></div></div>
-    <section><h5>Commits por ${f.grupo === 'dia' ? 'día' : f.grupo} <span class="seg sm">${[['autor', 'por autor'], ['rama', 'por rama']].map(([k, n]) => `<button data-s="${k}" class="${f.serie === k ? 'on' : ''}">${n}</button>`).join('')}</span></h5><div id="esChart"></div></section>
-    <section><h5>¿Cuándo se trabaja? <small>commits por día de la semana y hora</small></h5><div id="esHeat"></div></section>
-    <section><h5>Quién envía más <small>todas las ramas, también las remotas</small> <span class="seg sm">${[['commits', 'Commits'], ['lineas', 'Líneas'], ['palabras', 'Palabras'], ['horas', 'Horas']].map(([k, n]) => `<button data-v="${k}" class="${f.ver === k ? 'on' : ''}">${n}</button>`).join('')}</span></h5><div id="esAut"></div></section>
-    <section><h5>Por rama <small>cada commit en la rama donde se hizo (aproximado)</small></h5><div id="esRam"></div></section>
-    <section><h5>Archivos más cambiados</h5><div id="esFiles"></div></section>`;
+      <div class="tile"><small>Días activos</small><b>${days.size}</b><span>de ${nDays}</span></div></div>`)}`;
   const set = o => { Object.assign(f, o); gfSave(); estRender(); };
   E.querySelector('#esD').onchange = e => e.target.value && set({ desde: e.target.value, preset: '' });
   E.querySelector('#esH').onchange = e => e.target.value && set({ hasta: e.target.value, preset: '' });
   E.querySelector('#esR').onchange = e => set({ rama: e.target.value });
   E.querySelector('#esA').onchange = e => set({ autor: e.target.value });
   E.onclick = e => { const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.fold) { const pl = new Set(gfL.estPleg || []); pl.has(b.dataset.fold) ? pl.delete(b.dataset.fold) : pl.add(b.dataset.fold); gfL.estPleg = [...pl]; gfSave(); return estRender(); }
+    if (b.dataset.reset != null) { gfL.estOrden = null; gfL.estPleg = []; gfSave(); return estRender(); }
     if (b.dataset.p) set(estPreset(b.dataset.p)); else if (b.dataset.g) set({ grupo: b.dataset.g });
     else if (b.dataset.s) set({ serie: b.dataset.s }); else if (b.dataset.v) set({ ver: b.dataset.v }); };
-  estChart(work, f, t0, t1); estHeat(cs); estTable('#esAut', 'autor', cs, f); estTable('#esRam', 'rama', cs, f); estFiles(work);
+  // solo los bloques desplegados se dibujan
+  if ($('#esChart')) estChart(work, f, t0, t1);
+  if ($('#esHeat')) estHeat(cs);
+  if ($('#esAut')) estTable('#esAut', 'autor', cs, f);
+  if ($('#esRam')) estTable('#esRam', 'rama', cs, f);
+  if ($('#esFiles')) estFiles(work);
+  E.onmousedown = estDragStart;
+  G.scrollTop = keepTop;
+}
+// Bloques de la Estadística: se mueven arrastrando ⠿ y se pliegan con ▾; el orden y lo plegado se guardan (gfL)
+const EST_ORDER = ['resumen', 'grafico', 'horas', 'autores', 'ramas', 'archivos'];
+const estOrder = () => { const o = (gfL.estOrden || []).filter(k => EST_ORDER.includes(k)); return [...o, ...EST_ORDER.filter(k => !o.includes(k))]; };
+function estBlocks(f, tiles) {
+  const seg = (attr, cur, list) => `<span class="seg sm">${list.map(([k, n]) => `<button data-${attr}="${k}" class="${cur === k ? 'on' : ''}">${n}</button>`).join('')}</span>`;
+  const B = {
+    resumen: ['Resumen', '', tiles],
+    grafico: [`Commits por ${f.grupo === 'dia' ? 'día' : f.grupo}`, seg('s', f.serie, [['autor', 'por autor'], ['rama', 'por rama']]), '<div id="esChart"></div>'],
+    horas: ['¿Cuándo se trabaja?', '<small>commits por día de la semana y hora</small>', '<div id="esHeat"></div>'],
+    autores: ['Quién envía más', '<small>todas las ramas, también las remotas</small> ' + seg('v', f.ver, [['commits', 'Commits'], ['lineas', 'Líneas'], ['palabras', 'Palabras'], ['horas', 'Horas']]), '<div id="esAut"></div>'],
+    ramas: ['Por rama', '<small>cada commit en la rama donde se hizo (aproximado)</small>', '<div id="esRam"></div>'],
+    archivos: ['Archivos más cambiados', '', '<div id="esFiles"></div>'] };
+  const pleg = new Set(gfL.estPleg || []);
+  return `<div class="estblocks">${estOrder().map(k => { const p = pleg.has(k);
+    return `<section data-k="${k}" class="${p ? 'pleg' : ''}"><h5><span class="grip" title="Arrastra para mover el bloque">⠿</span>`
+      + `<button class="fold" data-fold="${k}" title="${p ? 'Desplegar' : 'Plegar'}">${p ? '▸' : '▾'}</button>${B[k][0]} ${p ? '' : B[k][1]}</h5>${p ? '' : B[k][2]}</section>`; }).join('')}</div>
+    <p class="estreset"><button data-reset title="Volver al orden de siempre y desplegar todo">↺ Orden original</button></p>`;
+}
+// Arrastrar un bloque por su asa ⠿: una línea marca dónde caerá (antes o después del bloque bajo el ratón); cerca del
+// borde de la columna, la página se desplaza sola. Con el ratón, no con arrastrar del navegador: así no copia texto.
+function estDragStart(e) {
+  const grip = e.target.closest('.grip'); if (!grip || e.button !== 0) return;
+  e.preventDefault();
+  const sec = grip.closest('section'), G = $('#gfGraph'), key = sec.dataset.k;
+  let target = null, after = false, scroll = 0;
+  sec.classList.add('dragging'); document.body.classList.add('dragging');
+  const clear = () => document.querySelectorAll('.estblocks .dropb, .estblocks .dropa').forEach(x => x.classList.remove('dropb', 'dropa'));
+  const tick = setInterval(() => scroll && (G.scrollTop += scroll), 16);
+  const mv = ev => {
+    const g = G.getBoundingClientRect(); scroll = ev.clientY < g.top + 40 ? -12 : ev.clientY > g.bottom - 40 ? 12 : 0;
+    const over = document.elementFromPoint(ev.clientX, ev.clientY)?.closest('.estblocks section');
+    clear(); target = null;
+    if (!over || over === sec) return;
+    const r = over.getBoundingClientRect(); after = ev.clientY > r.top + r.height / 2; target = over.dataset.k;
+    over.classList.add(after ? 'dropa' : 'dropb');
+  };
+  addEventListener('mousemove', mv);
+  addEventListener('mouseup', () => {
+    removeEventListener('mousemove', mv); clearInterval(tick); clear();
+    sec.classList.remove('dragging'); document.body.classList.remove('dragging');
+    if (!target) return;
+    const o = estOrder().filter(k => k !== key); o.splice(o.indexOf(target) + (after ? 1 : 0), 0, key);
+    gfL.estOrden = o; gfSave(); estRender();
+  }, { once: true });
 }
 // tooltip compartido de los gráficos
 function estTip(el, html) {

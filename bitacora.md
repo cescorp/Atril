@@ -8,6 +8,9 @@ Entradas nuevas arriba. Formato: `## AAAA-MM-DD · título` + 2–4 líneas (qu�
 - **Cómo trabaja el usuario:** escribe en español. **Antes de construir algo nuevo, dibujarlo en texto y esperar su «ok».** No instalar nada sin acuerdo. Ahorrar tokens. Prefiere lo simple: rechazó un panel de IA con modos (ver 2026-11-02).
 - **Para verificar sin tocar su DeskLens:** levantar `desklens.Handler` en el puerto 8799 con `CONFIG`, `CONV_DIR`, `RECOVERY_DIR` e `INDEX_DB` en una carpeta temporal y hacer captura con Edge sin ventana (`--headless=new --screenshot`). Así se probó cada paso. Ojo: en Windows dos servidores pueden escuchar el mismo puerto sin error; si hay otra sesión probando, usa otro puerto.
 
+## 2026-11-04 · Estadística: bloques que se arrastran y se pliegan
+Para ver cómo cambia lo que interesa al tocar las fechas: seis bloques (Resumen, Commits por periodo, ¿Cuándo se trabaja?, Quién envía más, Por rama, Archivos más cambiados) con asa ⠿ para arrastrarlos (con eventos de ratón, no el arrastrar del navegador; una línea morada marca dónde caen; cerca del borde la columna se desplaza sola) y ▾/▸ para plegarlos (los plegados no se dibujan). Orden y plegados en `gfL.estOrden`/`estPleg` (se recuerdan), «↺ Orden original» al final. La barra de fechas y filtros queda fija arriba y al redibujar se conserva el scroll. Probado con arrastre real del ratón y recargando.
+
 ## 2026-11-04 · Estadística: los números no se salen de su tarjeta
 Captura del usuario: en «Líneas», «−1.266» se montaba sobre la tarjeta vecina (los valores tenían `white-space:nowrap`). Ahora el valor es un flex que parte de línea (+ y − bajan uno debajo del otro si no caben), tarjetas de 150 px como mínimo y `overflow:hidden`; las pestañas y los botones de periodo también bajan de línea en vez de recortarse. Comprobado a 900 px y con una tarjeta forzada a 150 px.
 
