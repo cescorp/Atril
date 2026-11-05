@@ -4665,6 +4665,14 @@ CodeMirror.commands.desklensEsc = cm => {
 Object.assign(CodeMirror.defaults.extraKeys ||= {}, { 'Ctrl-F': 'desklensFind', 'Ctrl-H': 'desklensReplace', Esc: 'desklensEsc', 'Alt-Z': () => toggleWrap() });
 
 // Ajuste de línea (Alt+Z, como VS Code): editor y comparador; se recuerda
+// Windows (indicador del cursor, dictado, teclado táctil, asas de selección) pone su marca donde está el cursor del
+// cuadro de texto invisible de CodeMirror. Ese cuadro vive en un contenedor de 3 px con overflow:hidden que el
+// navegador desplaza para «mostrar» lo que se escribe, y el desplazamiento se queda: el cuadro (y la marca) acababa a
+// la izquierda y arriba del cursor visible, más cuanto más se escribía. En todos los editores se deja siempre en 0.
+CodeMirror.defineInitHook(cm => {
+  const w = cm.getInputField().parentNode, pin = () => { if (w.scrollLeft || w.scrollTop) { w.scrollLeft = 0; w.scrollTop = 0; } };
+  w.addEventListener('scroll', pin); cm.on('cursorActivity', pin); cm.on('change', pin);
+});
 const wrapOn = () => LS('desklens.wrap') === '1';
 let cmpWrap = null; // el comparador abierto se vuelve a dibujar con el ajuste nuevo
 function toggleWrap() {
