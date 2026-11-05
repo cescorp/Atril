@@ -8,6 +8,9 @@ Entradas nuevas arriba. Formato: `## AAAA-MM-DD · título` + 2–4 líneas (qu�
 - **Cómo trabaja el usuario:** escribe en español. **Antes de construir algo nuevo, dibujarlo en texto y esperar su «ok».** No instalar nada sin acuerdo. Ahorrar tokens. Prefiere lo simple: rechazó un panel de IA con modos (ver 2026-11-02).
 - **Para verificar sin tocar su DeskLens:** levantar `desklens.Handler` en el puerto 8799 con `CONFIG`, `CONV_DIR`, `RECOVERY_DIR` e `INDEX_DB` en una carpeta temporal y hacer captura con Edge sin ventana (`--headless=new --screenshot`). Así se probó cada paso. Ojo: en Windows dos servidores pueden escuchar el mismo puerto sin error; si hay otra sesión probando, usa otro puerto.
 
+## 2026-11-04 · Nº de archivos en cada fila del historial de Git
+«📄 N» antes del autor (los commits sin archivos no lo muestran; un merge cuenta lo que trajo). `git_graph` lo saca con `--name-only` en la misma llamada: medido, el historial sigue en ≈ 200 ms (homeshape y Atril); `--shortstat` costaba +1,2 s en homeshape y se descartó (el usuario pidió no añadirlo si era caro).
+
 ## 2026-11-04 · Proyectos con el mismo nombre
 Captura del usuario: dos «hesis» en carpetas distintas se confundían. (A) Si dos proyectos se ven con el mismo nombre, a su lado va en gris lo justo de la carpeta que los contiene para distinguirlos, desde el final («…\Trabajo» / «…\2025»; la ruta entera si solo cambia la unidad): `project_label`. (B) «✎ Nombre en DeskLens…» en el ⋮ del proyecto: un nombre propio (`config.json` › `nombres`; la carpeta no cambia; vacío = el de la carpeta), y entonces ya no hace falta el lugar. Se ve en el árbol, el selector y el título de Git y «En:» del buscador. «Bitácora grande» usaba 🟡, que en algún Windows sale como un cuadrado vacío: ahora ⚠️ como los demás avisos.
 

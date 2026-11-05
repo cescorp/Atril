@@ -849,6 +849,7 @@ assert.deepStrictEqual(findRefs('Ver 1 Samuel 4:4 y 1 Samuel 8:5, 20; Deuteronom
     assert lados["e"] == "saliente" and lados["f"] == "entrante" and lados["d"] == "" and g["remota"] == "origin/main"
     assert any(len(c["padres"]) == 2 for c in g["commits"])  # el merge de sincronizar
     e = next(c for c in g["commits"] if c["mensaje"] == "e")
+    assert e["n"] == 1 and all(isinstance(c["n"], int) for c in g["commits"])  # archivos cambiados por commit
     code, d = get(port, f"/api/git/archivos?ruta={urllib.request.quote(str(rep))}&hash={e['hash']}")
     assert [(f["rel"], f["mas"], f["menos"]) for f in json.loads(d)["archivos"]] == [("e.md", 2, 0)]
     # cambiar de rama con cambios sin commit: 409 con los archivos; «apartar» los guarda en el stash y

@@ -234,7 +234,7 @@ body.gitfull #gitv .shead{display:none} /* la barra de arriba ya dice «Git» */
 .gfrow:hover{background:var(--hover)}.gfrow.on{background:var(--active)}
 .gfrow[data-lado=entrante]{border-left-color:#2f7fd8}.gfrow[data-lado=saliente]{border-left-color:var(--accent)}
 .gfrow svg{flex:none;overflow:visible}.gfrow .gh{font:11.5px Consolas,monospace;color:var(--muted);flex:none}
-.gfrow .gm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}.gfrow .ga,.gfrow .gfdate{color:var(--muted);font-size:11.5px;flex:none}
+.gfrow .gm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}.gfrow .gfn{flex:none;font-size:11.5px;color:var(--muted);min-width:3.2em;text-align:right}.gfrow .ga,.gfrow .gfdate{color:var(--muted);font-size:11.5px;flex:none}
 .gfrow .gl{flex:none;font-size:11px;font-weight:600}.gfrow[data-lado=entrante] .gl{color:#2f7fd8}.gfrow[data-lado=saliente] .gl{color:var(--accent)}
 .gref{flex:none;font-size:10.5px;padding:0 6px;border-radius:8px;border:1px solid var(--line);color:var(--muted)}
 .gref.head{border-color:var(--accent);color:var(--accent)}.gref.rem{border-style:dashed}
@@ -2584,7 +2584,9 @@ function gitRow(c, lead, msg, cls = '') {
   const row = Object.assign(document.createElement('div'), { className: 'gfrow' + cls + (gfSel === c.hash ? ' on' : ''), title: `${c.corto} · ${c.autor} · ${c.fecha}\n\n${c.mensaje}` });
   row.dataset.lado = c.lado; row.dataset.hash = c.hash;
   row.innerHTML = lead + `<span class="gl">${c.lado === 'entrante' ? '↓' : c.lado === 'saliente' ? '↑' : ''}</span>${refs}`
-    + `<span class="gm">${msg ?? esc(c.mensaje)}</span><span class="ga">${esc(c.autor)}</span><span class="gfdate" title="${esc(c.fecha)}">${esc(fmtWhen(c.ts))}</span>`;
+    + `<span class="gm">${msg ?? esc(c.mensaje)}</span>`
+    + (c.n ? `<span class="gfn" title="${c.n} archivo${c.n === 1 ? '' : 's'} cambiado${c.n === 1 ? '' : 's'}">📄 ${c.n}</span>` : '')
+    + `<span class="ga">${esc(c.autor)}</span><span class="gfdate" title="${esc(c.fecha)}">${esc(fmtWhen(c.ts))}</span>`;
   row.onclick = () => {
     gfSel = gfL.sel[gst.ruta] = c.hash; gfL.sinDet = false; gitfullLayout(); // elegir un commit vuelve a mostrar su detalle
     $('#gfGraph').querySelectorAll('.gfrow.on').forEach(e => e.classList.remove('on')); row.classList.add('on'); gitCommitDetail(c);

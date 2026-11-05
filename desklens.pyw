@@ -2517,15 +2517,20 @@ def git_graph(path, todas=False, limit=300):
     up = git_run(repo, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}")
     refs = ["--branches", "--remotes", "--tags", "HEAD"] if todas else ["HEAD", *([up] if up else [])]
     out = git_do(repo, "-c", "core.quotePath=false", "log", "--date-order", f"-n{limit}", "--date=format:%d/%m/%Y %H:%M",
-                 "--format=%x1e%H%x1f%P%x1f%h%x1f%an%x1f%ad%x1f%s%x1f%D%x1f%at", *refs, "--")
+                 "--format=%x1e%H%x1f%P%x1f%h%x1f%an%x1f%ad%x1f%s%x1f%D%x1f%at",
+                 # nombres de los archivos de cada commit, para contarlos (un merge: lo que trajo, como el detalle).
+                 # --name-only no compara contenidos: +25 ms en 300 commits (--shortstat costaba +1,2 s en homeshape)
+                 "--name-only", "--diff-merges=first-parent", *refs, "--")
     incoming = set(git_run(repo, "rev-list", f"HEAD..{up}").split()) if up else set()
     outgoing = set(git_run(repo, "rev-list", f"{up}..HEAD").split()) if up else set()
     commits = []
     for rec in out.split("\x1e"):
         if not rec.strip():
             continue
-        h, parents, short, author, date, subject, deco, ts = (rec.strip("\n").split("\x1f") + [""] * 8)[:8]
+        head, _, names = rec.strip("\n").partition("\n")
+        h, parents, short, author, date, subject, deco, ts = (head.split("\x1f") + [""] * 8)[:8]
         commits.append({"hash": h, "padres": parents.split(), "corto": short, "autor": author, "fecha": date, "ts": int(ts or 0),
+                        "n": sum(1 for ln in names.splitlines() if ln.strip()),
                         "mensaje": subject, "refs": [r.strip() for r in deco.split(",") if r.strip()],
                         "lado": "entrante" if h in incoming else "saliente" if h in outgoing else ""})
     return {"commits": commits, "remota": up or None, "mas": len(commits) >= limit}
