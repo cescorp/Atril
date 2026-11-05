@@ -5465,7 +5465,10 @@ async function launch(start, label, cmd, cwd, ruta, onDone = null) {
   let res;
   try { res = await start(); } catch (e) { return ask('No se pudo ejecutar', e.message, ['Entendido']); }
   const r = { id: res.id, label, cmd, cwd, ruta, onDone, again: start, trozos: [], fin: false, codigo: null, dur: 0 };
-  runsUI.push(r); curRun = r; showPanel(true); drawRuns(); poll(r);
+  runsUI.push(r); curRun = r;
+  // como mucho 7 pestañas: se quitan las terminadas más antiguas (las que siguen corriendo, nunca)
+  while (runsUI.length > 7) { const old = runsUI.find(x => x.fin && x !== r); if (!old) break; runsUI.splice(runsUI.indexOf(old), 1); }
+  showPanel(true); drawRuns(); poll(r);
 }
 // Trae la salida nueva de un proceso cada 300 ms hasta que termina; al final llama a onDone (p. ej. «Explicar error»).
 async function poll(r) {
