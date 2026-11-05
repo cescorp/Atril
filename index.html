@@ -527,6 +527,9 @@ body.split .pane:not(.on) #view{opacity:.92}
 #symbar{flex-basis:100%;display:flex;align-items:center;gap:1px;overflow-x:auto;white-space:nowrap;font-size:12px;margin-top:3px;padding-top:3px;border-top:1px solid var(--line)}
 #symbar[hidden]{display:none}#symbar .sc{border:0;background:none;padding:2px 6px;border-radius:4px;color:var(--muted);font-size:12px;flex:none}
 #symbar .sc:hover{background:var(--hover);color:var(--ink)}#symbar .sc.cur{color:var(--ink);font-weight:600}#symbar .sc.in{color:var(--faint)}#symbar .sep{color:var(--faint);flex:none}
+.cm-bp{width:14px}.CodeMirror .cm-bp .bp{color:#e51400;cursor:pointer;font-size:11px;padding-left:2px}.CodeMirror-gutter.cm-bp{cursor:pointer}
+.dbg-line,.code .cl.dbg{background:color-mix(in srgb,#ffc800 32%,transparent)!important}
+#runbar .dbgb{font-weight:600}
 .code .cl.jump{background:color-mix(in srgb,var(--accent) 18%,transparent)}
 .crumbs{flex:1;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:13px;padding:0 8px}
 .crumbs b{font-weight:400;color:var(--ink)}
@@ -1098,6 +1101,7 @@ const I = {
   more: '<circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
   play: '<path d="M7 4v16l13-8z"/>',
+  bug: '<rect x="8" y="6" width="8" height="14" rx="4"/><path d="M12 10v10M4 13h4M16 13h4M5 7l3 2M19 7l-3 2M5 19l3-2M19 19l-3-2M10 6l-1-2M14 6l1-2"/>',
   down: '<path d="m6 9 6 6 6-6"/>',
   panelLeft: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/>',
   panelRight: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/>',
@@ -4532,6 +4536,11 @@ async function render() {
     B.insertBefore(iconBtn('play', why ? 'No se puede ejecutar: ' + why : 'Ejecutar · ' + f.ejecutar.texto, () => runFile(path, f), !!why),
       B.querySelector('button.primary') || null);
     if (!why) menu.unshift(['Ejecutar', () => runFile(path, f)]);
+    if (!why && f.ejecutar.depurar) {
+      B.insertBefore(iconBtn('bug', 'Depurar paso a paso (pdb) · ● puntos de parada: clic en el margen del editor', () => runFile(path, f, true)),
+        B.querySelector('button.primary') || null);
+      menu.splice(1, 0, ['Depurar paso a paso', () => runFile(path, f, true)]);
+    }
   }
   if (!ed) {
     if (editable) { B.append(iconBtn('pencil', 'Editar', () => startEdit(path, f))); menu.push(['Editar', () => startEdit(path, f)]); }
@@ -4644,7 +4653,7 @@ function textDesc(a, b) {
 function editorView(V, ed, name, path) {
   V.className = 'flush';
   const cm = CodeMirror(V, { value: ed.text, lineNumbers: true, matchBrackets: true, indentUnit: AJ.editor_tab || 4, tabSize: AJ.editor_tab || 4, lineWrapping: wrapOn(),
-    theme: isDark() ? 'material-darker' : 'default', foldGutter: true, gutters: ['CodeMirror-linenumbers', 'CodeMirror-foldgutter'],
+    theme: isDark() ? 'material-darker' : 'default', foldGutter: true, gutters: ['cm-bp', 'CodeMirror-linenumbers', 'CodeMirror-foldgutter'],
     foldOptions: { rangeFinder: foldFinder, widget: '⋯', minFoldSize: 1 },
     extraKeys: { 'Shift-Ctrl-[': 'fold', 'Shift-Ctrl-]': 'unfold' } });
   // plegado: se guarda al plegar o desplegar; al abrir, se recupera cuando el modo ya cargó (lo usa para encontrar el bloque)
@@ -4661,6 +4670,8 @@ function editorView(V, ed, name, path) {
   cm.on('cursorActivity', () => symUpd(cm.getCursor().line));
   cm.on('change', () => { clearTimeout(symT); symT = setTimeout(() => { syms = codeSymbols(cm.getValue().split('\n'), symLang); symUpd(cm.getCursor().line); }, 400); });
   symUpd(0);
+  if (!isUntitled(path)) bpEditor(cm, path);
+  if (dbgAt?.path.toLowerCase() === path.toLowerCase()) setTimeout(() => dbgPaint({ path: dbgAt.path, line: dbgAt.line }));
   const info = CodeMirror.findModeByFileName(name.toLowerCase().endsWith('.blade.php') ? 'x.php' : name);
   if (info) { cm.setOption('mode', info.mime || info.mimes?.[0]); CodeMirror.autoLoadMode(cm, info.mode); }
   editorCM = cm;
@@ -6312,12 +6323,13 @@ function runDialog(title, comando, carpeta, editable, note = '') {
 }
 
 // ▶ Ejecutar el archivo: guarda antes si hay cambios, confirma (salvo «no volver a preguntar») y lo lanza en la consola.
-async function runFile(path, f) {
+async function runFile(path, f, dbg = false) {
   const ed = edits.get(path);
   if (ed && isDirty(ed)) {
     if (await ask('Cambios sin guardar', `Guarda "${f.nombre}" antes de ejecutarlo.`, ['Guardar y ejecutar', 'Cancelar']) !== 'Guardar y ejecutar') return;
     await save(path); if (isDirty(ed)) return;
   }
+  if (dbg) return debugFile(path, f, ed ? ed.text : f.texto);
   if (!noAsk.has(path)) {
     const r = await runDialog('Ejecutar ' + f.nombre, f.ejecutar.texto, f.ejecutar.carpeta, false);
     if (!r) return;
@@ -6359,6 +6371,7 @@ async function poll(r) {
     try {
       const d = await api(`/api/salida?id=${r.id}&desde=${r.trozos.length}`);
       r.trozos.push(...d.trozos); Object.assign(r, { fin: d.fin, codigo: d.codigo, dur: d.dur });
+      if (r.dbg) dbgOut(r, d.trozos);
       if (r === curRun) { appendOut(d.trozos); drawRunBar(); }
       if (r.fin) drawRunTabs();
     } catch { r.fin = true; drawRuns(); }
@@ -6404,9 +6417,11 @@ function appendOut(trozos) {
 function drawRunBar() {
   const B = $('#runbar'), r = curRun; B.innerHTML = '';
   $('#inrow').hidden = !r || r.fin;
-  $('#stdin').placeholder = r?.term ? 'Escribe una orden y pulsa Enter · pega varias líneas para ejecutarlas en orden · ↑↓ anteriores'
+  $('#stdin').placeholder = r?.dbg ? 'Orden de pdb y Enter · p variable (ver su valor) · l (ver el código) · w (dónde estás) · b 20 (parar en la línea 20)'
+    : r?.term ? 'Escribe una orden y pulsa Enter · pega varias líneas para ejecutarlas en orden · ↑↓ anteriores'
     : 'Escribe aquí y pulsa Enter (para pause, S/N, input())';
   if (!r) return;
+  if (r.dbg && !r.fin) B.append(...DBG_KEYS.map(([t, cmd, key, tip]) => Object.assign(button(t, () => dbgSend(r, cmd)), { title: `${tip} (${key})`, className: 'dbgb' })));
   B.append(Object.assign(document.createElement('span'), { className: 'rstate',
     textContent: r.fin ? `${r.codigo === 0 ? '✓' : '✗'} código ${r.codigo} · ${fmtDur(r.dur)}` : `● En ejecución · ${fmtDur(r.dur)}` }));
   B.append(r.fin ? button('↻ Repetir', () => launch(r.again, r.label, r.cmd, r.cwd, r.ruta)) : button('■ Detener', () => api('/api/detener', { id: r.id })),
@@ -6437,6 +6452,59 @@ $('#stdin').addEventListener('keydown', e => {
   r.hi = Math.max(0, Math.min(r.hist.length, (r.hi ?? r.hist.length) + (e.key === 'ArrowUp' ? -1 : 1)));
   $('#stdin').value = r.hist[r.hi] ?? ''; stdinFit();
 });
+// ---------- 🐞 depurar paso a paso (Python con pdb, que viene con Python) ----------
+// Los ● puntos de parada se ponen con clic en el margen del editor y se recuerdan por archivo (localStorage
+// «desklens.paradas»: ruta → [[línea, texto]], como lo plegado). La consola se agranda mientras se depura; la línea
+// donde está parado se resalta en el editor o en la lectura (sale de lo que escribe pdb: «> C:\…\x.py(12)f()»).
+const DBG_KEYS = [['▶ Continuar', 'c', 'F5', 'Hasta el siguiente punto de parada'], ['⤼ Paso', 'n', 'F10', 'Siguiente línea, sin entrar en funciones'],
+  ['↘ Entrar', 's', 'F11', 'Entrar en la función de esta línea'], ['↗ Salir', 'r', 'Mayús+F11', 'Terminar la función actual y volver']];
+const bpStore = () => { try { return JSON.parse(LS('desklens.paradas') || '{}'); } catch { return {}; } };
+function bpSave(path, list) { const all = bpStore(); delete all[path]; if (list.length) all[path] = list; LS('desklens.paradas', JSON.stringify(all)); }
+const bpMark = () => Object.assign(document.createElement('span'), { className: 'bp', textContent: '●', title: 'Punto de parada (clic: quitar)' });
+function bpEditor(cm, path) { // en el editor: margen de ●, clic para poner o quitar
+  const keep = () => { const l = []; cm.eachLine(h => { if (h.gutterMarkers?.['cm-bp']) l.push([cm.getLineNumber(h), h.text.trim()]); }); bpSave(path, l); };
+  const lines = cm.getValue().split('\n');
+  for (const sv of bpStore()[path] || []) { const l = foldAnchor(lines, sv); if (l >= 0) cm.setGutterMarker(l, 'cm-bp', bpMark()); }
+  cm.on('gutterClick', (_, l, g) => { if (g !== 'cm-bp' && g !== 'CodeMirror-linenumbers') return;
+    cm.setGutterMarker(l, 'cm-bp', cm.lineInfo(l).gutterMarkers?.['cm-bp'] ? null : bpMark()); keep(); });
+  cm.on('change', () => { clearTimeout(cm.bpT); cm.bpT = setTimeout(keep, 1000); }); // las ● se mueven con lo escrito
+}
+let dbgAt = null; // { path, line } donde está parado el depurador
+async function debugFile(path, f, text) {
+  const lines = text.split('\n'), paradas = (bpStore()[path] || []).map(sv => foldAnchor(lines, sv)).filter(l => l >= 0).map(l => l + 1);
+  const P = $('#panel'), h0 = P.style.height;
+  const r = await launch(() => api('/api/ejecutar', { ruta: path, depurar: true, paradas }), '🐞 ' + f.nombre,
+    `python -m pdb ${f.nombre}` + (paradas.length ? `   · paradas: ${paradas.join(', ')}` : '   · sin paradas: empieza en la primera línea'),
+    f.ejecutar.carpeta, path, () => { dbgPaint(null); P.style.height = h0; });
+  if (!r?.id) return;
+  r.dbg = true; r.tail = ''; drawRunBar();
+  P.style.height = Math.max(P.offsetHeight, Math.round(innerHeight * 0.55)) + 'px'; // más alto para ver el paso a paso
+}
+function dbgSend(r, cmd) { if (r.fin) return; appendOut([['in', cmd + '\n']]); api('/api/entrada', { id: r.id, texto: cmd }); }
+function dbgOut(r, trozos) {
+  r.tail = (r.tail + trozos.map(t => t[1]).join('')).slice(-4000);
+  if (r.tail.includes('The program finished and will be restarted')) { r.tail = ''; return dbgSend(r, 'q'); } // terminó: no volver a empezar
+  if (!/\(Pdb\) $/.test(r.tail)) return; // aún corriendo
+  const m = [...r.tail.matchAll(/^> (.+?)\((\d+)\)/gm)].at(-1); if (!m) return;
+  const at = { path: m[1], line: +m[2] - 1 };
+  if (at.path.toLowerCase() !== cur?.toLowerCase()) openTab(at.path);
+  setTimeout(() => { if (!r.fin) dbgPaint(at); }, 300); // si ya terminó, onDone lo limpió: no volver a marcar
+}
+function dbgPaint(at) {
+  if (dbgAt?.cm) dbgAt.cm.removeLineClass(dbgAt.h, 'background', 'dbg-line');
+  document.querySelectorAll('.code .cl.dbg').forEach(x => x.classList.remove('dbg'));
+  dbgAt = at; if (!at || at.path.toLowerCase() !== cur?.toLowerCase()) return;
+  if (editorCM) { at.cm = editorCM; at.h = editorCM.addLineClass(at.line, 'background', 'dbg-line'); editorCM.scrollIntoView({ line: at.line, ch: 0 }, 120); return; }
+  const code = $('#view .code'); code?.unfoldTo?.(at.line);
+  const row = code?.querySelector(`.cl[data-i="${at.line}"]`); if (!row) return;
+  row.classList.add('dbg'); const V = $('#view'), y = row.getBoundingClientRect().top - V.getBoundingClientRect().top;
+  if (y < 40 || y > V.clientHeight - 40) V.scrollTop += y - V.clientHeight / 3;
+}
+addEventListener('keydown', e => { // F5 F10 F11 Mayús+F11 mientras se depura (como VS Code)
+  const r = curRun; if (!r?.dbg || r.fin || !/^F(5|10|11)$/.test(e.key)) return;
+  e.preventDefault(); dbgSend(r, e.key === 'F5' ? 'c' : e.key === 'F10' ? 'n' : e.shiftKey ? 'r' : 's');
+}, true);
+
 // ＞ Terminal: cmd en la carpeta del proyecto (el del archivo abierto, el elegido en Git o el primero) para escribir órdenes
 function termCwd() {
   const ps = side?.proyectos || [], inside = p => p && ps.find(x => p.toLowerCase().startsWith(x.ruta.toLowerCase() + '\\') || p.toLowerCase() === x.ruta.toLowerCase());

@@ -162,6 +162,18 @@ with tempfile.TemporaryDirectory() as tmp:
     assert wait_run(rid, 10)["codigo"] != 0
     assert desklens.command_for(proj / "utf8.md") == (None, None) and desklens.run_info(proj / "utf8.md") is None
     assert desklens.run_info(proj / "hola.py")["texto"].endswith("hola.py")
+    # 🐞 depurar: pdb para en la línea 2 (punto de parada), un paso, ver una variable y seguir hasta el final
+    (proj / "dep.py").write_text("x = 1\ny = x + 1\nz = y * 10\nprint('z', z)\n", encoding="utf-8")
+    assert desklens.run_info(proj / "dep.py")["depurar"] and not desklens.run_info(proj / "acento.bat" if desklens.WINDOWS else proj / "acento.sh")["depurar"]
+    assert desklens.command_for(proj / "acento.sh", [])[0] is None  # depurar: por ahora solo Python
+    a, e = desklens.command_for(proj / "dep.py", [2])
+    rid = desklens.start_run(a, str(proj), e, "dep.py")
+    for cmd in ("n", "p y", "c", "q"):
+        time.sleep(1.5)
+        desklens.runs[rid].send(cmd)
+    o = wait_run(rid, 15)
+    out = text(o, "out")
+    assert "dep.py(2)<module>()" in out and "dep.py(3)<module>()" in out and "(Pdb) 2\n" in out and "z 20" in out, out
 
     # comando de pruebas detectado por los archivos del proyecto
     lara = tmp / "lara"

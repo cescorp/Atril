@@ -560,15 +560,24 @@ def git_bash():
     return None
 
 
-def command_for(path):
-    """(argumentos, codificación de la salida) para ejecutar el archivo, o (None, motivo)."""
+DEBUG_EXT = (".py", ".pyw")  # 🐞 Depurar: por ahora Python (pdb, viene con Python)
+
+
+def command_for(path, paradas=None):
+    """(argumentos, codificación de la salida) para ejecutar el archivo, o (None, motivo). paradas (lista de números de
+    línea, o [] sin ninguna): depurar con pdb, que para en la primera línea o, si hay paradas, sigue hasta la primera."""
     p = Path(path)
     ext = p.suffix.lower()
     here = Path(sys.executable).parent  # con desklens.pyw, sys.executable es pythonw.exe
     if ext in (".py", ".pyw"):
-        gui = ext == ".pyw"
+        gui = ext == ".pyw" and paradas is None  # depurando, python.exe también para un .pyw (pdb escribe en la consola)
         exe = find_venv_python(p, gui) or (str(here / ("pythonw.exe" if gui else "python.exe")) if WINDOWS else sys.executable)
+        if paradas is not None:
+            cmds = [a for n in paradas for a in ("-c", f"b {int(n)}")] + (["-c", "continue"] if paradas else [])
+            return [exe, "-m", "pdb", *cmds, str(p)], "utf-8"
         return [exe, str(p)], "utf-8"
+    if paradas is not None:
+        return None, "Depurar: por ahora solo Python"
     if ext in (".bat", ".cmd", ".vbs") and not WINDOWS:
         return None, "Solo se ejecuta en Windows"
     if ext == ".ps1" and not WINDOWS:  # PowerShell 7 existe para macOS y Linux
@@ -595,7 +604,7 @@ def run_info(path):
     if args is None:
         return {"error": enc} if enc else None
     return {"texto": subprocess.list2cmdline([Path(args[0]).name if os.sep in args[0] else args[0], *args[1:]]),
-            "carpeta": str(Path(path).parent)}
+            "carpeta": str(Path(path).parent), "depurar": Path(path).suffix.lower() in DEBUG_EXT}
 
 
 def detect_tests(project):
@@ -3663,7 +3672,10 @@ class Handler(BaseHTTPRequestHandler):
             if self.denied(data.get("ruta", "")):
                 return
             p = Path(data["ruta"]).resolve()
-            args, enc = command_for(p)
+            paradas = data.get("paradas") if data.get("depurar") else None
+            if paradas is not None and not all(isinstance(n, int) for n in paradas):
+                return self.send_json(400, {"error": "paradas: números de línea"})
+            args, enc = command_for(p, paradas)
             if args is None:
                 return self.send_json(400, {"error": enc or "Este tipo de archivo no se ejecuta"})
             extra = [str(a) for a in data.get("args", []) if isinstance(a, str)]  # p. ej. citas para verificar_citas.py
