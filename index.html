@@ -153,6 +153,7 @@ aside h2{font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppe
 .nm{display:flex;min-width:0}.nm .b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}.nm .e{flex:none;white-space:pre}
 .node.bak{opacity:.5}body:not(.showbak) .node.bak{display:none}
 #sidetools .bakbtn{font-size:11px;font-weight:600;width:auto;padding:0 6px}body.showbak #sidetools .bakbtn{color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent)}
+.node .plug{flex:none;max-width:45%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-left:6px;font-size:11px;color:var(--faint)}
 .node .x{opacity:0;flex:none;display:inline-flex;align-items:center;justify-content:center;width:26px;height:22px;margin:-2px -4px -2px 0;border-radius:5px;font-size:15px;font-weight:700;cursor:pointer}
 .node:hover .x{opacity:.6}.node .x:hover{opacity:1;background:var(--active);color:var(--accent)} /* ⋮ y ✕: zona de clic de 26×22, no solo el carácter */
 .kids{margin-left:12px;padding-left:4px;border-left:1px solid var(--line)}
@@ -980,11 +981,13 @@ async function loadSide() {
   const pending = [];
   for (const p of st.proyectos) {
     const box = document.createElement('div'); box.className = 'proj';
-    box.append(nodeEl(p.nombre, p.ruta, true, p.ruta));
+    const root = nodeEl(p.nombre, p.ruta, true, p.ruta); box.append(root);
+    if (p.lugar) root.querySelector('.n').after(Object.assign(document.createElement('span'), { className: 'plug', textContent: p.lugar }));
+    if (p.nombre !== p.carpeta) root.title = `${p.ruta}\n(en DeskLens: «${p.nombre}»; la carpeta se llama «${p.carpeta}»)`;
     const b = document.createElement('div'); b.className = 'badges';
     if (!p.avisos.length) b.innerHTML = '<span class="ok">✅ En orden</span>';
     for (const a of p.avisos) {
-      const s = button((a === 'Bitácora grande' ? '🟡 ' : '⚠️ ') + a, () =>
+      const s = button('⚠️ ' + a, () =>
         a === 'Bitácora grande' ? archiveDialog(p) : a === 'No encontrado' ? removeMissing(p) : templateDialog(p));
       s.className = 'badge'; b.append(s);
     }
@@ -1034,6 +1037,7 @@ function nodeEl(name, path, isDir, removable, git) {
       if (!isDir) return remove();
       const o = sortOf(path), setSort = m => { const all = sortMap(); all[path] = m; LS('desklens.orden', JSON.stringify(all)); loadSide(); };
       return openMenu(e.target, [['Nuevo archivo aquí', () => newInline('archivo', path)], ['Nueva carpeta aquí', () => newInline('carpeta', path)],
+        ['✎ Nombre en DeskLens…', () => renameProject(path), { title: 'Cómo se ve este proyecto en DeskLens; la carpeta no cambia' }],
         ['Ejecutar pruebas', () => runTests(path, name)], ['＞ Terminal aquí', () => openTerminal(path)],
         ['Mostrar en carpeta', () => api('/api/mostrar', { ruta: path })], ['Quitar de DeskLens', remove],
         '-', { head: 'Ordenar (carpetas primero)' },
@@ -1082,6 +1086,17 @@ function nodeMenu(anchor, path, isDir, git, extra = []) {
     ['🖨  Imprimir…', () => printDialog(path), canPrint(path) ? { key: 'Ctrl+P' } : { disabled: true, title: 'Audio, vídeo y fuentes no se imprimen' }],
     '-', ...copy, '-', trash]);
 }
+// Nombre de un proyecto en DeskLens (útil con dos carpetas que se llaman igual); vacío: el de la carpeta
+async function renameProject(path) {
+  const p = side.proyectos.find(x => x.ruta === path);
+  const n = await ask('Nombre en DeskLens', `Cómo quieres ver «${p.carpeta}» en DeskLens (la carpeta no cambia).\nDéjalo vacío para usar el de la carpeta.\n${path}`,
+    ['Guardar', 'Cancelar'], { input: p.nombre === p.carpeta ? '' : p.nombre });
+  if (n == null) return;
+  try { await api('/api/nombre_proyecto', { ruta: path, nombre: n }); } catch (e) { return ask('Nombre en DeskLens', e.message, ['Entendido']); }
+  await loadSide(); render(); if (gitOn()) gitDraw();
+}
+// Nombre de un proyecto tal como se ve (nombre propio, y la carpeta que lo distingue si hay otro igual)
+const projLabel = ruta => { const p = side?.proyectos?.find(x => x.ruta === ruta); return p ? p.nombre + (p.lugar ? ` · ${p.lugar}` : '') : ruta?.split(/[\\/]/).pop(); };
 // ↗ Abrir con el programa que Windows tenga para ese tipo, o elegir otro en la ventana «Abrir con» de Windows
 function openWithItems(path) {
   const run = modo => api('/api/abrir_con', { ruta: path, modo }).catch(e => ask('Abrir con', e.message, ['Entendido']));
@@ -2069,7 +2084,7 @@ function drawSearchToggles() {
 }
 // «En:» dónde busca: en todos los proyectos, en los marcados o en el del archivo abierto (se recuerda).
 const sscope = (() => { try { return { modo: 'todos', lista: [], ...JSON.parse(LS('desklens.buscar.en') || '{}') }; } catch { return { modo: 'todos', lista: [] }; } })();
-const scopeAll = () => [...(side?.proyectos || []).map(p => [p.ruta, p.nombre]), ['sueltos', 'Archivos sueltos']];
+const scopeAll = () => [...(side?.proyectos || []).map(p => [p.ruta, p.nombre + (p.lugar ? ` · ${p.lugar}` : '')]), ['sueltos', 'Archivos sueltos']];
 const scopeName = r => scopeAll().find(a => a[0] === r)?.[1] || r;
 // Raíces que se envían al servidor; null = en todo. Un proyecto quitado de DeskLens deja de contar.
 function scopeRoots() {
@@ -2141,7 +2156,7 @@ function gitRepoPath() {
 }
 async function gitLoad() {
   const ruta = gitRepoPath();
-  $('#gRepo').textContent = ruta ? '▾ ' + (side.proyectos.find(p => p.ruta === ruta)?.nombre || ruta) : 'Añade un proyecto';
+  $('#gRepo').textContent = ruta ? '▾ ' + projLabel(ruta) : 'Añade un proyecto';
   if (!ruta) { gst = null; return gitDraw(); }
   try { gst = await api('/api/git/estado?ruta=' + encodeURIComponent(ruta)); gst.ruta = ruta; }
   catch (e) { gst = { error: e.message, ruta }; }
@@ -2394,8 +2409,8 @@ async function gitRepoMenu(anchor) {
   const ps = [...(side?.proyectos || [])].sort((a, b) => !sum.find(x => x.ruta === a.ruta)?.rama - !sum.find(x => x.ruta === b.ruta)?.rama);
   openMenu(anchor, [{ head: 'Proyecto' }, ...ps.map(p => {
     const mark = p.ruta === gst?.ruta ? '✓' : '\u2003', info = st(p.ruta);
-    return [mark + ' ' + p.nombre + ' ' + info.replace(/<[^>]+>/g, ' '), () => { LS('desklens.git.repo', p.ruta); gfSel = gfL.sel[p.ruta] || null; gfRestore = true; gitLoad(); },
-      { title: p.ruta, html: `<span class="mr-mark">${mark}</span><b class="mr-name">${esc(p.nombre)}</b>${info}` }];
+    return [mark + ' ' + p.nombre + ' ' + (p.lugar || '') + ' ' + info.replace(/<[^>]+>/g, ' '), () => { LS('desklens.git.repo', p.ruta); gfSel = gfL.sel[p.ruta] || null; gfRestore = true; gitLoad(); },
+      { title: p.ruta, html: `<span class="mr-mark">${mark}</span><b class="mr-name">${esc(p.nombre)}</b>${p.lugar ? `<span class="mr-off">${esc(p.lugar)}</span>` : ''}${info}` }];
   })]);
 }
 // ---------- Git a pantalla completa (⤢): proyectos y ramas · grafo con entrantes y salientes · detalle · cambios ----------
@@ -2477,7 +2492,7 @@ function gitFullClose(keep = false) {
 // Dibuja título, proyectos, ramas y (si cambió la punta de la rama o de su remota) el grafo
 async function gitFullDraw() {
   if (!gitFullOn() || !gst || gst.error) return;
-  $('#gfTitle').textContent = `${gst.nombre} · ⎇ ${gst.rama}` + (gst.remota ? ` ↔ ${gst.remota}` : ' (sin remota)');
+  $('#gfTitle').textContent = `${projLabel(gst.ruta)} · ⎇ ${gst.rama}` + (gst.remota ? ` ↔ ${gst.remota}` : ' (sin remota)');
   $('#gfPull').disabled = !gst.remota; $('#gfPush').disabled = $('#gfFetch').disabled = !gst.remotos.length;
   gitFullSide();
   const todas = $('#gfAll').checked, key = `${gst.ruta}|${gst.punta}|${todas}`;
@@ -2491,13 +2506,13 @@ async function gitFullDraw() {
 // remota del mismo nombre, con dónde está: al día, por subir/traer, solo en tu PC o solo en el remoto (GitHub…).
 function gitFullSide() {
   const web = gst.servicio || 'el remoto', n = (k, s, p) => `${k} ${k === 1 ? s : p}`;
-  $('#gfRepo').innerHTML = `<b>${esc(gst.nombre)}</b><span>▾</span>`;
+  $('#gfRepo').innerHTML = `<b>${esc(projLabel(gst.ruta))}</b><span>▾</span>`;
   $('#gfRepo').onclick = e => { e.stopPropagation(); gitRepoMenu(e.currentTarget); };
   const sinCommit = gst.preparados.length + gst.cambios.length + gst.conflictos.length;
   const st = [gst.atras && `↓ ${n(gst.atras, 'commit', 'commits')} por traer`, gst.adelante && `↑ ${n(gst.adelante, 'commit', 'commits')} por subir`,
     sinCommit && n(sinCommit, 'archivo sin commit', 'archivos sin commit')].filter(Boolean);
   $('#gfSt').innerHTML = `⎇ ${esc(gst.rama)} · ` + (st.length ? esc(st.join(' · ')) : gst.remota ? `<span class="gbok">✓ Todo al día con ${esc(web)}</span>` : 'sin remoto');
-  $('#gfBrH').innerHTML = `<span>Ramas de ${esc(gst.nombre)}</span><span class="sp"></span>`;
+  $('#gfBrH').innerHTML = `<span>Ramas de ${esc(projLabel(gst.ruta).split(' · ')[0])}</span><span class="sp"></span>`;
   $('#gfBrH').append(Object.assign(button('⋯', e => { e.stopPropagation(); gitBranchMenu(e.currentTarget); }),
     { className: 'ic gfbm', title: `Pull, Push, Fusionar y más para «${gst.rama}»` }));
   const info = new Map((gst.ramas_info || []).map(x => [x.rama, x])), localOf = r => r.split('/').slice(1).join('/');

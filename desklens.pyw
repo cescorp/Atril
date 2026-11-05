@@ -44,6 +44,40 @@ HIDDEN = {".git", "__pycache__", ".ipynb_checkpoints", ".idea", ".vs"}
 
 # ---------- configuración y permisos ----------
 
+def project_label(root, cfg):
+    """Cómo se ve un proyecto: su nombre en DeskLens (si se le puso uno) o el de su carpeta, y «lugar», la carpeta que
+    lo contiene, solo cuando otro proyecto se ve con el mismo nombre (dos «hesis» en sitios distintos). Del lugar va lo
+    justo para distinguirlos, desde el final: «…\\A» y «…\\B\\2025» (una ruta larga recortada por delante se vería igual)."""
+    names = cfg.get("nombres", {})
+    name_of = lambda r: names.get(r) or Path(r).name or r
+    mine = name_of(root)
+    same = [r for r in cfg["proyectos"] if name_of(r).lower() == mine.lower()]
+    if len(same) < 2:
+        return {"nombre": mine, "carpeta": Path(root).name or root, "lugar": ""}
+    parts = {r: Path(r).parent.parts for r in same}
+    tail = lambda r, k: "\\".join(parts[r][-k:]).lower()
+    k = 1
+    while k < len(parts[root]) and sum(tail(r, k) == tail(root, k) for r in same) > 1:
+        k += 1
+    mine_parts = parts[root]
+    lugar = str(Path(*mine_parts)) if k >= len(mine_parts) else "…\\" + "\\".join(mine_parts[-k:])
+    return {"nombre": mine, "carpeta": Path(root).name or root, "lugar": lugar}
+
+
+def set_project_name(root, name):
+    """Nombre del proyecto en DeskLens (la carpeta no cambia); vacío: vuelve el de la carpeta."""
+    cfg = load_config()
+    if root not in cfg["proyectos"]:
+        raise ValueError("No es un proyecto de DeskLens")
+    names = cfg.setdefault("nombres", {})
+    name = " ".join(str(name or "").split())[:60]
+    if name and name != (Path(root).name or root):
+        names[root] = name
+    else:
+        names.pop(root, None)
+    save_config(cfg)
+
+
 def load_config():
     """config.json (proyectos, sueltos, ajustes, IA, ventana…); si falta o está roto, una configuración vacía."""
     try:
@@ -352,7 +386,7 @@ def estado():
     cfg = load_config()
     return {
         "reiniciar": Path(__file__).stat().st_mtime_ns != CODE_MTIME,
-        "proyectos": [{"ruta": r, "nombre": Path(r).name or r, "avisos": status(r)} for r in cfg["proyectos"]],
+        "proyectos": [{"ruta": r, **project_label(r, cfg), "avisos": status(r)} for r in cfg["proyectos"]],
         "sueltos": [{"ruta": s, "nombre": Path(s).name, "existe": Path(s).is_file(), "git": git_state(s)}
                     for s in cfg["sueltos"]],
     }
@@ -3556,6 +3590,12 @@ class Handler(BaseHTTPRequestHandler):
             cfg = load_config()
             cfg["ventana"] = {k: int(data[k]) for k in ("x", "y", "w", "h")}
             save_config(cfg)
+            return self.send_json(200, {})
+        if url == "/api/nombre_proyecto":
+            try:
+                set_project_name(data.get("ruta", ""), data.get("nombre", ""))
+            except ValueError as e:
+                return self.send_json(400, {"error": str(e)})
             return self.send_json(200, {})
         if url == "/api/abrir_fuera":  # otra instancia (doble clic en el Explorador) pide abrir archivos en esta ventana
             rutas = [str(Path(r).resolve()) for r in data.get("rutas", []) if Path(r).is_file()]

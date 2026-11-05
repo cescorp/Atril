@@ -759,6 +759,18 @@ assert.deepStrictEqual(findRefs('Ver 1 Samuel 4:4 y 1 Samuel 8:5, 20; Deuteronom
     assert act("pull_rama", "main")[0] == 400 and act("push_a", "nada/x")[0] == 400 and act("push_a", "origin/-x")[0] == 400
     assert act("cancelar_fusion", "")[0] == 400  # no hay fusión en curso
     git(otro, "checkout", "-q", "main")
+    # proyectos con el mismo nombre: «lugar» los distingue; un nombre propio en DeskLens manda y la carpeta no cambia
+    cfg = {"proyectos": [r"G:\Trabajo\hesis", r"D:\Respaldos\hesis", r"G:\otro"]}
+    assert desklens.project_label(r"G:\Trabajo\hesis", cfg) == {"nombre": "hesis", "carpeta": "hesis", "lugar": "…\\Trabajo"}
+    assert desklens.project_label(r"G:\a\x\h", {"proyectos": [r"G:\a\x\h", r"D:\a\x\h"]})["lugar"] == "G:\\a\\x"  # solo cambia la unidad
+    assert desklens.project_label(r"G:\otro", cfg)["lugar"] == ""
+    cfg["nombres"] = {r"D:\Respaldos\hesis": "hesis (pruebas)"}
+    assert desklens.project_label(r"G:\Trabajo\hesis", cfg)["lugar"] == "" and desklens.project_label(r"D:\Respaldos\hesis", cfg)["nombre"] == "hesis (pruebas)"
+    code, _ = post("/api/nombre_proyecto", {"ruta": str(proj), "nombre": "  Mi   proyecto "})
+    assert code == 200 and desklens.project_label(str(proj), desklens.load_config())["nombre"] == "Mi proyecto"
+    post("/api/nombre_proyecto", {"ruta": str(proj), "nombre": ""})  # vacío: vuelve el de la carpeta
+    assert desklens.project_label(str(proj), desklens.load_config())["nombre"] == proj.name and proj.exists()
+    assert post("/api/nombre_proyecto", {"ruta": str(fuera), "nombre": "x"})[0] == 400
     # terminal: varias líneas pegadas se ejecutan en orden, cd se mantiene, tildes en rutas y salida UTF-8 de git
     (proj / "año").mkdir(); (proj / "año" / "camión.txt").write_text("x")
     code, r = post("/api/terminal", {"cwd": str(proj)})
