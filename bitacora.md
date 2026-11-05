@@ -8,6 +8,10 @@ Entradas nuevas arriba. Formato: `## AAAA-MM-DD · título` + 2–4 líneas (qu�
 - **Cómo trabaja el usuario:** escribe en español. **Antes de construir algo nuevo, dibujarlo en texto y esperar su «ok».** No instalar nada sin acuerdo. Ahorrar tokens. Prefiere lo simple: rechazó un panel de IA con modos (ver 2026-11-02).
 - **Para verificar sin tocar su DeskLens:** levantar `desklens.Handler` en el puerto 8799 con `CONFIG`, `CONV_DIR`, `RECOVERY_DIR` e `INDEX_DB` en una carpeta temporal y hacer captura con Edge sin ventana (`--headless=new --screenshot`). Así se probó cada paso. Ojo: en Windows dos servidores pueden escuchar el mismo puerto sin error; si hay otra sesión probando, usa otro puerto.
 
+## 2026-11-04 · Abrir con… y DeskLens en Windows
+Menús de archivo (explorador y ⋮ de la pestaña): «↗ Abrir con el programa de Windows» (`os.startfile`; se niega con ejecutables como .bat/.exe/.ps1: eso sería ejecutarlos) y «↗ Abrir con…» (ventana de Windows `OpenAs_RunDLL`). ⚙ Ajustes › «🪟 Abrir desde Windows…»: registra DeskLens en «Abrir con» de las extensiones elegidas y, opcional, «Abrir con DeskLens» en el clic derecho del Explorador; todo en HKCU (sin administrador, `WIN_BASE`), con «Quitar de Windows». «Hacer predeterminado…» abre la ventana «Abrir con» sobre un archivo de ejemplo: Windows 10 exige que el usuario lo confirme. Doble clic con DeskLens ya abierto: la 2.ª instancia pasa los archivos por `/api/abrir_fuera`, la ventana los recoge cada 1,5 s (`/api/pendientes`) como pestañas y se trae al frente (`SetForegroundWindow`); si el DeskLens que corre es antiguo o no tiene ventana, se abre otra como antes. Las pruebas registran en una clave de prueba (`Software\DeskLensPrueba`) y la borran.
+Pendiente: probar de verdad en el Explorador (registrar, doble clic en un .txt con DeskLens abierto y cerrado). Ojo: esta sesión encontró `G:\Atril` en la rama `main` (5f1b39a, versión «Atril»); se volvió a `publico` con el ok del usuario.
+
 ## 2026-11-04 · La consola de git se oculta sola al terminar bien
 Fetch, Pull, Push, Sincronizar, Fusionar…: la consola se ve mientras corre y, si terminó bien, se oculta 1,5 s después (la ejecución queda en su pestaña ✓ y un aviso lo dice). Si falla, o si la consola ya estaba abierta antes, se queda como está.
 
@@ -289,5 +293,6 @@ Problema: el chat es difícil de leer y se pierde el hilo entre proyectos y chat
 - [ ] Probar en la ventana real: lectura de PDF en el chat, números de página del PDF creado, panel 🔗 en uso diario.
 - [ ] Medir la carga fija de Gemini y Codex cuando estén conectados.
 - [ ] Probar en la ventana real la edición a mano de Word, imágenes y PDF (hecha el 2026-11-02).
-- [ ] Decidir: aviso «⏳ Sin actividad», nivel 4 de formatos (LibreOffice/ffmpeg), «Abrir con DeskLens» en el menú contextual del Explorador.
+- [ ] Decidir: aviso «⏳ Sin actividad», nivel 4 de formatos (LibreOffice/ffmpeg).
+- [ ] Probar en el Explorador real «🪟 Abrir desde Windows» (hecho el 2026-11-04, probado solo en una clave de prueba).
 - [ ] Nota de Obsidian sobre el modo mínimo de Claude: propuesta, pendiente de aprobación del usuario.

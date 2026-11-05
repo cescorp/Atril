@@ -759,6 +759,44 @@ assert.deepStrictEqual(findRefs('Ver 1 Samuel 4:4 y 1 Samuel 8:5, 20; Deuteronom
     assert act("pull_rama", "main")[0] == 400 and act("push_a", "nada/x")[0] == 400 and act("push_a", "origin/-x")[0] == 400
     assert act("cancelar_fusion", "")[0] == 400  # no hay fusión en curso
     git(otro, "checkout", "-q", "main")
+    # abrir desde Windows: otra instancia pasa archivos a esta ventana; «Abrir con» no ejecuta programas
+    nota = proj / "desde_windows.txt"; nota.write_text("x")
+    code, r = post("/api/abrir_fuera", {"rutas": [str(nota), str(proj / "no-existe.txt")]})
+    assert code == 200 and "ventana" in r
+    assert json.loads(get(port, "/api/pendientes")[1])["rutas"] == [str(nota.resolve())]
+    assert json.loads(get(port, "/api/pendientes")[1])["rutas"] == []  # se entregan una sola vez
+    for bad in ("x.bat", "x.exe", "x.ps1"):
+        try:
+            desklens.open_default(proj / bad)
+            raise AssertionError("abrió un ejecutable: " + bad)
+        except ValueError:
+            pass
+    plan = desklens.win_assoc_plan([".txt"], True, '"py" "d.pyw" "%1"')
+    assert (desklens.WIN_BASE + r"\.txt\OpenWithProgids", "DeskLens.Archivo", "") in plan
+    assert (desklens.WIN_BASE + r"\*\shell\DeskLens\command", "", '"py" "d.pyw" "%1"') in plan
+    assert not any("shell\\DeskLens" in k for k, _, _ in desklens.win_assoc_plan([".txt"], False, "c"))
+    if desklens.WINDOWS:  # registrar y quitar de verdad, pero en una clave de prueba (no en las asociaciones reales)
+        import winreg
+        desklens.WIN_BASE = r"Software\DeskLensPrueba\Classes"
+        try:
+            desklens.win_register([".txt", ".md", ".inventada"], True)
+            st = desklens.win_state()
+            assert st["registradas"] == [".txt", ".md"] and st["menu"]
+            desklens.win_register([".md"], False)  # volver a registrar deja solo lo elegido
+            st = desklens.win_state()
+            assert st["registradas"] == [".md"] and not st["menu"]
+            desklens.win_unregister()
+            assert desklens.win_state()["registradas"] == []
+        finally:
+            for k in (r"Software\DeskLensPrueba\Classes\.txt\OpenWithProgids", r"Software\DeskLensPrueba\Classes\.txt",
+                      r"Software\DeskLensPrueba\Classes\.md\OpenWithProgids", r"Software\DeskLensPrueba\Classes\.md",
+                      r"Software\DeskLensPrueba\Classes\*\shell", r"Software\DeskLensPrueba\Classes\*",
+                      r"Software\DeskLensPrueba\Classes", r"Software\DeskLensPrueba"):
+                try:
+                    winreg.DeleteKey(winreg.HKEY_CURRENT_USER, k)
+                except OSError:
+                    pass
+            desklens.WIN_BASE = r"Software\Classes"
     # pestaña Ignorados: carpeta entera como una entrada, regla que lo ignora, y lo que git ya seguía aunque esté en .gitignore
     ign = fuera / "ign"; ign.mkdir(); git(ign, "init", "-q")
     git(ign, "config", "user.name", "T"); git(ign, "config", "user.email", "t@example.com")

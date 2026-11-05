@@ -3140,6 +3140,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json(200, explore(q.get("ruta", load_config().get("ultima", ""))))
             if url.path == "/api/ia":
                 return self.send_json(200, ia_status(refresh=q.get("refrescar") == "1"))
+            if url.path == "/api/windows":
+                return self.send_json(200, win_state())
+            if url.path == "/api/pendientes":  # archivos que otra instancia pidió abrir aquí
+                out, pending_open[:] = pending_open[:], []
+                return self.send_json(200, {"rutas": out})
             if url.path == "/api/ajustes":
                 return self.send_json(200, {"valores": ajustes(), "lista": [
                     {"clave": k, "grupo": g, "etiqueta": e, "defecto": d, "min": lo, "max": hi} for k, g, e, d, lo, hi in SETTINGS]})
@@ -3517,6 +3522,33 @@ class Handler(BaseHTTPRequestHandler):
             cfg["ventana"] = {k: int(data[k]) for k in ("x", "y", "w", "h")}
             save_config(cfg)
             return self.send_json(200, {})
+        if url == "/api/abrir_fuera":  # otra instancia (doble clic en el Explorador) pide abrir archivos en esta ventana
+            rutas = [str(Path(r).resolve()) for r in data.get("rutas", []) if Path(r).is_file()]
+            add_paths("sueltos", [r for r in rutas if not allowed(r)])
+            pending_open.extend(rutas)
+            return self.send_json(200, {"ventana": time.time() - last_ping < 45})  # la ventana hace ping cada 20 s
+        if url == "/api/abrir_con" and allowed(data.get("ruta", "")):
+            try:
+                if data.get("modo") == "elegir":
+                    win_open_with(Path(data["ruta"]).resolve())
+                else:
+                    open_default(Path(data["ruta"]).resolve())
+            except (OSError, ValueError) as e:
+                return self.send_json(400, {"error": str(e)})
+            return self.send_json(200, {})
+        if url in ("/api/windows/registrar", "/api/windows/quitar", "/api/windows/predeterminado"):
+            if not WINDOWS:
+                return self.send_json(400, {"error": "Solo en Windows"})
+            try:
+                if url.endswith("registrar"):
+                    win_register(data.get("exts", []), bool(data.get("menu")))
+                elif url.endswith("quitar"):
+                    win_unregister()
+                else:
+                    win_choose_default(data.get("ext", ""))
+            except (OSError, ValueError) as e:
+                return self.send_json(400, {"error": str(e)})
+            return self.send_json(200, win_state())
         if url == "/api/mostrar" and allowed(data.get("ruta", "")):
             p = Path(data["ruta"]).resolve()
             try:
@@ -3569,6 +3601,153 @@ def window_flags(cfg):
         return []
     return [f"--window-position={x},{y}", f"--window-size={w},{h}"]
 
+# ---------- Windows: abrir con otro programa y registrar DeskLens para abrir archivos desde el Explorador ----------
+# Todo va en HKEY_CURRENT_USER (solo este usuario, sin administrador) y «Quitar de Windows» lo deshace. Windows 10 no deja
+# que un programa se ponga como predeterminado él solo: eso lo confirma el usuario en la ventana «Abrir con» de Windows.
+
+WIN_BASE = r"Software\Classes"  # las pruebas lo cambian por una clave suya para no tocar las asociaciones reales
+WIN_PROGID = "DeskLens.Archivo"
+WIN_EXTS = [".txt", ".md", ".log", ".json", ".csv", ".py", ".ps1", ".bat", ".xml", ".ini", ".yml", ".yaml", ".sql", ".php", ".js", ".css", ".html"]
+EXEC_EXTS = {".exe", ".bat", ".cmd", ".com", ".ps1", ".vbs", ".vbe", ".js", ".jse", ".wsf", ".msi", ".scr", ".lnk", ".pif", ".reg", ".hta", ".cpl"}
+pending_open = []  # archivos que otra instancia de DeskLens pidió abrir en esta ventana (la ventana los recoge)
+
+
+def win_command():
+    """Orden que Windows ejecuta al abrir un archivo con DeskLens: pythonw (sin consola) + desklens.pyw + el archivo."""
+    exe = Path(sys.executable)
+    w = exe.with_name("pythonw.exe")
+    return f'"{w if w.exists() else exe}" "{Path(__file__).resolve()}" "%1"'
+
+
+def win_assoc_plan(exts, menu, cmd):
+    """Claves y valores del registro para «Abrir con DeskLens»: [(clave, nombre, valor)], nombre "" = valor por defecto."""
+    p = f"{WIN_BASE}\\{WIN_PROGID}"
+    plan = [(p, "", "Archivo (DeskLens)"), (p + r"\shell\open\command", "", cmd),
+            (p + r"\Application", "ApplicationName", "DeskLens"),  # el nombre que se ve en «Abrir con»
+            (p + r"\Application", "ApplicationDescription", "Leer y editar archivos de tus proyectos")]
+    plan += [(f"{WIN_BASE}\\{e}\\OpenWithProgids", WIN_PROGID, "") for e in exts]
+    if menu:  # clic derecho en cualquier archivo del Explorador
+        plan += [(WIN_BASE + r"\*\shell\DeskLens", "", "Abrir con DeskLens"), (WIN_BASE + r"\*\shell\DeskLens\command", "", cmd)]
+    return plan
+
+
+def win_notify():
+    """Avisa al Explorador de que cambiaron las asociaciones (si no, no se ve hasta reiniciar sesión)."""
+    import ctypes
+    ctypes.windll.shell32.SHChangeNotify(0x08000000, 0, None, None)  # SHCNE_ASSOCCHANGED
+
+
+def win_state():
+    """Qué extensiones abren con DeskLens y si está el «Abrir con DeskLens» del clic derecho."""
+    if not WINDOWS:
+        return {"windows": False}
+    import winreg
+    def has(key, name=None):
+        try:
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key) as k:
+                if name is not None:
+                    winreg.QueryValueEx(k, name)
+            return True
+        except OSError:
+            return False
+    return {"windows": True, "lista": WIN_EXTS,
+            "registradas": [e for e in WIN_EXTS if has(f"{WIN_BASE}\\{e}\\OpenWithProgids", WIN_PROGID)],
+            "menu": has(WIN_BASE + r"\*\shell\DeskLens\command"), "orden": win_command()}
+
+
+def win_register(exts, menu):
+    """Deja DeskLens en «Abrir con» de esas extensiones (y, si se pide, en el clic derecho); quita las demás."""
+    import winreg
+    win_unregister()
+    for key, name, value in win_assoc_plan([e for e in exts if e in WIN_EXTS], menu, win_command()):
+        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, key) as k:
+            winreg.SetValueEx(k, name, 0, winreg.REG_SZ, value)
+    win_notify()
+
+
+def win_unregister():
+    """Quita todo lo que puso win_register (y nada más)."""
+    import winreg
+    def drop_tree(key):
+        try:
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key) as k:
+                while True:
+                    try:
+                        drop_tree(key + "\\" + winreg.EnumKey(k, 0))
+                    except OSError:
+                        break
+            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, key)
+        except OSError:
+            pass
+    for e in WIN_EXTS:
+        try:
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, f"{WIN_BASE}\\{e}\\OpenWithProgids", 0, winreg.KEY_SET_VALUE) as k:
+                winreg.DeleteValue(k, WIN_PROGID)
+        except OSError:
+            pass
+    drop_tree(f"{WIN_BASE}\\{WIN_PROGID}")
+    drop_tree(WIN_BASE + r"\*\shell\DeskLens")
+    win_notify()
+
+
+def win_open_with(path):
+    """Ventana «¿Cómo quieres abrir este archivo?» de Windows (con «Usar siempre esta aplicación»)."""
+    subprocess.Popen(["rundll32.exe", "shell32.dll,OpenAs_RunDLL", str(path)])
+
+
+def win_choose_default(ext):
+    """Para elegir el programa predeterminado de una extensión: la ventana «Abrir con» sobre un archivo de ejemplo vacío."""
+    if ext not in WIN_EXTS:
+        raise ValueError("Extensión no válida")
+    sample = Path(tempfile.gettempdir()) / f"DeskLens - ejemplo{ext}"
+    sample.touch()
+    win_open_with(sample)
+
+
+def open_default(path):
+    """Abre el archivo con el programa que Windows (o macOS/Linux) tenga para su tipo. Los ejecutables no: eso sería
+    ejecutarlos, y para eso está «Ejecutar» en la consola."""
+    p = Path(path)
+    if p.suffix.lower() in EXEC_EXTS:
+        raise ValueError(f"«{p.name}» es un programa o script: abrirlo lo ejecutaría. Usa ▶ Ejecutar si es lo que quieres.")
+    if WINDOWS:
+        os.startfile(str(p))
+    else:
+        subprocess.Popen(["open" if MAC else "xdg-open", str(p)])
+
+
+def win_focus_window():
+    """Trae al frente la ventana de DeskLens (la que tiene ese título). Funciona porque quien la pide acaba de recibir
+    el doble clic del usuario: Windows deja que esa instancia cambie la ventana activa."""
+    import ctypes
+    from ctypes import wintypes
+    u = ctypes.windll.user32
+    found = []
+    def each(hwnd, _):
+        n = u.GetWindowTextLengthW(hwnd)
+        if n and u.IsWindowVisible(hwnd):
+            b = ctypes.create_unicode_buffer(n + 1)
+            u.GetWindowTextW(hwnd, b, n + 1)
+            if b.value == "DeskLens" or b.value.endswith(" - DeskLens"):
+                found.append(hwnd)
+        return True
+    u.EnumWindows(ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)(each), 0)
+    if found:
+        u.ShowWindow(found[0], 9)  # SW_RESTORE: si estaba minimizada
+        u.SetForegroundWindow(found[0])
+
+
+def hand_to_running(port, files):
+    """Si ya hay un DeskLens con la ventana abierta, le pasa los archivos para abrirlos en pestañas; True si los aceptó."""
+    import urllib.request
+    try:
+        req = urllib.request.Request(f"http://127.0.0.1:{port}/api/abrir_fuera", data=json.dumps({"rutas": files}).encode(),
+                                     headers={"X-DeskLens": "1", "Content-Type": "application/json"}, method="POST")
+        with urllib.request.urlopen(req, timeout=3) as r:
+            return bool(json.loads(r.read()).get("ventana"))
+    except (OSError, ValueError):
+        return False  # un DeskLens anterior sin esta función, o no responde: se abre otra ventana como antes
+
 
 def open_window(url):
     """Ventana propia en modo aplicación con el navegador de ⚙ Ajustes (o el primero instalado); con «predeterminado»
@@ -3585,8 +3764,9 @@ def open_window(url):
 
 
 def main():
-    """Arranque: los archivos pasados como argumento (arrastrados sobre el icono) se añaden como sueltos; si DeskLens
-    ya está abierto en ese puerto, solo se abre otra ventana; si no, servidor, indexador, limpieza y ventana."""
+    """Arranque: los archivos pasados como argumento (arrastrados sobre el icono o abiertos desde Windows) se añaden
+    como sueltos; si DeskLens ya está abierto en ese puerto, se abren en pestañas de su ventana (o, si no tiene ventana,
+    en otra nueva); si no, servidor, indexador, limpieza y ventana."""
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     files = [str(Path(a).resolve()) for a in args if Path(a).is_file()]
     if files:
@@ -3596,7 +3776,11 @@ def main():
     try:
         server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
     except OSError:
-        server = None  # ya hay un DeskLens abierto: solo se abre otra ventana
+        server = None  # ya hay un DeskLens abierto: sus archivos van a su ventana o, si no la tiene, se abre otra
+        if files and hand_to_running(port, files):
+            if WINDOWS:
+                win_focus_window()
+            return
     if "--sin-ventana" not in sys.argv:
         open_window(url)
     if server:

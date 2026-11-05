@@ -686,6 +686,11 @@ dialog#dlg.sets[open]{display:flex}
 .sets>header,.sets>footer{display:flex;align-items:center;gap:14px;padding:12px 20px}
 .sets>header{border-bottom:1px solid var(--line)}.sets>footer{border-top:1px solid var(--line)}
 .sets>header b{font-size:16px;margin-right:6px}
+dialog#dlg.sets.win{width:min(760px,calc(100vw - 32px));height:fit-content;max-height:calc(100vh - 48px)}
+.win .wbody{flex:1;overflow:auto;padding:16px 22px;display:flex;flex-direction:column;gap:14px}
+.win .wexts{display:grid;grid-template-columns:repeat(auto-fill,minmax(86px,1fr));gap:8px 12px}
+.win .wexts label,.win .wmenu{display:flex;gap:6px;align-items:center;font-size:13px;cursor:pointer}
+.win .wstate{font-weight:500;margin:0}.win .wcmd{font:11px Consolas,monospace;word-break:break-all;margin:0}
 .sfind{flex:0 1 340px;font:inherit;padding:6px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
 .sfind:focus{outline:2px solid var(--accent);outline-offset:-1px}
 .sonly{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);cursor:pointer}
@@ -1070,10 +1075,17 @@ function nodeMenu(anchor, path, isDir, git, extra = []) {
     ...(otherPath() && otherPath() !== path ? [['⇆  Comparar con el otro lado', () => compareFiles(path, otherPath()), { title: otherPath() }]] : []),
     '-',
     ['📄  Abrir', () => openTab(path, true)],
+    ...openWithItems(path),
     ['✎  Editar', () => editPath(path)],
     ['📎  Adjuntar al chat', () => { setIA(true); dropPath(path); }, { title: 'Lo mismo que arrastrarlo al panel de IA' }],
     ['🖨  Imprimir…', () => printDialog(path), canPrint(path) ? { key: 'Ctrl+P' } : { disabled: true, title: 'Audio, vídeo y fuentes no se imprimen' }],
     '-', ...copy, '-', trash]);
+}
+// ↗ Abrir con el programa que Windows tenga para ese tipo, o elegir otro en la ventana «Abrir con» de Windows
+function openWithItems(path) {
+  const run = modo => api('/api/abrir_con', { ruta: path, modo }).catch(e => ask('Abrir con', e.message, ['Entendido']));
+  return [['↗  Abrir con el programa de Windows', () => run('windows'), { title: 'El programa que Windows usa para este tipo de archivo (Word, Excel, Bloc de notas…)' }],
+    ['↗  Abrir con…', () => run('elegir'), { title: 'Elegir el programa en la ventana «Abrir con» de Windows' }]];
 }
 // «Eliminar»: pregunta, cierra sus pestañas (si hay cambios sin guardar, pregunta antes) y lo envía a la papelera.
 async function trashPath(path, isDir) {
@@ -3302,8 +3314,41 @@ async function loadSettings() {
   r.setProperty('--codeFont', (AJ.letra_codigo || 13) + 'px');
 }
 // Grupos a la izquierda, filas «nombre | valor | rango» a la derecha; filtro, ● = distinto del valor por defecto
+// Ajustes › Abrir desde Windows: DeskLens en «Abrir con» de las extensiones elegidas y en el clic derecho del Explorador.
+// Solo para este usuario (sin administrador); hacerlo predeterminado lo confirma el usuario en la ventana de Windows.
+async function winDialog() {
+  const st = await api('/api/windows').catch(e => ({ error: e.message }));
+  if (!st.windows) return ask('Abrir desde Windows', st.error || 'Esto solo está disponible en Windows.', ['Entendido']);
+  const d = $('#dlg'); d.className = 'sets win'; d.oninput = d.onchange = null; d.onclose = null;
+  const draw = st => {
+    const reg = new Set(st.registradas), on = st.registradas.length > 0 || st.menu;
+    d.innerHTML = `<header><b>Abrir archivos con DeskLens desde Windows</b></header>
+      <div class="wbody"><p class="ok">Elige qué tipos de archivo pueden abrirse con DeskLens. Aparecerá en «Abrir con» del Explorador;
+        para que sea el programa de siempre, pulsa «Hacer predeterminado…» y marca «Usar siempre esta aplicación».</p>
+      <div class="wexts">${st.lista.map(e => `<label><input type="checkbox" value="${e}" ${reg.has(e) || (!on && ['.txt', '.md', '.log', '.json', '.csv'].includes(e)) ? 'checked' : ''}> ${e}</label>`).join('')}</div>
+      <label class="wmenu"><input type="checkbox" id="wMenu" ${st.menu || !on ? 'checked' : ''}> «Abrir con DeskLens» en el clic derecho de cualquier archivo del Explorador</label>
+      <p class="wstate">${on ? `✓ Registrado: ${st.registradas.join(' ') || 'ninguna extensión'}${st.menu ? ' · clic derecho' : ''}` : 'Aún no está registrado en Windows.'}</p>
+      <p class="ok wcmd" title="Lo que Windows ejecuta al abrir un archivo con DeskLens">${esc(st.orden)}</p></div>
+      <footer><span class="ok">Solo para tu usuario · se deshace con «Quitar de Windows»</span><div class="exp-actions"></div></footer>`;
+    const exts = () => [...d.querySelectorAll('.wexts input:checked')].map(i => i.value);
+    const call = async (url, body, msg) => { try { const r = await api(url, body); if (msg) flash(msg); return r; } catch (e) { ask('Abrir desde Windows', e.message, ['Entendido']); } };
+    d.querySelector('.exp-actions').append(
+      Object.assign(button('Registrar en Windows', async () => { const r = await call('/api/windows/registrar', { exts: exts(), menu: $('#wMenu').checked }, '✓ DeskLens está en «Abrir con»'); r && draw(r); }), { className: 'primary' }),
+      Object.assign(button('Hacer predeterminado…', e => {
+        if (!reg.size) return flash('Registra primero alguna extensión');
+        openMenu(e.currentTarget, [{ head: 'Elegir DeskLens para…' }, ...[...reg].map(x => [x, () => call('/api/windows/predeterminado', { ext: x },
+          'En la ventana de Windows: elige DeskLens y marca «Usar siempre esta aplicación»')])]);
+      }), { title: 'Abre la ventana «Abrir con» de Windows para esa extensión', disabled: !reg.size }),
+      Object.assign(button('Quitar de Windows', async () => {
+        if (await ask('Quitar de Windows', 'DeskLens deja de aparecer en «Abrir con» y en el clic derecho del Explorador.', ['Quitar', 'Cancelar'], { danger: true }) !== 'Quitar') return;
+        const r = await call('/api/windows/quitar', {}, 'DeskLens ya no está en el Explorador'); r && draw(r);
+      }), { disabled: !on }),
+      button('Volver a Ajustes', () => settingsDialog()));
+  };
+  draw(st); if (!d.open) d.showModal();
+}
 async function settingsDialog() {
-  const s = await api('/api/ajustes'), d = $('#dlg');
+  const s = await api('/api/ajustes'), d = $('#dlg'), reopen = d.open; // desde «Volver a Ajustes» el modal ya está abierto
   d.className = 'sets'; d.oninput = d.onchange = null; d.onclose = null;
   const groups = [...new Set(s.lista.map(a => a.grupo))];
   // las etiquetas largas llevan su aclaración entre paréntesis: va debajo, en pequeño
@@ -3355,6 +3400,7 @@ async function settingsDialog() {
     i.type === 'checkbox' ? i.checked = a.defecto : i.value = a.defecto; refresh();
   };
   d.lastChild.lastChild.append(
+    Object.assign(button('🪟 Abrir desde Windows…', winDialog), { title: 'Que los .txt, .md… se abran con DeskLens desde el Explorador' }),
     button('Restablecer todo', () => { for (const a of s.lista) { const i = inp(a.clave); i.type === 'checkbox' ? i.checked = a.defecto : i.value = a.defecto; } refresh(); }),
     Object.assign(button('Guardar', async () => {
       const before = s.valores.puerto;
@@ -3363,7 +3409,7 @@ async function settingsDialog() {
       flash('✓ Ajustes guardados' + (AJ.puerto !== before ? ' · el puerto se aplica al reabrir DeskLens' : ''));
     }), { className: 'primary' }),
     button('Cancelar', () => d.close()));
-  refresh(); d.showModal(); find.focus();
+  refresh(); if (!reopen) d.showModal(); find.focus();
 }
 const copyText = (t, msg) => navigator.clipboard.writeText(t).catch(() => { // sin permiso del portapapeles: el método clásico
   const a = Object.assign(document.createElement('textarea'), { value: t, style: 'position:fixed;opacity:0' });
@@ -3855,7 +3901,7 @@ async function render() {
     menu.push(['Editar', () => wordEdit(path)]);
   }
   if (canPrint(path)) menu.push(['🖨 Imprimir…', () => printDialog(path), { key: 'Ctrl+P' }]);
-  if (!isUntitled(path)) menu.push(['Mostrar en carpeta', () => api('/api/mostrar', { ruta: f.ruta })],
+  if (!isUntitled(path)) menu.push(...openWithItems(f.ruta), ['Mostrar en carpeta', () => api('/api/mostrar', { ruta: f.ruta })],
     ['Información', () => infoDialog(f.ruta)], ['Comparar versiones (git)', () => compareDialog(f.ruta)],
     ['Copiar ruta', () => copyText(f.ruta, 'Ruta copiada'), { title: f.ruta }]);
   // 🔍 en todas las pestañas: buscar no necesita editar (reemplazar sí: Ctrl+H pasa a edición)
@@ -6424,6 +6470,13 @@ $('#convDel').innerHTML = svg('trash');
 idxPoll(); pdfWorker();
 loadIA().catch(() => {}).finally(() => linked ? syncConvToTab(true) : loadConvList(LS('desklens.conv')));
 setInterval(() => fetch('/api/ping', { method: 'POST' }), 20000); fetch('/api/ping', { method: 'POST' });
+setInterval(async () => { // ponytail: sondeo cada 1,5 s (una petición local vacía); un canal de eventos si algún día pesa
+  if (document.hidden && !document.hasFocus()) return; // ventana minimizada: se recoge al volver
+  let r; try { r = await api('/api/pendientes'); } catch { return; }
+  if (!r.rutas.length) return;
+  await loadSide(); r.rutas.forEach((p, i) => openTab(p, i === r.rutas.length - 1));
+  flash(r.rutas.length === 1 ? `Abierto desde Windows: ${r.rutas[0].split(/[\\/]/).pop()}` : `${r.rutas.length} archivos abiertos desde Windows`);
+}, 1500);
 addEventListener('pagehide', () => navigator.sendBeacon('/api/adios'));
 
 // Posición y tamaño de la ventana: se guardan al cambiar (el navegador no avisa al mover, así que se comprueba cada 2 s)
