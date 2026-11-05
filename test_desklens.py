@@ -856,7 +856,9 @@ assert.deepStrictEqual(findRefs('Ver 1 Samuel 4:4 y 1 Samuel 8:5, 20; Deuteronom
     total = int(subprocess.check_output(["git", "-C", str(rep), "rev-list", "--all", "--count"], text=True))
     assert st["pendientes"] == 0 and len(st["commits"]) == total
     ce = next(c for c in st["commits"] if c[0] == e["hash"][:10])
-    assert ce[1] and ce[2] == e["ts"] and ce[4] is False and ce[5] == [["e.md", 2, 0]] and ce[3]
+    assert ce[1] and ce[2] == e["ts"] and ce[4] is False and ce[5] == [["e.md", 2, 0, 2]] and ce[3]  # archivo, +, −, palabras
+    diff = "diff --git a/x.md b/x.md\n--- a/x.md\n+++ b/x.md\n@@ -1 +1 @@\n hola\n-adiós mundo\n+buenos días, señor\n~\n+++ más\n"
+    assert desklens.stats_words(diff) == {"x.md": 4}  # «+++ más» dentro del trozo es texto, no cabecera
     assert all(c[5] == [] for c in st["commits"] if c[4])  # merges: sin líneas
     assert list((tmp / "estadistica").glob("*.json"))  # calculado una vez y guardado
     assert desklens.git_stats(str(rep), budget=0)["pendientes"] == 0  # la 2.ª vez ya no calcula nada

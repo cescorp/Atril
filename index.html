@@ -223,6 +223,7 @@ body.gitfull #gitfull{grid-row:1;display:grid;grid-template-rows:auto minmax(0,1
 .esttiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
 .esttiles .tile{border:1px solid var(--line);border-radius:8px;padding:8px 12px;display:flex;flex-direction:column;gap:2px;min-width:0}
 .esttiles small{font-size:11.5px;color:var(--muted)}.esttiles b{font-size:22px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums;white-space:nowrap}
+.esttiles .hrs b.h2{font-size:16px;margin-top:2px}.esttab th small{font-weight:400;color:var(--faint)}
 .esttiles b i{font-style:normal;color:#2e8b57;font-size:17px}.esttiles b em{font-style:normal;color:#c0392b;font-size:17px}.esttiles span{font-size:11.5px;color:var(--faint)}
 .est section h5{margin:0 0 8px;font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .est section h5 small{text-transform:none;letter-spacing:0;font-weight:400;color:var(--faint)}
@@ -2780,7 +2781,20 @@ function estHours(cs) {
   }
   return secs / 3600;
 }
-const estLines = c => (c.files || []).reduce((a, [f, ad, de]) => EST_SKIP.test(f) || ad < 0 ? a : [a[0] + ad, a[1] + de], [0, 0]);
+// un archivo cuenta si es escrito a mano: ni generado (lock, .min, vendor…), ni binario, ni más de 5.000 líneas de golpe
+// en un commit (una librería pegada o un volcado, no trabajo escrito)
+const estOk = ([f, ad]) => !EST_SKIP.test(f) && ad >= 0 && ad <= 5000;
+const estLines = c => (c.files || []).reduce((a, x) => estOk(x) ? [a[0] + x[1], a[1] + x[2]] : a, [0, 0]);
+const estWords = c => (c.files || []).reduce((a, x) => estOk(x) ? a + (x[3] || 0) : a, 0);
+// Palabras por hora: la de ⚙ Ajustes › Git o, con 0, calibrada con todo el historial del proyecto (palabras ÷ horas por
+// tiempo). Un ritmo fijo de tecleo no sirve cuando parte del código se genera o se pega (en homeshape daba 9.840 h
+// frente a 181 h por tiempo); calibrado, «por cambios» reparte las horas reales según cuánto se escribió.
+function estRitmo() {
+  if (AJ?.est_ritmo > 0) return AJ.est_ritmo;
+  if (gfSt.ritmo == null) { const w = gfSt.commits.filter(c => !c.merge).reduce((a, c) => a + estWords(c), 0), h = estHours(gfSt.commits);
+    gfSt.ritmo = w && h ? w / h : 200; }
+  return gfSt.ritmo;
+}
 async function gitStatsDraw() {
   const G = $('#gfGraph'); G.style.opacity = '';
   if (gfSt?.ruta !== gst.ruta || gfSt.punta !== gst.punta) gfSt = { ruta: gst.ruta, punta: gst.punta, data: null };
@@ -2796,7 +2810,7 @@ async function gitStatsDraw() {
       ctx.data = r;
       ctx.commits = r.commits.map(([h, autor, ts, rama, merge, files]) => ({ h, autor, ts, rama, merge, files }));
       if (!r.pendientes) break;
-      $('#est').innerHTML = `<p class="gfmore">Contando las líneas de cada commit (solo la primera vez): faltan ${r.pendientes} de ${r.commits.length}…</p>`;
+      $('#est').innerHTML = `<p class="gfmore">Contando las líneas y palabras de cada commit (solo la primera vez; después es al instante): faltan ${r.pendientes} de ${r.commits.length}…</p>`;
     }
     // color fijo por autor y por rama: según sus commits de siempre (no cambia al filtrar)
     const rankOf = key => { const n = new Map(); gfSt.commits.forEach(c => !c.merge && n.set(c[key], (n.get(c[key]) || 0) + 1));
@@ -2816,6 +2830,7 @@ function estRender() {
   const lines = work.reduce((a, c) => { const [x, y] = estLines(c); return [a[0] + x, a[1] + y]; }, [0, 0]);
   const files = new Set(work.flatMap(c => (c.files || []).map(x => x[0])));
   const days = new Set(cs.map(c => estDay(new Date(c.ts * 1000)))), nDays = Math.round((t1 - t0) / 86400);
+  const words = work.reduce((a, c) => a + estWords(c), 0), hoursW = words / estRitmo();
   const hours = cs.length ? estHours(cs) : 0, diff = prev.length ? Math.round((work.length - prev.length) / prev.length * 100) : null;
   const opts = (key, label) => `<option value="">${label}</option>` + [...gfSt.rank[key].keys()].map(n => `<option ${f[key] === n ? 'selected' : ''}>${esc(n)}</option>`).join('');
   E.innerHTML = `<div class="estbar">
@@ -2827,11 +2842,15 @@ function estRender() {
       <div class="tile"><small>Commits</small><b>${fmtN(work.length)}</b><span>${diff == null ? '' : `${diff >= 0 ? '↑' : '↓'} ${Math.abs(diff)} % que el periodo anterior`}${cs.length - work.length ? ` · ${cs.length - work.length} merge${cs.length - work.length === 1 ? '' : 's'}` : ''}</span></div>
       <div class="tile"><small>Archivos</small><b>${fmtN(files.size)}</b><span>distintos</span></div>
       <div class="tile" title="Sin archivos generados (lock, .min, vendor, node_modules) ni binarios"><small>Líneas</small><b><i>+${fmtN(lines[0])}</i> <em>−${fmtN(lines[1])}</em></b><span>sin generados ni binarios</span></div>
-      <div class="tile" title="Estimado por sesiones: commits de un autor con menos de ${AJ?.est_pausa_min ?? 120} min entre sí son una sesión, y a cada una se suman ${AJ?.est_previo_min ?? 30} min previos (⚙ Ajustes › Git). Git no guarda cuánto se trabajó."><small>Horas ≈</small><b>${fmtH(hours)}</b><span>estimado por tiempo ⓘ</span></div>
+      <div class="tile" title="Palabras añadidas en archivos escritos a mano: sin generados (lock, .min, vendor, node_modules, dist, build), binarios ni archivos con más de 5.000 líneas de golpe"><small>Palabras</small><b>${fmtN(words)}</b><span>escritas ⓘ</span></div>
+      <div class="tile hrs" title="Dos estimados (git no guarda cuánto se trabajó):
+· por tiempo: commits de un autor con menos de ${AJ?.est_pausa_min ?? 120} min entre sí son una sesión, y a cada una se suman ${AJ?.est_previo_min ?? 30} min previos;
+· por cambios: palabras escritas ÷ ${fmtN(Math.round(estRitmo()))} por hora (${AJ?.est_ritmo > 0 ? 'fijado en Ajustes' : 'calibrado con todo el historial del proyecto'}).
+Si se parecen, el número es fiable. Se ajustan en ⚙ Ajustes › Git."><small>Horas ≈</small><b>${fmtH(hours)}</b><span>por tiempo ⓘ</span><b class="h2">${fmtH(hoursW)}</b><span>por cambios · ${fmtN(Math.round(estRitmo()))} pal/h</span></div>
       <div class="tile"><small>Días activos</small><b>${days.size}</b><span>de ${nDays}</span></div></div>
     <section><h5>Commits por ${f.grupo === 'dia' ? 'día' : f.grupo} <span class="seg sm">${[['autor', 'por autor'], ['rama', 'por rama']].map(([k, n]) => `<button data-s="${k}" class="${f.serie === k ? 'on' : ''}">${n}</button>`).join('')}</span></h5><div id="esChart"></div></section>
     <section><h5>¿Cuándo se trabaja? <small>commits por día de la semana y hora</small></h5><div id="esHeat"></div></section>
-    <section><h5>Quién envía más <small>todas las ramas, también las remotas</small> <span class="seg sm">${[['commits', 'Commits'], ['lineas', 'Líneas'], ['horas', 'Horas']].map(([k, n]) => `<button data-v="${k}" class="${f.ver === k ? 'on' : ''}">${n}</button>`).join('')}</span></h5><div id="esAut"></div></section>
+    <section><h5>Quién envía más <small>todas las ramas, también las remotas</small> <span class="seg sm">${[['commits', 'Commits'], ['lineas', 'Líneas'], ['palabras', 'Palabras'], ['horas', 'Horas']].map(([k, n]) => `<button data-v="${k}" class="${f.ver === k ? 'on' : ''}">${n}</button>`).join('')}</span></h5><div id="esAut"></div></section>
     <section><h5>Por rama <small>cada commit en la rama donde se hizo (aproximado)</small></h5><div id="esRam"></div></section>
     <section><h5>Archivos más cambiados</h5><div id="esFiles"></div></section>`;
   const set = o => { Object.assign(f, o); gfSave(); estRender(); };
@@ -2905,22 +2924,23 @@ function estTable(sel, key, cs, f) {
   const by = new Map();
   for (const c of cs) (by.get(c[key]) || by.set(c[key], []).get(c[key])).push(c);
   const rows = [...by].map(([n, list]) => { const w = list.filter(c => !c.merge), l = w.reduce((a, c) => { const [x, y] = estLines(c); return [a[0] + x, a[1] + y]; }, [0, 0]);
-    return { n, commits: w.length, mas: l[0], menos: l[1], horas: estHours(list), ultimo: Math.max(...list.map(c => c.ts)), otras: key === 'autor' ? [...new Set(w.map(c => c.rama))] : [...new Set(w.map(c => c.autor))] }; });
-  const val = r => f.ver === 'lineas' ? r.mas + r.menos : f.ver === 'horas' ? r.horas : r.commits, tot = rows.reduce((a, r) => a + val(r), 0) || 1;
+    const pal = w.reduce((a, c) => a + estWords(c), 0);
+    return { n, commits: w.length, mas: l[0], menos: l[1], pal, horasC: pal / estRitmo(), horas: estHours(list), ultimo: Math.max(...list.map(c => c.ts)), otras: key === 'autor' ? [...new Set(w.map(c => c.rama))] : [...new Set(w.map(c => c.autor))] }; });
+  const val = r => f.ver === 'lineas' ? r.mas + r.menos : f.ver === 'palabras' ? r.pal : f.ver === 'horas' ? r.horas : r.commits, tot = rows.reduce((a, r) => a + val(r), 0) || 1;
   rows.sort((a, b) => val(b) - val(a));
   const T = $(sel);
   if (!rows.length) return T.innerHTML = '<p class="gfmore">Sin commits en este periodo.</p>';
-  T.innerHTML = `<table class="esttab"><thead><tr><th>${key === 'autor' ? 'Autor' : 'Rama'}</th><th class="pc">% de ${f.ver === 'lineas' ? 'líneas' : f.ver}</th><th class="num">Commits</th><th class="num">+líneas</th><th class="num">−líneas</th><th class="num">Horas ≈</th><th>Último</th><th>${key === 'autor' ? 'Ramas' : 'Autores'}</th></tr></thead><tbody>${rows.map(r => {
+  T.innerHTML = `<table class="esttab"><thead><tr><th>${key === 'autor' ? 'Autor' : 'Rama'}</th><th class="pc">% de ${f.ver === 'lineas' ? 'líneas' : f.ver}</th><th class="num">Commits</th><th class="num">+líneas</th><th class="num">−líneas</th><th class="num">Palabras</th><th class="num" title="por tiempo · por cambios">Horas ≈ <small>tiempo · cambios</small></th><th>Último</th><th>${key === 'autor' ? 'Ramas' : 'Autores'}</th></tr></thead><tbody>${rows.map(r => {
     const pc = val(r) / tot * 100;
     return `<tr data-n="${esc(r.n)}" class="${f[key] === r.n ? 'on' : ''}" title="Clic: ver solo «${esc(r.n)}» (otra vez: quitar el filtro)"><td><i class="sw" style="background:${estColor(key, r.n)}"></i>${esc(r.n)}</td>
       <td class="pc"><span class="pcn">${pc < 1 && pc > 0 ? '<1' : Math.round(pc)} %</span><span class="pcbar"><i style="width:${pc}%;background:${estColor(key, r.n)}"></i></span></td>
-      <td class="num">${fmtN(r.commits)}</td><td class="num add">+${fmtN(r.mas)}</td><td class="num del">−${fmtN(r.menos)}</td><td class="num">${fmtH(r.horas)}</td>
+      <td class="num">${fmtN(r.commits)}</td><td class="num add">+${fmtN(r.mas)}</td><td class="num del">−${fmtN(r.menos)}</td><td class="num">${fmtN(r.pal)}</td><td class="num">${fmtH(r.horas)} · ${fmtH(r.horasC)}</td>
       <td class="gc">${esc(fmtWhen(r.ultimo))}</td><td class="gc ot">${esc(r.otras.slice(0, 4).join(', '))}${r.otras.length > 4 ? '…' : ''}</td></tr>`; }).join('')}</tbody></table>`;
   T.querySelector('tbody').onclick = e => { const tr = e.target.closest('tr'); if (!tr) return; f[key] = f[key] === tr.dataset.n ? '' : tr.dataset.n; gfSave(); estRender(); };
 }
 function estFiles(work) {
   const n = new Map();
-  for (const c of work) for (const [p] of c.files || []) if (!EST_SKIP.test(p)) n.set(p, (n.get(p) || 0) + 1);
+  for (const c of work) for (const x of c.files || []) if (!EST_SKIP.test(x[0])) n.set(x[0], (n.get(x[0]) || 0) + 1);
   const top = [...n].sort((a, b) => b[1] - a[1]).slice(0, 10), max = top[0]?.[1] || 1, F = $('#esFiles');
   F.innerHTML = top.length ? `<table class="esttab"><tbody>${top.map(([p, v]) => `<tr data-p="${esc(p)}" title="Clic: abrir ${esc(p)}"><td class="fp"><bdi>${esc(p)}</bdi></td>
     <td class="pc"><span class="pcbar"><i style="width:${v / max * 100}%;background:${EST_CAT[estDark() ? 'dark' : 'light'][0]}"></i></span></td><td class="num">${v} ${v === 1 ? 'vez' : 'veces'}</td></tr>`).join('')}</tbody></table>`

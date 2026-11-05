@@ -106,6 +106,7 @@ SETTINGS = [
     ("git_fetch_min", "Git", "Buscar novedades en los remotos cada (minutos; 0 = nunca)", 5, 0, 1440),
     ("est_pausa_min", "Git", "Estadística: pausa máxima dentro de una sesión de trabajo (minutos; más, es otra sesión)", 120, 10, 1440),
     ("est_previo_min", "Git", "Estadística: tiempo de trabajo antes del primer commit de cada sesión (minutos)", 30, 0, 480),
+    ("est_ritmo", "Git", "Estadística: palabras escritas por hora para las horas ≈ por cambios (0 = calibrado con el historial del proyecto)", 0, 0, 100000),
     ("ia_espera_seg", "IA", "Tiempo máximo de espera de una respuesta (segundos)", 600, 30, 3600),
     ("ia_explicar_lineas", "IA", "Líneas de la consola que envía «Explicar error»", 40, 5, 500),
     ("ia_pdf_en_adelante", "IA", "Páginas que toma «página N en adelante»", 10, 1, 100),
@@ -2798,6 +2799,22 @@ def stats_branches(repo, commits):
     return owner
 
 
+def stats_words(diff):
+    """Palabras añadidas por archivo en la salida de «git show --word-diff=porcelain»: las líneas que empiezan por «+»
+    dentro de los trozos (@@); lo de antes del primer @@ de cada archivo es la cabecera (+++ b/ruta)."""
+    out, name, in_hunk = {}, None, False
+    for ln in diff.splitlines():
+        if ln.startswith("diff --git "):
+            in_hunk, name = False, ln.split(" b/", 1)[-1]
+        elif not in_hunk and ln.startswith("+++ b/"):
+            name = ln[6:]
+        elif ln.startswith("@@"):
+            in_hunk = True
+        elif in_hunk and ln.startswith("+") and name:
+            out[name] = out.get(name, 0) + len(re.findall(r"\w+", ln[1:]))
+    return out
+
+
 def git_stats(path, budget=1.5):
     """Todos los commits de todas las ramas (también las remotas) con autor, fecha, rama y, si ya están calculadas,
     las líneas por archivo. Los merges no suman líneas (repetirían lo que trajo la otra rama)."""
@@ -2830,12 +2847,27 @@ def git_stats(path, budget=1.5):
                         files.append([name, int(a) if a.isdigit() else -1, int(d) if d.isdigit() else -1])  # -1: binario
                 cache[head.strip()] = files
                 changed = True
+    # 2.ª pasada: palabras escritas por archivo (4.º dato de cada archivo). Más caro (compara contenidos: ~4,6 s cada
+    # 300 commits en homeshape), así que va después de las líneas y con lo que quede del tiempo de esta petición
+    words_todo = [h for h in (c["hash"] for c in commits if len(c["padres"]) < 2)
+                  if h in cache and any(len(f) < 4 for f in cache[h])]
+    while words_todo and time.time() - start < budget:
+        batch, words_todo = words_todo[:10], words_todo[10:]  # tandas pequeñas: hay commits enormes
+        txt = git_run(repo, "-c", "core.quotePath=false", "show", "--word-diff=porcelain", "--format=%x1e%H", "-M", *batch)
+        for rec in txt.split("\x1e"):
+            head, _, body = rec.strip("\n").partition("\n")
+            if head.strip() in cache:
+                counts = stats_words(body)
+                for f in cache[head.strip()]:
+                    f[3:] = [counts.get(f[0], 0)]
+                changed = True
     if changed:
         tmp = cache_file.with_suffix(".tmp")
         tmp.write_text(json.dumps(cache, ensure_ascii=False), encoding="utf-8")
         tmp.replace(cache_file)
     owner = stats_branches(repo, commits)
-    return {"repositorio": str(repo), "pendientes": len(todo),
+    pending = sum(1 for c in commits if len(c["padres"]) < 2 and (c["hash"] not in cache or any(len(f) < 4 for f in cache[c["hash"]])))
+    return {"repositorio": str(repo), "pendientes": pending,
             "commits": [[c["hash"][:10], c["autor"], c["ts"], owner.get(c["hash"], "(sin rama)"), len(c["padres"]) > 1,
                          [] if len(c["padres"]) > 1 else cache.get(c["hash"])] for c in commits]}
 
