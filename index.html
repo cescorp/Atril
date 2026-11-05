@@ -352,7 +352,7 @@ body.split .pane:not(.on) #view{opacity:.92}
 #bar{display:flex;gap:2px;align-items:center;padding:4px 8px;background:var(--paper);min-height:40px}
 .crumbs{flex:1;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:13px;padding:0 8px}
 .crumbs b{font-weight:400;color:var(--ink)}
-.menu{position:fixed;z-index:20;display:flex;flex-direction:column;min-width:190px;max-height:calc(100vh - 8px);overflow:auto;padding:4px;background:var(--paper);border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.15)}
+.menu{position:fixed;z-index:20;display:flex;flex-direction:column;min-width:190px;max-height:min(70vh,calc(100vh - 8px));overflow:auto;padding:4px;background:var(--paper);border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.15)}
 .menu button{border:0;background:none;text-align:left;padding:6px 10px;font-size:13px}
 .menu button:hover,.menu button:focus-visible{background:var(--hover);outline:none}
 .menu button{max-width:560px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:none}
@@ -371,17 +371,19 @@ dialog#dlg.cmp[open]{display:flex}
 .clist{position:relative}
 .cpick.missing{color:var(--muted);font-style:italic}
 /* combo de versiones: commit con ▸ y sus archivos debajo */
-.menu .vrow{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;border-left:3px solid transparent;border-radius:4px;min-width:460px}
+.menu .vrow{border-left:3px solid transparent;border-radius:4px;min-width:460px;max-width:640px}
+.menu .vhead{position:relative} /* el enlace de archivos va encima de la 2.ª línea de la fila, a la derecha */
+.menu>*{flex-shrink:0}
 .menu .vrow.on{border-left-color:var(--accent);background:var(--active)}
-.menu .vmain{display:flex;flex-direction:column;align-items:stretch;gap:1px;text-align:left;padding:6px 10px;min-width:0}
-.menu .vt{display:flex;gap:14px;align-items:baseline}.menu .vt b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;color:var(--ink)}
-.menu .vw{flex:none;font-size:11.5px;color:var(--muted)}
-.menu .vd{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.menu .vmain{display:flex;flex-direction:column;align-items:stretch;gap:1px;text-align:left;padding:4px 10px;width:100%;min-width:0}
+.menu .vt{display:flex;gap:6px;align-items:baseline}.menu .vt b{flex:0 1 auto;max-width:70%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;color:var(--ink)}
+.menu .vw{flex:none;margin-left:8px;font-size:11.5px;color:var(--muted)}
+.menu .vd{flex:1;min-width:0;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .menu .va{font-size:11.5px;color:var(--faint)}.menu .vh{display:none}
 .menu .vfile .vn{flex:none;font:11px Consolas,monospace}.menu .vfile ins{color:#2e8b57;text-decoration:none}.menu .vfile del{color:#c0392b;text-decoration:none}
 .menu .vrow[hidden]{display:none}
-.menu .vexp{margin:0 8px 6px 0;padding:2px 9px;font-size:11.5px;color:var(--ink);border:1px solid var(--line);border-radius:11px;white-space:nowrap}
-.menu .vexp:hover{border-color:var(--accent);color:var(--accent)}
+.menu .vexp{position:absolute;right:6px;bottom:2px;padding:0 4px;border:0;background:none;font-size:11.5px;color:var(--accent);white-space:nowrap}
+.menu .vexp:hover{text-decoration:underline;background:none}
 .menu .vfiles{grid-column:1/-1;display:flex;flex-direction:column;margin:0 0 4px 18px;padding-left:8px;border-left:2px solid var(--line)}
 .menu .vfiles[hidden]{display:none}.menu .vfiles .ok{padding:4px 6px;font-size:12px}
 .menu .vfile{display:flex;gap:8px;align-items:center;padding:3px 6px;font:12px/1.4 Consolas,monospace}
@@ -1610,8 +1612,9 @@ async function compareDialog(path, carry = null) {
   }
   // ---- anchos: lista de cambios (borde derecho) y columnas (el hueco entre ellas); doble clic = ancho original; se recuerdan ----
   function syncHeads() { // cada combo encima de su columna, midan lo que midan
-    const H = d.querySelector('.cheads'), b = H.getBoundingClientRect();
-    const ps = d.querySelectorAll('.cmerge .CodeMirror-merge-pane'), heads = H.querySelectorAll('.chead');
+    const H = d.querySelector('.cheads'), ps = d.querySelectorAll('.cmerge .CodeMirror-merge-pane'), heads = H.querySelectorAll('.chead');
+    H.style.height = Math.max(40, ...[...heads].map(h => h.offsetHeight + 12)) + 'px'; // 6 px arriba y abajo
+    const b = H.getBoundingClientRect();
     if (!ps.length) { // aún cargando: repartidos a partes iguales a la derecha de la lista
       const x0 = (d.querySelector('.clist')?.offsetWidth || 0) + 8, w = (b.width - x0 - 28) / heads.length;
       return heads.forEach((h, i) => Object.assign(h.style, { left: x0 + i * w + 'px', width: w - 12 + 'px' }));
@@ -1796,7 +1799,7 @@ async function compareDialog(path, carry = null) {
     }
     return items;
   }
-  // Fila de un commit: título y hora, detalle del mensaje, autor y el botón «📄 N archivos» que despliega sus archivos.
+  // Fila de un commit en 2 líneas: «título · detalle … hora» y «autor … 📄 N archivos ▸» (despliega sus archivos).
   // El hash y la fecha completa van ocultos en la fila para que el filtro los siga encontrando.
   function versionRow(x, on, i) {
     const choose = () => { pick[i] = x; build(); };
@@ -1804,8 +1807,9 @@ async function compareDialog(path, carry = null) {
     const c = x.c, [t, det] = c ? msgParts(c.mensaje) : [x.label, ''];
     const row = document.createElement('div'); row.className = 'vrow' + (on ? ' on' : '');
     const main = Object.assign(button('', () => { closeMenu(); choose(); }), { title: x.title || x.label, className: 'vmain' });
-    main.innerHTML = `<span class="vt"><b>${esc(t)}</b><span class="vw">${c ? esc(dayKey(c.ts) === 'Hoy' ? fmtWhen(c.ts) : hhmm(c.ts)) : ''}</span></span>`
-      + (det ? `<span class="vd">${esc(det)}</span>` : '') + (c ? `<span class="va">${esc(c.autor)}</span><span class="vh">${esc(c.corto)} ${esc(c.fecha)}</span>` : '');
+    main.innerHTML = `<span class="vt"><b>${esc(t)}</b><span class="vd">${det ? '· ' + esc(det) : ''}</span>`
+      + `<span class="vw">${c ? esc(dayKey(c.ts) === 'Hoy' ? fmtWhen(c.ts) : hhmm(c.ts)) : ''}</span></span>`
+      + (c ? `<span class="va">${esc(c.autor)}</span><span class="vh">${esc(c.corto)} ${esc(c.fecha)}</span>` : '');
     const files = Object.assign(document.createElement('div'), { className: 'vfiles', hidden: true });
     const nTxt = n => n ? `📄 ${n} archivo${n === 1 ? '' : 's'}` : '📄 Archivos';
     const exp = Object.assign(button(nTxt(c?.n) + ' ▸', async e => {
@@ -1826,7 +1830,8 @@ async function compareDialog(path, carry = null) {
         return a;
       }));
     }), { className: 'vexp', title: 'Ver los archivos de este commit (clic en uno: compararlo con las mismas versiones)' });
-    row.append(main, exp, files);
+    const head = Object.assign(document.createElement('div'), { className: 'vhead' }); head.append(main, exp);
+    row.append(head, files);
     return { el: row, btn: main };
   }
   if (!d.open) d.showModal();
