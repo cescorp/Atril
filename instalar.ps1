@@ -73,8 +73,10 @@ function Recargar-Path {
 # winget: instala o actualiza un paquete aceptando sus licencias (las mismas que al instalarlo a mano).
 # Puede salir la ventana de Windows que pide permiso de administrador: hay que aceptarla.
 function Winget-Texto([string]$verbo, [string]$id) { "winget $verbo --id $id -e --accept-package-agreements --accept-source-agreements" }
-function Winget([string]$verbo, [string]$id) {
-    winget $verbo --id $id -e --accept-package-agreements --accept-source-agreements
+# Ojo: la función NO puede llamarse «Winget»: PowerShell no distingue mayúsculas y la línea de dentro se llamaría a
+# sí misma sin fin («desbordamiento de la profundidad de llamada»). Por eso se llama Usar-Winget y ejecuta winget.exe.
+function Usar-Winget([string]$verbo, [string]$id) {
+    winget.exe $verbo --id $id -e --accept-package-agreements --accept-source-agreements
     Recargar-Path
 }
 
@@ -136,11 +138,11 @@ function Python-Valido($py) { [bool]($py -and ($py.Mayor -gt 3 -or ($py.Mayor -e
 $py = Buscar-Python
 if (Python-Valido $py) {
     Ok "Python $($py.Mayor).$($py.Menor) · $($py.Exe)"
-    if ($HayWinget) { Info "¿Buscar una versión más nueva?"; if (Confirmar @(Winget-Texto 'upgrade' 'Python.Python.3.12') $false) { Winget 'upgrade' 'Python.Python.3.12' } }
+    if ($HayWinget) { Info "¿Buscar una versión más nueva?"; if (Confirmar @(Winget-Texto 'upgrade' 'Python.Python.3.12') $false) { Usar-Winget 'upgrade' 'Python.Python.3.12' } }
 } else {
     Falta $(if ($py) { "Hay Python $($py.Mayor).$($py.Menor); DeskLens necesita 3.10 o más nuevo." } else { "No se encontró Python." })
     if ($HayWinget) {
-        if (Confirmar @(Winget-Texto 'install' 'Python.Python.3.12') $true) { Winget 'install' 'Python.Python.3.12' }
+        if (Confirmar @(Winget-Texto 'install' 'Python.Python.3.12') $true) { Usar-Winget 'install' 'Python.Python.3.12' }
     } else {
         $url = "https://www.python.org/ftp/python/$PY_VERSION/python-$PY_VERSION-amd64.exe"
         $todos = if ($EsAdmin) { 1 } else { 0 }   # para todos los usuarios solo si es administrador
@@ -169,11 +171,11 @@ Titulo "2. Git"
 $git = Get-Command git -ErrorAction SilentlyContinue
 if ($git) {
     Ok ((git --version) -replace 'git version ', 'Git ')
-    if ($HayWinget) { Info "¿Buscar una versión más nueva?"; if (Confirmar @(Winget-Texto 'upgrade' 'Git.Git') $false) { Winget 'upgrade' 'Git.Git' } }
+    if ($HayWinget) { Info "¿Buscar una versión más nueva?"; if (Confirmar @(Winget-Texto 'upgrade' 'Git.Git') $false) { Usar-Winget 'upgrade' 'Git.Git' } }
 } else {
     Falta "No se encontró Git (recomendado)."
     if ($HayWinget) {
-        if (Confirmar @(Winget-Texto 'install' 'Git.Git') $true) { Winget 'install' 'Git.Git' }
+        if (Confirmar @(Winget-Texto 'install' 'Git.Git') $true) { Usar-Winget 'install' 'Git.Git' }
     } else {
         $api = 'https://api.github.com/repos/git-for-windows/git/releases/latest'
         $alcance = if ($EsAdmin) { @() } else { @('/CURRENTUSER') }
@@ -228,7 +230,7 @@ foreach ($ia in $ias) {
 if ($faltan.Count -and -not (Get-Command npm -ErrorAction SilentlyContinue)) {
     Info "Para instalar las que faltan hace falta Node.js (incluye npm)."
     if ($HayWinget) {
-        if (Confirmar @(Winget-Texto 'install' 'OpenJS.NodeJS.LTS') $false) { Winget 'install' 'OpenJS.NodeJS.LTS' }
+        if (Confirmar @(Winget-Texto 'install' 'OpenJS.NodeJS.LTS') $false) { Usar-Winget 'install' 'OpenJS.NodeJS.LTS' }
     } elseif (-not $EsAdmin) {
         Info "Node.js sin winget necesita administrador: ejecuta instalar.bat con «Ejecutar como administrador»."
     } elseif (Confirmar @("Invoke-RestMethod https://nodejs.org/dist/index.json  (la última versión LTS)",
