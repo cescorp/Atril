@@ -223,6 +223,7 @@ body.gitfull #gitfull{grid-row:1;display:grid;grid-template-rows:auto minmax(0,1
 .estblocks .fold{border:0;background:none;padding:0 2px;color:var(--muted);font-size:11px;cursor:pointer}
 .estblocks section.dropb::before,.estblocks section.dropa::after{content:"";position:absolute;left:0;right:0;height:3px;border-radius:2px;background:var(--accent)}
 .estblocks section.dropb::before{top:-9px}.estblocks section.dropa::after{bottom:-9px}
+.estproj{font:inherit;font-size:12px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:3px 9px;cursor:pointer}.estproj:hover{border-color:var(--accent)}
 .estreset{margin:0;text-align:right}.estreset button{border:0;background:none;color:var(--muted);font-size:12px;cursor:pointer}.estreset button:hover{color:var(--accent)}
 .estbar label{display:flex;gap:6px;align-items:center}.estbar input[type=date],.estbar select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:3px 6px}
 .est .seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:6px;overflow:hidden}.est .seg button{white-space:nowrap}.est .seg button{border:0;border-radius:0;background:none;padding:3px 9px;font-size:12px;color:var(--muted)}
@@ -2802,27 +2803,46 @@ function estRitmo() {
     gfSt.ritmo = w && h ? w / h : 200; }
   return gfSt.ritmo;
 }
+// Proyectos de la estadística: el actual o, si se eligieron varios en «Proyectos», todos esos juntos (unificados)
+const estRutas = () => { const sel = (gfL.estProy || []).filter(r => side?.proyectos?.some(p => p.ruta === r));
+  return sel.length > 1 ? sel : [gst.ruta]; };
+const estUnion = () => estRutas().length > 1;
+// «Unir autores»: nombres distintos de la misma persona (jramos = Jean Ramos); se aplica al cargar y al cambiarlo
+const estAlias = n => (gfL.estAlias || {})[n] || n;
+function estApplyAlias() {
+  for (const c of gfSt.commits) c.autor = estAlias(c.autor0);
+  const rankOf = key => { const n = new Map(); gfSt.commits.forEach(c => !c.merge && n.set(c[key], (n.get(c[key]) || 0) + 1));
+    return new Map([...n].sort((a, b) => b[1] - a[1]).map(([k], i) => [k, i])); };
+  gfSt.rank = { autor: rankOf('autor'), rama: rankOf('rama'), proy: rankOf('proy') }; // color fijo según sus commits de siempre
+}
 async function gitStatsDraw() {
   const G = $('#gfGraph'); G.style.opacity = '';
-  if (gfSt?.ruta !== gst.ruta || gfSt.punta !== gst.punta) gfSt = { ruta: gst.ruta, punta: gst.punta, data: null };
+  const rutas = estRutas(), key = rutas.join('|') + '|' + gst.punta;
+  if (gfSt?.key !== key) gfSt = { key, rutas, data: null };
   G.innerHTML = `<h4>${gitTabsHtml()}<span class="sp"></span></h4><div class="est" id="est"></div>`;
   const h4 = G.querySelector('h4'); h4.append(gitfullMaxBtn('hist')); gitTabsBind(h4); gitfullLayout(false);
   if (!gfSt.data) {
-    const ctx = gfSt;
-    $('#est').innerHTML = '<p class="gfmore">Leyendo los commits de todas las ramas…</p>';
-    for (;;) { // las líneas de los commits nuevos se calculan por tandas: se repite hasta que no quede ninguno
-      let r; try { r = await api('/api/git/estadistica?ruta=' + encodeURIComponent(ctx.ruta)); }
-      catch (e) { if (ctx === gfSt) $('#est').innerHTML = `<p class="gfmore">⚠️ ${esc(e.message)}</p>`; return; }
-      if (ctx !== gfSt || gfL.tab !== 'est') return;
-      ctx.data = r;
-      ctx.commits = r.commits.map(([h, autor, ts, rama, merge, files]) => ({ h, autor, ts, rama, merge, files }));
-      if (!r.pendientes) break;
-      $('#est').innerHTML = `<p class="gfmore">Contando las líneas y palabras de cada commit (solo la primera vez; después es al instante): faltan ${r.pendientes} de ${r.commits.length}…</p>`;
-    }
-    // color fijo por autor y por rama: según sus commits de siempre (no cambia al filtrar)
-    const rankOf = key => { const n = new Map(); gfSt.commits.forEach(c => !c.merge && n.set(c[key], (n.get(c[key]) || 0) + 1));
-      return new Map([...n].sort((a, b) => b[1] - a[1]).map(([k], i) => [k, i])); };
-    gfSt.rank = { autor: rankOf('autor'), rama: rankOf('rama') };
+    const ctx = gfSt, faltan = new Map(), total = new Map();
+    $('#est').innerHTML = `<p class="gfmore">Leyendo los commits de ${rutas.length > 1 ? `${rutas.length} proyectos` : 'todas las ramas'}…</p>`;
+    // cada proyecto: se pide hasta que no le quede nada por contar (líneas y palabras se calculan una vez y se guardan)
+    const load = async ruta => { for (;;) {
+      let r; try { r = await api('/api/git/estadistica?ruta=' + encodeURIComponent(ruta)); }
+      catch (e) { if (rutas.length === 1) throw e; flash(`${projLabel(ruta)}: ${e.message}`); return { commits: [], repositorio: ruta, pendientes: 0 }; } // p. ej. sin git: se salta
+      if (ctx !== gfSt) return null;
+      faltan.set(ruta, r.pendientes); total.set(ruta, r.commits.length);
+      if (!r.pendientes) return r;
+      const n = [...faltan.values()].reduce((a, b) => a + b, 0), t = [...total.values()].reduce((a, b) => a + b, 0);
+      if (gfL.tab === 'est') $('#est').innerHTML = `<p class="gfmore">Contando las líneas y palabras de cada commit (solo la primera vez; después es al instante): faltan ${n} de ${t}…</p>`;
+    } };
+    let res; try { res = await Promise.all(rutas.map(load)); }
+    catch (e) { if (ctx === gfSt) $('#est').innerHTML = `<p class="gfmore">⚠️ ${esc(e.message)}</p>`; return; }
+    if (ctx !== gfSt || gfL.tab !== 'est' || res.includes(null)) return;
+    const multi = rutas.length > 1;
+    ctx.data = res; ctx.commits = [];
+    res.forEach((r, i) => { const proy = projLabel(rutas[i]);
+      for (const [h, autor, ts, rama, merge, files] of r.commits)
+        ctx.commits.push({ h, autor0: autor, autor, ts, rama: multi ? `${proy} · ${rama}` : rama, merge, files, proy, repo: r.repositorio }); });
+    estApplyAlias();
   }
   estRender();
 }
@@ -2833,7 +2853,8 @@ function estRender() {
   const G = $('#gfGraph'), keepTop = G.scrollTop; // al cambiar de fechas cada bloque se redibuja en su sitio
   const f = estF(), all = gfSt.commits;
   const t0 = estParse(f.desde).getTime() / 1000, t1 = estParse(f.hasta).getTime() / 1000 + 86400;
-  const pick = (a, b) => all.filter(c => c.ts >= a && c.ts < b && (!f.rama || c.rama === f.rama) && (!f.autor || c.autor === f.autor));
+  if (!estUnion()) f.proy = '';
+  const pick = (a, b) => all.filter(c => c.ts >= a && c.ts < b && (!f.rama || c.rama === f.rama) && (!f.autor || c.autor === f.autor) && (!f.proy || c.proy === f.proy));
   const cs = pick(t0, t1), work = cs.filter(c => !c.merge), prev = pick(t0 - (t1 - t0), t0).filter(c => !c.merge);
   const lines = work.reduce((a, c) => { const [x, y] = estLines(c); return [a[0] + x, a[1] + y]; }, [0, 0]);
   const files = new Set(work.flatMap(c => (c.files || []).map(x => x[0])));
@@ -2845,7 +2866,9 @@ function estRender() {
       <label>Desde <input type="date" id="esD" value="${f.desde}"></label><label>Hasta <input type="date" id="esH" value="${f.hasta}"></label>
       <span class="seg">${[['hoy', 'Hoy'], ['semana', 'Esta semana'], ['mes', 'Este mes'], ['anio', 'Este año'], ['todo', 'Todo']].map(([k, n]) => `<button data-p="${k}" class="${f.preset === k ? 'on' : ''}">${n}</button>`).join('')}</span>
       <span class="seg" title="Agrupar el gráfico">${[['dia', 'Día'], ['semana', 'Semana'], ['mes', 'Mes']].map(([k, n]) => `<button data-g="${k}" class="${f.grupo === k ? 'on' : ''}">${n}</button>`).join('')}</span>
-      <select id="esR">${opts('rama', 'Todas las ramas')}</select><select id="esA">${opts('autor', 'Todos los autores')}</select></div>
+      <select id="esR">${opts('rama', 'Todas las ramas')}</select><select id="esA">${opts('autor', 'Todos los autores')}</select>
+      <button class="estproj" id="esP" title="Ver juntos varios proyectos (unificar)">📁 ${estUnion() ? `${estRutas().length} proyectos` : esc(projLabel(gst.ruta))} ▾</button>
+      <button class="estproj" id="esU" title="Nombres distintos de la misma persona (p. ej. «jramos» y «Jean Ramos»)">👥 Unir autores…</button></div>
     ${estBlocks(f, `<div class="esttiles">
       <div class="tile"><small>Commits</small><b>${fmtN(work.length)}</b><span>${diff == null ? '' : `${diff >= 0 ? '↑' : '↓'} ${Math.abs(diff)} % que el periodo anterior`}${cs.length - work.length ? ` · ${cs.length - work.length} merge${cs.length - work.length === 1 ? '' : 's'}` : ''}</span></div>
       <div class="tile"><small>Archivos</small><b>${fmtN(files.size)}</b><span>distintos</span></div>
@@ -2861,6 +2884,8 @@ Si se parecen, el número es fiable. Se ajustan en ⚙ Ajustes › Git."><small>
   E.querySelector('#esH').onchange = e => e.target.value && set({ hasta: e.target.value, preset: '' });
   E.querySelector('#esR').onchange = e => set({ rama: e.target.value });
   E.querySelector('#esA').onchange = e => set({ autor: e.target.value });
+  E.querySelector('#esP').onclick = e => { e.stopPropagation(); estProjMenu(e.currentTarget); };
+  E.querySelector('#esU').onclick = e => { e.stopPropagation(); estAliasDialog(); };
   E.onclick = e => { const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.fold) { const pl = new Set(gfL.estPleg || []); pl.has(b.dataset.fold) ? pl.delete(b.dataset.fold) : pl.add(b.dataset.fold); gfL.estPleg = [...pl]; gfSave(); return estRender(); }
     if (b.dataset.reset != null) { gfL.estOrden = null; gfL.estPleg = []; gfSave(); return estRender(); }
@@ -2871,13 +2896,15 @@ Si se parecen, el número es fiable. Se ajustan en ⚙ Ajustes › Git."><small>
   if ($('#esHeat')) estHeat(cs);
   if ($('#esAut')) estTable('#esAut', 'autor', cs, f);
   if ($('#esRam')) estTable('#esRam', 'rama', cs, f);
+  if ($('#esPro')) estTable('#esPro', 'proy', cs, f);
   if ($('#esFiles')) estFiles(work);
   E.onmousedown = estDragStart;
   G.scrollTop = keepTop;
 }
 // Bloques de la Estadística: se mueven arrastrando ⠿ y se pliegan con ▾; el orden y lo plegado se guardan (gfL)
-const EST_ORDER = ['resumen', 'grafico', 'horas', 'autores', 'ramas', 'archivos'];
-const estOrder = () => { const o = (gfL.estOrden || []).filter(k => EST_ORDER.includes(k)); return [...o, ...EST_ORDER.filter(k => !o.includes(k))]; };
+const EST_ORDER = ['resumen', 'grafico', 'horas', 'autores', 'proyectos', 'ramas', 'archivos'];
+const estOrder = () => { const all = EST_ORDER.filter(k => k !== 'proyectos' || estUnion()), o = (gfL.estOrden || []).filter(k => all.includes(k));
+  return [...o, ...all.filter(k => !o.includes(k))]; };
 function estBlocks(f, tiles) {
   const seg = (attr, cur, list) => `<span class="seg sm">${list.map(([k, n]) => `<button data-${attr}="${k}" class="${cur === k ? 'on' : ''}">${n}</button>`).join('')}</span>`;
   const B = {
@@ -2886,6 +2913,7 @@ function estBlocks(f, tiles) {
     horas: ['¿Cuándo se trabaja?', '<small>commits por día de la semana y hora</small>', '<div id="esHeat"></div>'],
     autores: ['Quién envía más', '<small>todas las ramas, también las remotas</small> ' + seg('v', f.ver, [['commits', 'Commits'], ['lineas', 'Líneas'], ['palabras', 'Palabras'], ['horas', 'Horas']]), '<div id="esAut"></div>'],
     ramas: ['Por rama', '<small>cada commit en la rama donde se hizo (aproximado)</small>', '<div id="esRam"></div>'],
+    proyectos: ['Por proyecto', '<small>cuánto se trabajó en cada uno y quién</small>', '<div id="esPro"></div>'],
     archivos: ['Archivos más cambiados', '', '<div id="esFiles"></div>'] };
   const pleg = new Set(gfL.estPleg || []);
   return `<div class="estblocks">${estOrder().map(k => { const p = pleg.has(k);
@@ -2919,6 +2947,30 @@ function estDragStart(e) {
     const o = estOrder().filter(k => k !== key); o.splice(o.indexOf(target) + (after ? 1 : 0), 0, key);
     gfL.estOrden = o; gfSave(); estRender();
   }, { once: true });
+}
+// «📁 Proyectos»: marcar varios los une en una sola estadística; con uno solo, sigue al proyecto actual de Git
+function estProjMenu(anchor) {
+  const sel = new Set(estUnion() ? estRutas() : [gst.ruta]);
+  const ps = side?.proyectos || [];
+  openMenu(anchor, [{ head: 'Ver juntos (unificar)' }, ...ps.map(p => [`${sel.has(p.ruta) ? '☑' : '☐'}  ${projLabel(p.ruta)}`, () => {
+    sel.has(p.ruta) ? sel.delete(p.ruta) : sel.add(p.ruta);
+    gfL.estProy = [...sel]; gfL.est && (gfL.est.rama = '', gfL.est.proy = ''); gfSave(); gitStatsDraw().then(() => estProjMenu($('#esP')));
+  }, { title: p.ruta }]), '-', ['Solo el proyecto actual', () => { gfL.estProy = []; gfSave(); gitStatsDraw(); }, sel.size > 1 ? {} : { disabled: true }]]);
+}
+// «👥 Unir autores»: cada nombre que aparece puede marcarse como la misma persona que otro
+function estAliasDialog() {
+  const names = [...new Set(gfSt.commits.map(c => c.autor0))].sort((a, b) => a.localeCompare(b)), alias = { ...(gfL.estAlias || {}) };
+  const d = $('#dlg'); d.className = 'sets win'; d.oninput = d.onchange = null; d.onclose = null;
+  d.innerHTML = `<header><b>Unir autores</b></header><div class="wbody"><p class="ok">Si una persona firma con nombres distintos (en otro PC u otro proyecto), elige con qué nombre se cuenta. Se aplica a todos los proyectos.</p>
+    <table class="esttab"><thead><tr><th>Nombre en git</th><th>Se cuenta como</th></tr></thead><tbody>${names.map(n => `<tr><td>${esc(n)}</td><td><select data-n="${esc(n)}">
+      <option value="">(él mismo)</option>${names.filter(m => m !== n).map(m => `<option ${alias[n] === m ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select></td></tr>`).join('')}</tbody></table></div>
+    <footer><span class="ok">${names.length} nombres en ${gfSt.rutas.length} proyecto${gfSt.rutas.length === 1 ? '' : 's'}</span><div class="exp-actions"></div></footer>`;
+  d.querySelector('.exp-actions').append(Object.assign(button('Guardar', () => {
+    const a = {}; d.querySelectorAll('select[data-n]').forEach(s => { if (s.value) a[s.dataset.n] = s.value; });
+    for (const k of Object.keys(a)) { let v = a[k], seen = new Set([k]); while (a[v] && !seen.has(v)) { seen.add(v); v = a[v]; } a[k] = v; } // A→B→C = A→C
+    gfL.estAlias = a; gfSave(); d.close(); estApplyAlias(); if (gfL.est) gfL.est.autor = ''; estRender(); flash('✓ Autores unidos');
+  }), { className: 'primary' }), button('Cancelar', () => d.close()));
+  d.showModal();
 }
 // tooltip compartido de los gráficos
 function estTip(el, html) {
@@ -2982,27 +3034,33 @@ function estTable(sel, key, cs, f) {
   for (const c of cs) (by.get(c[key]) || by.set(c[key], []).get(c[key])).push(c);
   const rows = [...by].map(([n, list]) => { const w = list.filter(c => !c.merge), l = w.reduce((a, c) => { const [x, y] = estLines(c); return [a[0] + x, a[1] + y]; }, [0, 0]);
     const pal = w.reduce((a, c) => a + estWords(c), 0);
-    return { n, commits: w.length, mas: l[0], menos: l[1], pal, horasC: pal / estRitmo(), horas: estHours(list), ultimo: Math.max(...list.map(c => c.ts)), otras: key === 'autor' ? [...new Set(w.map(c => c.rama))] : [...new Set(w.map(c => c.autor))] }; });
+    const share = k => { const m = new Map(); w.forEach(c => m.set(c[k], (m.get(c[k]) || 0) + 1)); return [...m].sort((a, b) => b[1] - a[1]); };
+    const otras = key === 'proy' ? share('autor').map(([a, v]) => `${a} ${Math.round(v / (w.length || 1) * 100)} %`)
+      : key === 'autor' && estUnion() ? share('proy').map(([p, v]) => `${p} ${v}`)
+      : key === 'autor' ? [...new Set(w.map(c => c.rama))] : [...new Set(w.map(c => c.autor))];
+    return { n, commits: w.length, mas: l[0], menos: l[1], pal, horasC: pal / estRitmo(), horas: estHours(list), ultimo: Math.max(...list.map(c => c.ts)), otras }; });
   const val = r => f.ver === 'lineas' ? r.mas + r.menos : f.ver === 'palabras' ? r.pal : f.ver === 'horas' ? r.horas : r.commits, tot = rows.reduce((a, r) => a + val(r), 0) || 1;
   rows.sort((a, b) => val(b) - val(a));
   const T = $(sel);
   if (!rows.length) return T.innerHTML = '<p class="gfmore">Sin commits en este periodo.</p>';
-  T.innerHTML = `<table class="esttab"><thead><tr><th>${key === 'autor' ? 'Autor' : 'Rama'}</th><th class="pc">% de ${f.ver === 'lineas' ? 'líneas' : f.ver}</th><th class="num">Commits</th><th class="num">+líneas</th><th class="num">−líneas</th><th class="num">Palabras</th><th class="num" title="por tiempo · por cambios">Horas ≈ <small>tiempo · cambios</small></th><th>Último</th><th>${key === 'autor' ? 'Ramas' : 'Autores'}</th></tr></thead><tbody>${rows.map(r => {
+  T.innerHTML = `<table class="esttab"><thead><tr><th>${{ autor: 'Autor', rama: 'Rama', proy: 'Proyecto' }[key]}</th><th class="pc">% de ${f.ver === 'lineas' ? 'líneas' : f.ver}</th><th class="num">Commits</th><th class="num">+líneas</th><th class="num">−líneas</th><th class="num">Palabras</th><th class="num" title="por tiempo · por cambios">Horas ≈ <small>tiempo · cambios</small></th><th>Último</th><th>${key === 'proy' ? 'Autores' : key === 'autor' ? (estUnion() ? 'Proyectos' : 'Ramas') : 'Autores'}</th></tr></thead><tbody>${rows.map(r => {
     const pc = val(r) / tot * 100;
     return `<tr data-n="${esc(r.n)}" class="${f[key] === r.n ? 'on' : ''}" title="Clic: ver solo «${esc(r.n)}» (otra vez: quitar el filtro)"><td><i class="sw" style="background:${estColor(key, r.n)}"></i>${esc(r.n)}</td>
       <td class="pc"><span class="pcn">${pc < 1 && pc > 0 ? '<1' : Math.round(pc)} %</span><span class="pcbar"><i style="width:${pc}%;background:${estColor(key, r.n)}"></i></span></td>
       <td class="num">${fmtN(r.commits)}</td><td class="num add">+${fmtN(r.mas)}</td><td class="num del">−${fmtN(r.menos)}</td><td class="num">${fmtN(r.pal)}</td><td class="num">${fmtH(r.horas)} · ${fmtH(r.horasC)}</td>
-      <td class="gc">${esc(fmtWhen(r.ultimo))}</td><td class="gc ot">${esc(r.otras.slice(0, 4).join(', '))}${r.otras.length > 4 ? '…' : ''}</td></tr>`; }).join('')}</tbody></table>`;
+      <td class="gc">${esc(fmtWhen(r.ultimo))}</td><td class="gc ot" title="${esc(r.otras.join(' · '))}">${esc(r.otras.slice(0, 4).join(' · '))}${r.otras.length > 4 ? '…' : ''}</td></tr>`; }).join('')}</tbody></table>`;
   T.querySelector('tbody').onclick = e => { const tr = e.target.closest('tr'); if (!tr) return; f[key] = f[key] === tr.dataset.n ? '' : tr.dataset.n; gfSave(); estRender(); };
 }
 function estFiles(work) {
   const n = new Map();
-  for (const c of work) for (const x of c.files || []) if (!EST_SKIP.test(x[0])) n.set(x[0], (n.get(x[0]) || 0) + 1);
+  const multi = estUnion(), where = new Map();
+  for (const c of work) for (const x of c.files || []) if (!EST_SKIP.test(x[0])) {
+    const k = multi ? `${c.proy} · ${x[0]}` : x[0]; n.set(k, (n.get(k) || 0) + 1); where.set(k, c.repo + '\\' + x[0].replace(/\//g, '\\')); }
   const top = [...n].sort((a, b) => b[1] - a[1]).slice(0, 10), max = top[0]?.[1] || 1, F = $('#esFiles');
   F.innerHTML = top.length ? `<table class="esttab"><tbody>${top.map(([p, v]) => `<tr data-p="${esc(p)}" title="Clic: abrir ${esc(p)}"><td class="fp"><bdi>${esc(p)}</bdi></td>
     <td class="pc"><span class="pcbar"><i style="width:${v / max * 100}%;background:${EST_CAT[estDark() ? 'dark' : 'light'][0]}"></i></span></td><td class="num">${v} ${v === 1 ? 'vez' : 'veces'}</td></tr>`).join('')}</tbody></table>`
     : '<p class="gfmore">Sin commits en este periodo.</p>';
-  F.onclick = e => { const tr = e.target.closest('tr[data-p]'); if (!tr) return; gitFullClose(true); openTab(gfSt.data.repositorio + '\\' + tr.dataset.p.replace(/\//g, '\\'), true); };
+  F.onclick = e => { const tr = e.target.closest('tr[data-p]'); if (!tr) return; gitFullClose(true); openTab(where.get(tr.dataset.p), true); };
 }
 // keep: solo se redibuja la lista (desplegar un merge), sin volver a pedir el detalle ni mover el scroll
 function gitGraphDraw(keep = false) {
