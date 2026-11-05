@@ -523,7 +523,11 @@ body.split .pane:not(.on) #view{opacity:.92}
 .tab b{font-weight:400;opacity:.45;font-size:12px}.tab b:hover{opacity:1}
 #tabs button.ic{width:26px;height:26px;margin:0 0 3px 2px}
 /* cabecera del archivo: ← → migas ⋮ */
-#bar{display:flex;gap:2px;align-items:center;padding:4px 8px;background:var(--paper);min-height:40px}
+#bar{display:flex;gap:2px;align-items:center;padding:4px 8px;background:var(--paper);min-height:40px;flex-wrap:wrap}
+#symbar{flex-basis:100%;display:flex;align-items:center;gap:1px;overflow-x:auto;white-space:nowrap;font-size:12px;margin-top:3px;padding-top:3px;border-top:1px solid var(--line)}
+#symbar[hidden]{display:none}#symbar .sc{border:0;background:none;padding:2px 6px;border-radius:4px;color:var(--muted);font-size:12px;flex:none}
+#symbar .sc:hover{background:var(--hover);color:var(--ink)}#symbar .sc.cur{color:var(--ink);font-weight:600}#symbar .sc.in{color:var(--faint)}#symbar .sep{color:var(--faint);flex:none}
+.code .cl.jump{background:color-mix(in srgb,var(--accent) 18%,transparent)}
 .crumbs{flex:1;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:13px;padding:0 8px}
 .crumbs b{font-weight:400;color:var(--ink)}
 .menu{position:fixed;z-index:20;display:flex;flex-direction:column;min-width:190px;max-height:min(70vh,calc(100vh - 8px));overflow:auto;padding:4px;background:var(--paper);border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.15)}
@@ -4651,6 +4655,12 @@ function editorView(V, ed, name, path) {
     for (const sv of foldStore()[path] || []) { const l = foldAnchor(lines, sv); if (l >= 0) cm.foldCode(CodeMirror.Pos(l, 0), null, 'fold'); }
     foldReady = true; }, 500);
   foldButtons(() => { cm.operation(() => CodeMirror.commands.foldAll(cm)); foldKeep(); }, () => { cm.operation(() => CodeMirror.commands.unfoldAll(cm)); foldKeep(); });
+  const symLang = kind(name.toLowerCase().endsWith('.blade.php') ? 'x.html' : name).lang;
+  let syms = codeSymbols(cm.getValue().split('\n'), symLang), symT = 0;
+  const symUpd = symBar(name, () => syms, n => { cm.setCursor(n, 0); cm.scrollIntoView(null, 120); cm.focus(); });
+  cm.on('cursorActivity', () => symUpd(cm.getCursor().line));
+  cm.on('change', () => { clearTimeout(symT); symT = setTimeout(() => { syms = codeSymbols(cm.getValue().split('\n'), symLang); symUpd(cm.getCursor().line); }, 400); });
+  symUpd(0);
   const info = CodeMirror.findModeByFileName(name.toLowerCase().endsWith('.blade.php') ? 'x.php' : name);
   if (info) { cm.setOption('mode', info.mime || info.mimes?.[0]); CodeMirror.autoLoadMode(cm, info.mode); }
   editorCM = cm;
@@ -5269,6 +5279,68 @@ function foldFinder(cm, start) {
   const b = CodeMirror.fold.brace(cm, CodeMirror.Pos(start.line + 1, 0));
   if (b) return { from: CodeMirror.Pos(start.line, cm.getLine(start.line).length), to: b.to };
 }
+// ---------- barra de migas del código: dónde estás (archivo › clase › función) y saltar a lo de al lado ----------
+// Los símbolos salen de los bloques de foldRanges: de cada bloque, su primera línea da el nombre y el tipo (clase,
+// función, etiqueta, título, clave…). Bloques sin nombre (if, for, listas) no son migas. ponytail: por patrones de
+// texto, no por un analizador de cada lenguaje: una línea muy irregular puede no reconocerse (no sale como miga).
+const SYM_ICON = { clase: '◆', funcion: 'ƒ', etiqueta: '‹›', titulo: '#', clave: '•', bloque: '▸' };
+function symName(line, lang) {
+  const t = line.trim(); let m;
+  if (lang === 'markdown') return (m = t.match(/^#{1,6}\s+(.+)/)) && { name: m[1].replace(/[*_`]/g, ''), kind: 'titulo' };
+  if (FOLD_TAG.has(lang)) {
+    if (!(m = t.match(/^<([A-Za-z][\w:.-]*)((?:[^>"']|"[^"]*"|'[^']*')*)/))) return null;
+    const id = m[2].match(/\bid\s*=\s*["']([^"']+)/), cls = m[2].match(/\bclass\s*=\s*["']([^"'\s]+)/);
+    return { name: m[1] + (id ? '#' + id[1] : '') + (cls ? '.' + cls[1] : ''), kind: 'etiqueta' };
+  }
+  if ((m = t.match(/\b(?:class|interface|trait|enum|struct|record|namespace|module|impl|object|protocol|extension)\s+([A-Za-z_$][\w$\\.:<>]*)/) || t.match(/^type\s+(\w+)\s+(?:struct|interface)\b/))) return { name: m[1].replace(/:+$/, ''), kind: 'clase' };
+  if ((m = t.match(/\b(?:function|def|fn|func|fun|sub|procedure|proc)\s+(?:\([^)]*\)\s*)?&?([A-Za-z_$][\w$.]*)/i))) return { name: m[1] + '()', kind: 'funcion' };
+  if ((m = t.match(/^(?:resource|data|module|variable|output|provider)\s+"([^"]+)"(?:\s+"([^"]+)")?/))) return { name: m[1] + (m[2] ? '.' + m[2] : ''), kind: 'clase' };
+  if ((m = t.match(/^(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>/))) return { name: m[1] + '()', kind: 'funcion' };
+  if (/^(?:if|else|for|foreach|while|switch|case|try|catch|finally|do|return|elseif|elif|with)\b/.test(t)) return null;
+  // método: «… nombre(args) …» con la llave al final o en la línea siguiente (Java, C#, PHP, Kotlin, JS de clase…)
+  if ((m = t.match(/^(?:[\w<>\[\],?@]+\s+)*([A-Za-z_$][\w$]*)\s*\([^()]*\)\s*(?::\s*[\w<>\[\]?, .]+)?\s*(?:throws [\w, .]+)?\s*\{?\s*$/)) && !/^(new|await|this|super)$/.test(m[1])) return { name: m[1] + '()', kind: 'funcion' };
+  if ((m = t.match(/^([.#@:]?[\w-][^{]*?)\s*\{$/)) && /css|scss|less/.test(lang)) return { name: m[1], kind: 'bloque' }; // selector CSS
+  if ((m = t.match(/^"?([\w$@.-][\w$@. -]*)"?\s*:/))) return { name: m[1], kind: 'clave' }; // JSON, YAML, objetos
+  return null;
+}
+// símbolos con su padre (el bloque con nombre que lo contiene)
+function codeSymbols(lines, lang) {
+  const ranges = foldRanges(lines, lang), out = [], stack = [];
+  for (const s of [...ranges.keys()].sort((a, b) => a - b)) {
+    const n = symName(lines[s], lang); if (!n) continue;
+    const sym = { s, e: ranges.get(s).end, ...n };
+    while (stack.length && stack.at(-1).e < s) stack.pop();
+    sym.parent = stack.at(-1) || null; out.push(sym); stack.push(sym);
+  }
+  return out;
+}
+// La barra: archivo › … › último ▾ (lista de lo que hay a su mismo nivel). update(línea) la pone al día; goto(línea)
+// lo hace quien la usa (lectura: desplazar y desplegar; editor: mover el cursor).
+function symBar(fileName, getSyms, goto) {
+  const B = $('#bar'); $('#symbar')?.remove();
+  const bar = Object.assign(document.createElement('div'), { id: 'symbar' }); B.append(bar);
+  let last = -2;
+  const list = (anchor, items, head) => openMenu(anchor, [{ head }, ...items.map(x => [`${SYM_ICON[x.kind]}  ${x.name}`, () => goto(x.s), { title: `Línea ${x.s + 1}` }])]);
+  return line => {
+    const syms = getSyms(); if (!syms.length) { bar.hidden = true; return; }
+    bar.hidden = false;
+    const path = syms.filter(x => x.s <= line && line <= x.e), key = path.map(x => x.s).join(',') + '|' + syms.length;
+    if (key === last) return; last = key; // sin cambios: no se rehace (es lo que se pinta al mover el cursor)
+    const top = syms.filter(x => !x.parent), here = path.at(-1);
+    bar.innerHTML = '';
+    const crumb = (text, title, fn, cls = '') => bar.appendChild(Object.assign(button(text, fn), { className: 'sc ' + cls, title }));
+    crumb('📄 ' + fileName + (path.length ? '' : ' ▾'), path.length ? 'Ir al principio' : 'Lo que hay en este archivo', e => path.length ? goto(0) : list(e.currentTarget, top, 'En este archivo'));
+    path.forEach((x, i) => {
+      bar.append(Object.assign(document.createElement('span'), { className: 'sep', textContent: '›' }));
+      const lastOne = i === path.length - 1, sib = syms.filter(y => y.parent === x.parent);
+      crumb(`${SYM_ICON[x.kind]} ${x.name}${lastOne ? ' ▾' : ''}`, lastOne ? `Saltar a otro al mismo nivel (${sib.length})` : `Ir a ${x.name} (línea ${x.s + 1})`,
+        e => lastOne ? list(e.currentTarget, sib, x.parent ? `En ${x.parent.name}` : 'En este archivo') : goto(x.s), lastOne ? 'cur' : '');
+    });
+    if (here) { const kids = syms.filter(y => y.parent === here); if (kids.length) { // y lo que hay dentro, si hay
+      bar.append(Object.assign(document.createElement('span'), { className: 'sep', textContent: '›' }));
+      crumb(`… ${kids.length} ▾`, `Dentro de ${here.name}`, e => list(e.currentTarget, kids, `Dentro de ${here.name}`), 'in'); } }
+  };
+}
 // ⊟ Plegar todo · ⊞ Desplegar todo en la barra del archivo, antes de 🔍
 function foldButtons(all, none) {
   const B = $('#bar'), s = [...B.querySelectorAll('button.ic')].find(b => b.title.startsWith('Buscar'));
@@ -5277,6 +5349,7 @@ function foldButtons(all, none) {
 }
 // Lectura: cada línea es un bloque (para poder ocultarla); ▾/▸ junto al número en las que abren un bloque
 function codeView(V, text, lang, path) {
+  text = text.replace(/\r\n?/g, '\n'); // CRLF: el \r sobrante hacía de cada línea dos filas
   const raw = text.split('\n'), html = hlLines(text, lang), d = document.createElement('div'), ranges = foldRanges(raw, lang);
   d.className = 'code';
   d.innerHTML = `<pre class="nums">${raw.map((_, i) => `<div class="nl${ranges.has(i) ? ' can' : ''}" data-i="${i}">${ranges.has(i) ? '<i class="fd"></i>' : ''}${i + 1}</div>`).join('')}</pre>`
@@ -5300,6 +5373,18 @@ function codeView(V, text, lang, path) {
   V.className = 'flush'; V.append(d);
   if (ranges.size) foldButtons(() => { ranges.forEach((_, s) => folded.add(s)); apply(); }, () => { folded.clear(); apply(); });
   d.unfoldTo = n => { let ch = false; for (const s of [...folded]) { const r = ranges.get(s); if (n > s && n <= r.end) { folded.delete(s); ch = true; } } if (ch) apply(); };
+  if (!path) return;
+  const syms = codeSymbols(raw, lang), topLine = () => { // primera línea visible (las plegadas no cuentan)
+    const y = V.getBoundingClientRect().top + 16 - cl[0].getBoundingClientRect().top + cl[0].offsetTop; let best = 0;
+    for (const r of cl) { if (r.classList.contains('hid')) continue; if (r.offsetTop > y) break; best = +r.dataset.i; }
+    return best;
+  };
+  const upd = symBar(path.split(/[\\/]/).pop(), () => syms, n => {
+    d.unfoldTo(n); const r = cl[n]; V.scrollTop += r.getBoundingClientRect().top - V.getBoundingClientRect().top - 12; upd(n);
+    r.classList.add('jump'); setTimeout(() => r.classList.remove('jump'), 1200);
+  });
+  let raf = 0; V.onscroll = () => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; upd(topLine()); }); };
+  upd(topLine());
 }
 // CSV/TSV a filas, con comillas y saltos de línea dentro de los campos ("" es una comilla).
 function parseDelimited(t, sep) {
