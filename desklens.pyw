@@ -560,12 +560,39 @@ def git_bash():
     return None
 
 
-DEBUG_EXT = (".py", ".pyw")  # 🐞 Depurar: por ahora Python (pdb, viene con Python)
+DEBUG_EXT = (".py", ".pyw", ".js", ".mjs", ".cjs", *((".bat", ".cmd") if WINDOWS else ()))  # 🐞 pdb, node inspect y batch imitado
+BAT_STOP = """@goto :eof
+:__dl
+:__dlloop
+@set "__dl="
+@set /p "__dl=(bat %1) "
+@if not defined __dl goto :eof
+@call %__dl%
+@goto __dlloop
+"""
+
+
+def bat_debug_copy(p):
+    """Batch no tiene depurador: una copia en la misma carpeta (para que %~dp0 siga valiendo) con «@call :__dl N» antes
+    de cada línea. Ahí espera con «(bat N) »: una orden de cmd (echo %x%, set…) se ejecuta con las variables de ese
+    momento; Enter vacío sigue. No para tras una línea con ^, ni en las que empiezan con ) ni en etiquetas :x.
+    Se lee y escribe byte a byte (latin-1), sin tocar la codificación del archivo."""
+    lines, out, prev = p.read_bytes().decode("latin-1").split("\n"), [], ""
+    for i, line in enumerate(lines, 1):
+        t = line.strip()
+        if t and not t.startswith((":", ")")) and not prev.rstrip().endswith("^"):
+            out.append(f"@call :__dl {i}\r")
+        out.append(line)
+        prev = line
+    copy = p.with_name(".~dl_" + p.name)
+    copy.write_bytes(("\n".join(out).rstrip("\r\n") + "\r\n" + BAT_STOP.replace("\n", "\r\n")).encode("latin-1"))
+    return copy
 
 
 def command_for(path, paradas=None):
     """(argumentos, codificación de la salida) para ejecutar el archivo, o (None, motivo). paradas (lista de números de
-    línea, o [] sin ninguna): depurar con pdb, que para en la primera línea o, si hay paradas, sigue hasta la primera."""
+    line, o [] sin ninguna): depurar con pdb, que para en la primera línea o, si hay paradas, sigue hasta la primera.
+    Con node inspect las paradas las manda la ventana al empezar (sb(N)); --port=0: un puerto libre, por si hay dos."""
     p = Path(path)
     ext = p.suffix.lower()
     here = Path(sys.executable).parent  # con desklens.pyw, sys.executable es pythonw.exe
@@ -576,20 +603,21 @@ def command_for(path, paradas=None):
             cmds = [a for n in paradas for a in ("-c", f"b {int(n)}")] + (["-c", "continue"] if paradas else [])
             return [exe, "-m", "pdb", *cmds, str(p)], "utf-8"
         return [exe, str(p)], "utf-8"
-    if paradas is not None:
-        return None, "Depurar: por ahora solo Python"
+    if paradas is not None and ext not in DEBUG_EXT:
+        return None, "Depurar: por ahora solo Python y JavaScript"
     if ext in (".bat", ".cmd", ".vbs") and not WINDOWS:
         return None, "Solo se ejecuta en Windows"
     if ext == ".ps1" and not WINDOWS:  # PowerShell 7 existe para macOS y Linux
         return (["pwsh", "-NoProfile", "-File", str(p)], "utf-8") if shutil.which("pwsh") else (None, "PowerShell (pwsh) no está instalado")
     if ext in (".bat", ".cmd"):
-        return ["cmd", "/c", str(p)], oem_encoding()
+        return ["cmd", "/c", str(bat_debug_copy(p) if paradas is not None else p)], oem_encoding()
     if ext == ".ps1":
         return ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(p)], oem_encoding()
     if ext == ".vbs":
         return ["cscript", "//nologo", str(p)], oem_encoding()
     if ext in (".js", ".mjs", ".cjs"):
-        return ([shutil.which("node"), str(p)], "utf-8") if shutil.which("node") else (None, "Node no está instalado")
+        node = shutil.which("node")
+        return ([node, *(["inspect", "--port=0"] if paradas is not None else []), str(p)], "utf-8") if node else (None, "Node no está instalado")
     if ext == ".php":
         return ([shutil.which("php"), str(p)], "utf-8") if shutil.which("php") else (None, "PHP no está instalado")
     if ext in (".sh", ".bash"):
@@ -3679,7 +3707,10 @@ class Handler(BaseHTTPRequestHandler):
             if args is None:
                 return self.send_json(400, {"error": enc or "Este tipo de archivo no se ejecuta"})
             extra = [str(a) for a in data.get("args", []) if isinstance(a, str)]  # p. ej. citas para verificar_citas.py
-            return self.send_json(200, {"id": start_run(args + extra, str(p.parent), enc, p.name)})
+            rid = start_run(args + extra, str(p.parent), enc, p.name)
+            if Path(args[-1]).name.startswith(".~dl_"):  # la copia de depurar un .bat se borra al terminar
+                threading.Thread(target=lambda: (runs[rid].proc.wait(), Path(args[-1]).unlink(missing_ok=True)), daemon=True).start()
+            return self.send_json(200, {"id": rid})
         if url == "/api/pruebas":
             if not is_project(data.get("ruta", "")) or not data.get("comando", "").strip():
                 return self.send_json(400, {"error": "proyecto o comando no válido"})

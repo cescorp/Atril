@@ -4537,7 +4537,7 @@ async function render() {
       B.querySelector('button.primary') || null);
     if (!why) menu.unshift(['Ejecutar', () => runFile(path, f)]);
     if (!why && f.ejecutar.depurar) {
-      B.insertBefore(iconBtn('bug', 'Depurar paso a paso (pdb) · ● puntos de parada: clic en el margen del editor', () => runFile(path, f, true)),
+      B.insertBefore(iconBtn('bug', 'Depurar paso a paso · ● puntos de parada: clic en el margen del editor', () => runFile(path, f, true)),
         B.querySelector('button.primary') || null);
       menu.splice(1, 0, ['Depurar paso a paso', () => runFile(path, f, true)]);
     }
@@ -6370,6 +6370,7 @@ async function poll(r) {
   while (!r.fin) {
     try {
       const d = await api(`/api/salida?id=${r.id}&desde=${r.trozos.length}`);
+      if (r.dbg?.auto) for (const t of d.trozos) t[1] = t[1].replace(/\(bat \d+\) (?=[\s\S])/g, ''); // batch: sin los avisos ya pasados
       r.trozos.push(...d.trozos); Object.assign(r, { fin: d.fin, codigo: d.codigo, dur: d.dur });
       if (r.dbg) dbgOut(r, d.trozos);
       if (r === curRun) { appendOut(d.trozos); drawRunBar(); }
@@ -6410,18 +6411,18 @@ function drawRuns() {
 // Añade salida a la consola; solo baja al final si ya se estaba al final (no mueve a quien está leyendo arriba).
 function appendOut(trozos) {
   const O = $('#out'), stick = O.scrollHeight - O.scrollTop - O.clientHeight < 40;
-  for (const [k, t] of trozos) O.append(Object.assign(document.createElement('span'), { className: k === 'out' ? '' : k, textContent: t }));
+  for (const [k, t] of trozos) O.append(Object.assign(document.createElement('span'), { className: k === 'out' ? '' : k, textContent: t.replace(/\x08/g, '') })); // \b (node inspect borra su «debug>» así) salía como ⌫
   if (stick) O.scrollTop = O.scrollHeight;
 }
 // Barra de la consola: estado y duración, Repetir, Detener, Limpiar, Abrir en una terminal y 🤖 Explicar error.
 function drawRunBar() {
   const B = $('#runbar'), r = curRun; B.innerHTML = '';
   $('#inrow').hidden = !r || r.fin;
-  $('#stdin').placeholder = r?.dbg ? 'Orden de pdb y Enter · p variable (ver su valor) · l (ver el código) · w (dónde estás) · b 20 (parar en la línea 20)'
+  $('#stdin').placeholder = r?.dbg ? r.dbg.hint
     : r?.term ? 'Escribe una orden y pulsa Enter · pega varias líneas para ejecutarlas en orden · ↑↓ anteriores'
     : 'Escribe aquí y pulsa Enter (para pause, S/N, input())';
   if (!r) return;
-  if (r.dbg && !r.fin) B.append(...DBG_KEYS.map(([t, cmd, key, tip]) => Object.assign(button(t, () => dbgSend(r, cmd)), { title: `${tip} (${key})`, className: 'dbgb' })));
+  if (r.dbg && !r.fin) B.append(...DBG_KEYS.filter(x => !r.dbg.keys || r.dbg.keys.includes(x[1])).map(([t, k, key, tip]) => Object.assign(button(t, () => dbgKey(r, k)), { title: `${tip} (${key})`, className: 'dbgb' })));
   B.append(Object.assign(document.createElement('span'), { className: 'rstate',
     textContent: r.fin ? `${r.codigo === 0 ? '✓' : '✗'} código ${r.codigo} · ${fmtDur(r.dur)}` : `● En ejecución · ${fmtDur(r.dur)}` }));
   B.append(r.fin ? button('↻ Repetir', () => launch(r.again, r.label, r.cmd, r.cwd, r.ruta)) : button('■ Detener', () => api('/api/detener', { id: r.id })),
@@ -6452,12 +6453,33 @@ $('#stdin').addEventListener('keydown', e => {
   r.hi = Math.max(0, Math.min(r.hist.length, (r.hi ?? r.hist.length) + (e.key === 'ArrowUp' ? -1 : 1)));
   $('#stdin').value = r.hist[r.hi] ?? ''; stdinFit();
 });
-// ---------- 🐞 depurar paso a paso (Python con pdb, que viene con Python) ----------
+// ---------- 🐞 depurar paso a paso (Python con pdb, JavaScript con node inspect: vienen con ellos) ----------
 // Los ● puntos de parada se ponen con clic en el margen del editor y se recuerdan por archivo (localStorage
 // «desklens.paradas»: ruta → [[línea, texto]], como lo plegado). La consola se agranda mientras se depura; la línea
 // donde está parado se resalta en el editor o en la lectura (sale de lo que escribe pdb: «> C:\…\x.py(12)f()»).
 const DBG_KEYS = [['▶ Continuar', 'c', 'F5', 'Hasta el siguiente punto de parada'], ['⤼ Paso', 'n', 'F10', 'Siguiente línea, sin entrar en funciones'],
-  ['↘ Entrar', 's', 'F11', 'Entrar en la función de esta línea'], ['↗ Salir', 'r', 'Mayús+F11', 'Terminar la función actual y volver']];
+  ['↘ Entrar', 's', 'F11', 'Entrar en la función de esta línea'], ['↗ Salir', 'o', 'Mayús+F11', 'Terminar la función actual y volver']];
+// Cada depurador: sus órdenes, su aviso de «esperando orden», dónde dice que está, cómo avisa que el programa acabó y
+// cómo se cierra. start: lo que se manda al primer aviso (las ● en node; en Python van en la orden, con -c).
+const DBG = {
+  py: { run: 'python -m pdb', cmd: { c: 'c', n: 'n', s: 's', o: 'r' }, prompt: /\(Pdb\) $/, at: /^> (?<p>.+?)\((?<l>\d+)\)/gm,
+    end: 'The program finished and will be restarted', quit: 'q',
+    hint: 'Orden de pdb y Enter · p variable (ver su valor) · l (ver el código) · w (dónde estás) · b 20 (parar en la línea 20)' },
+  js: { run: 'node inspect', cmd: { c: 'cont', n: 'next', s: 'step', o: 'out' }, prompt: /debug> $/, at: /\bin (?<p>\S+):(?<l>\d+)\n/g,
+    end: 'Waiting for the debugger to disconnect', quit: '.exit', start: ls => [...ls.map(n => `sb(${n})`), ...(ls.length ? ['cont'] : [])],
+    hint: 'Orden de node y Enter · exec variable (ver su valor) · list(5) (ver el código) · bt (dónde estás) · sb(20) (parar en la línea 20)' },
+  // batch, imitado: el servidor ejecuta una copia que para antes de cada línea (Enter vacío = seguir); Continuar va
+  // dando Enter solo hasta llegar a una ●. Sin funciones: no hay Entrar ni Salir.
+  bat: { run: 'cmd /c', cmd: { c: '', n: '' }, keys: ['c', 'n'], auto: true, prompt: /\(bat \d+\) $/, at: /\(bat (?<l>\d+)\) $/g,
+    hint: 'Orden de cmd y Enter · echo %variable% (ver su valor) · set (todas las variables) · Enter vacío: un paso' },
+};
+// ruta que escribe el depurador → ruta completa (node la da relativa a la carpeta del archivo, o como file:///)
+function dbgPath(p, dir) {
+  if (/^file:\/\/\//i.test(p)) p = decodeURI(p.slice(8)).replace(/\//g, '\\');
+  if (!/^([A-Za-z]:|\\\\|\/)/.test(p)) p = dir + '\\' + p;
+  const out = []; for (const x of p.split(/[\\/]/)) { if (x === '..') out.pop(); else if (x !== '.') out.push(x); }
+  return out.join('\\');
+}
 const bpStore = () => { try { return JSON.parse(LS('desklens.paradas') || '{}'); } catch { return {}; } };
 function bpSave(path, list) { const all = bpStore(); delete all[path]; if (list.length) all[path] = list; LS('desklens.paradas', JSON.stringify(all)); }
 const bpMark = () => Object.assign(document.createElement('span'), { className: 'bp', textContent: '●', title: 'Punto de parada (clic: quitar)' });
@@ -6472,21 +6494,29 @@ function bpEditor(cm, path) { // en el editor: margen de ●, clic para poner o 
 let dbgAt = null; // { path, line } donde está parado el depurador
 async function debugFile(path, f, text) {
   const lines = text.split('\n'), paradas = (bpStore()[path] || []).map(sv => foldAnchor(lines, sv)).filter(l => l >= 0).map(l => l + 1);
-  const P = $('#panel'), h0 = P.style.height;
+  const P = $('#panel'), h0 = P.style.height, lang = /\.pyw?$/i.test(path) ? 'py' : /\.(bat|cmd)$/i.test(path) ? 'bat' : 'js';
   const r = await launch(() => api('/api/ejecutar', { ruta: path, depurar: true, paradas }), '🐞 ' + f.nombre,
-    `python -m pdb ${f.nombre}` + (paradas.length ? `   · paradas: ${paradas.join(', ')}` : '   · sin paradas: empieza en la primera línea'),
+    `${DBG[lang].run} ${f.nombre}` + (paradas.length ? `   · paradas: ${paradas.join(', ')}` : '   · sin paradas: empieza en la primera línea'),
     f.ejecutar.carpeta, path, () => { dbgPaint(null); P.style.height = h0; });
   if (!r?.id) return;
-  r.dbg = true; r.tail = ''; drawRunBar();
+  Object.assign(r, { dbg: DBG[lang], tail: '', paradas, dir: f.ejecutar.carpeta, going: !!DBG[lang].auto && paradas.length > 0 }); drawRunBar();
   P.style.height = Math.max(P.offsetHeight, Math.round(innerHeight * 0.55)) + 'px'; // más alto para ver el paso a paso
 }
-function dbgSend(r, cmd) { if (r.fin) return; appendOut([['in', cmd + '\n']]); api('/api/entrada', { id: r.id, texto: cmd }); }
+function dbgSend(r, cmd, quiet = false) { if (r.fin) return; if (!quiet) appendOut([['in', cmd + '\n']]); api('/api/entrada', { id: r.id, texto: cmd }); }
+const dbgKey = (r, k) => { if (!(k in r.dbg.cmd)) return; if (k === 'c' && r.dbg.auto) r.going = true; dbgSend(r, r.dbg.cmd[k]); };
 function dbgOut(r, trozos) {
+  if (!trozos.length) return; // nada nuevo: ya se atendió
   r.tail = (r.tail + trozos.map(t => t[1]).join('')).slice(-4000);
-  if (r.tail.includes('The program finished and will be restarted')) { r.tail = ''; return dbgSend(r, 'q'); } // terminó: no volver a empezar
-  if (!/\(Pdb\) $/.test(r.tail)) return; // aún corriendo
-  const m = [...r.tail.matchAll(/^> (.+?)\((\d+)\)/gm)].at(-1); if (!m) return;
-  const at = { path: m[1], line: +m[2] - 1 };
+  const D = r.dbg;
+  if (D.end && r.tail.includes(D.end)) { r.tail = ''; return dbgSend(r, D.quit); } // el programa terminó: cerrar el depurador
+  if (!D.prompt.test(r.tail)) return; // aún corriendo
+  if (D.start && !r.started) { r.started = true; const c = D.start(r.paradas); if (c.length) dbgSend(r, c.join('\n')); }
+  const m = [...r.tail.matchAll(D.at)].filter(m => !m.groups.p?.startsWith('node:')).at(-1); if (!m) return;
+  const at = { path: m.groups.p ? dbgPath(m.groups.p, r.dir) : r.ruta, line: +m.groups.l - 1 };
+  if (r.going) { r.tail = ''; if (!r.paradas.includes(at.line + 1)) { // Continuar: hasta una ● (el aviso de esta línea no se muestra)
+    const last = r.trozos.at(-1); if (last) last[1] = last[1].replace(D.at, '');
+    if (r === curRun && $('#out').lastChild) $('#out').lastChild.textContent = $('#out').lastChild.textContent.replace(D.at, '');
+    return dbgSend(r, '', true); } r.going = false; }
   if (at.path.toLowerCase() !== cur?.toLowerCase()) openTab(at.path);
   setTimeout(() => { if (!r.fin) dbgPaint(at); }, 300); // si ya terminó, onDone lo limpió: no volver a marcar
 }
@@ -6502,7 +6532,7 @@ function dbgPaint(at) {
 }
 addEventListener('keydown', e => { // F5 F10 F11 Mayús+F11 mientras se depura (como VS Code)
   const r = curRun; if (!r?.dbg || r.fin || !/^F(5|10|11)$/.test(e.key)) return;
-  e.preventDefault(); dbgSend(r, e.key === 'F5' ? 'c' : e.key === 'F10' ? 'n' : e.shiftKey ? 'r' : 's');
+  e.preventDefault(); dbgKey(r, e.key === 'F5' ? 'c' : e.key === 'F10' ? 'n' : e.shiftKey ? 'o' : 's');
 }, true);
 
 // ＞ Terminal: cmd en la carpeta del proyecto (el del archivo abierto, el elegido en Git o el primero) para escribir órdenes

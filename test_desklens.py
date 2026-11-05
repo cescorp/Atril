@@ -164,8 +164,30 @@ with tempfile.TemporaryDirectory() as tmp:
     assert desklens.run_info(proj / "hola.py")["texto"].endswith("hola.py")
     # 🐞 depurar: pdb para en la línea 2 (punto de parada), un paso, ver una variable y seguir hasta el final
     (proj / "dep.py").write_text("x = 1\ny = x + 1\nz = y * 10\nprint('z', z)\n", encoding="utf-8")
-    assert desklens.run_info(proj / "dep.py")["depurar"] and not desklens.run_info(proj / "acento.bat" if desklens.WINDOWS else proj / "acento.sh")["depurar"]
-    assert desklens.command_for(proj / "acento.sh", [])[0] is None  # depurar: por ahora solo Python
+    assert desklens.run_info(proj / "dep.py")["depurar"] and not desklens.run_info(proj / "x.vbs" if desklens.WINDOWS else proj / "acento.sh")["depurar"]
+    assert desklens.command_for(proj / "acento.sh", [])[0] is None  # depurar: por ahora solo Python y JavaScript
+    if desklens.WINDOWS:  # batch imitado: para antes de cada línea; una orden con las variables de ese momento; Enter sigue
+        (proj / "dep.bat").write_bytes(b"@echo off\r\nset x=5\r\nset /a y=x*2 ^\r\n  +0\r\nif %y% gtr 5 (\r\n  echo grande\r\n) else (\r\n  echo chico\r\n)\r\n:fin\r\necho fin\r\n")
+        a, e = desklens.command_for(proj / "dep.bat", [])
+        copia = Path(a[-1]).read_text(encoding="latin-1")
+        assert Path(a[-1]).name == ".~dl_dep.bat" and "@call :__dl 4" not in copia and "@call :__dl 7" not in copia and "@call :__dl 9" not in copia and "@call :__dl 10" not in copia and "@call :__dl 6" in copia
+        rid = desklens.start_run(a, str(proj), e, "dep.bat")
+        for cmd in ("", "", "echo x=%x%", "", "", "", "", ""):
+            time.sleep(0.8)
+            desklens.runs[rid].send(cmd)
+        out = text(wait_run(rid, 15), "out")
+        assert "(bat 1) " in out and "(bat 3) " in out and "x=5" in out and "grande" in out and "fin" in out, out
+        Path(a[-1]).unlink()
+    if shutil.which("node"):  # node inspect: para al empezar; sb(2), cont, exec y, y se cierra al acabar
+        (proj / "dep.js").write_text("let x = 1;\nlet y = x + 1;\nconsole.log('z', y * 10);\n", encoding="utf-8")
+        a, e = desklens.command_for(proj / "dep.js", [])
+        assert a[1:3] == ["inspect", "--port=0"]
+        rid = desklens.start_run(a, str(proj), e, "dep.js")
+        for cmd in ("sb(3)\ncont", "exec y", "cont", ".exit"):
+            time.sleep(2)
+            desklens.runs[rid].send(cmd)
+        out = text(wait_run(rid, 15), "out")
+        assert "Break on start in dep.js:1" in out and "break in dep.js:3" in out and "debug> 2\n" in out and "z 20" in out, out
     a, e = desklens.command_for(proj / "dep.py", [2])
     rid = desklens.start_run(a, str(proj), e, "dep.py")
     for cmd in ("n", "p y", "c", "q"):
