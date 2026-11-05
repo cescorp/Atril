@@ -153,7 +153,8 @@ aside h2{font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppe
 .nm{display:flex;min-width:0}.nm .b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}.nm .e{flex:none;white-space:pre}
 .node.bak{opacity:.5}body:not(.showbak) .node.bak{display:none}
 #sidetools .bakbtn{font-size:11px;font-weight:600;width:auto;padding:0 6px}body.showbak #sidetools .bakbtn{color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent)}
-.node .x{opacity:0;font-size:12px}.node:hover .x{opacity:.6}.node .x:hover{opacity:1}
+.node .x{opacity:0;flex:none;display:inline-flex;align-items:center;justify-content:center;width:26px;height:22px;margin:-2px -4px -2px 0;border-radius:5px;font-size:15px;font-weight:700;cursor:pointer}
+.node:hover .x{opacity:.6}.node .x:hover{opacity:1;background:var(--active);color:var(--accent)} /* ⋮ y ✕: zona de clic de 26×22, no solo el carácter */
 .kids{margin-left:12px;padding-left:4px;border-left:1px solid var(--line)}
 .kids:empty{display:none}
 /* abierto en pestaña: negrita; vista previa: cursiva */
@@ -1448,11 +1449,21 @@ const loadMerge = () => mergeReady ||= (async () => {
 })().catch(e => { mergeReady = null; throw e; });
 // carry: al pasar a otro archivo desde los archivos de un commit, las mismas versiones por columna y cómo volver (←)
 async function compareDialog(path, carry = null) {
+  const name = path.split(/[\\/]/).pop(), dlg = $('#dlg');
+  // se abre ya con «Cargando…» (regla del clic al instante): el historial del archivo y la librería tardan
+  const early = !(dlg.open && dlg.classList.contains('cmp'));
+  if (early) {
+    dlg.className = 'cmp'; dlg.onclose = null;
+    dlg.innerHTML = `<header><b>Comparar versiones · ${esc(name)}</b><span class="ok">buscando sus versiones…</span>
+      <button class="ic" data-x title="Cerrar (Esc)">✕</button></header><div class="cheads"></div><div class="cbody"><p class="ok cload">Cargando…</p></div><footer></footer>`;
+    dlg.querySelector('[data-x]').onclick = () => dlg.close();
+    dlg.showModal();
+  }
   let log;
   try { [log] = await Promise.all([api('/api/git/log?ruta=' + encodeURIComponent(path)), loadMerge()]); }
-  catch (e) { return ask('Comparar versiones', e.message, ['Entendido']); }
-  const name = path.split(/[\\/]/).pop();
-  if (!log.repositorio) return ask('Comparar versiones', `«${name}» no está en un repositorio git.`, ['Entendido']);
+  catch (e) { if (early) dlg.close(); return ask('Comparar versiones', e.message, ['Entendido']); }
+  if (early && !dlg.open) return; // lo cerró mientras cargaba
+  if (!log.repositorio) { if (early) dlg.close(); return ask('Comparar versiones', `«${name}» no está en un repositorio git.`, ['Entendido']); }
   // versiones: lo que hay en el editor sin guardar, el disco y cada commit; si en una no existe el archivo, columna vacía
   const ed = edits.get(path), vers = [];
   const safe = (v, get) => async () => { try { return await get(); } catch { v.missing = true; return ''; } };
