@@ -2692,7 +2692,8 @@ def git_overview(path):
             "revert": ("rev-parse", "-q", "--verify", "REVERT_HEAD"),
             # cada rama local con la remota que sigue y cuánto va por delante/detrás: «[ahead 3, behind 2]», «[gone]»
             "track": ("for-each-ref", "--format=%(refname:short)\x1f%(upstream:short)\x1f%(upstream:track)", "refs/heads"),
-            "urls": ("config", "--get-regexp", r"^remote\..*\.url$")}.items()}
+            "urls": ("config", "--get-regexp", r"^remote\..*\.url$"),
+            "worktrees": ("worktree", "list", "--porcelain")}.items()}
         fetched = ex.submit(git_fetch_time, repo)
         out = git_do(repo, "-c", "core.quotePath=false", "status", "--porcelain=v1", "-z", "--branch", "--untracked-files=all")
         q = {k: f.result() for k, f in q.items()}
@@ -2733,6 +2734,7 @@ def git_overview(path):
             "fusionando": bool(q["merge"] or q["revert"]),  # merge o revert a medias
             "ramas_info": [git_track(ln) for ln in q["track"].splitlines() if ln],
             "servicio": git_service(q["urls"]),
+            "en_otra_carpeta": git_branches_elsewhere(repo, q["worktrees"]),
             "comprobado": fetched.result(),
             "preparados": staged, "cambios": changes, "conflictos": conflicts}
 
@@ -2983,6 +2985,27 @@ def git_branch_name(repo, name):
     return name
 
 
+def git_branches_elsewhere(repo, porcelain):
+    """{rama: carpeta} de las ramas abiertas en OTRA carpeta del mismo repositorio (git worktree): git no deja abrir
+    la misma rama en dos carpetas a la vez. porcelain: la salida de «git worktree list --porcelain»."""
+    out, path = {}, None
+    for ln in porcelain.splitlines():
+        if ln.startswith("worktree "):
+            path = Path(ln[9:])
+        elif ln.startswith("branch refs/heads/") and path and path.resolve() != Path(repo).resolve():
+            out[ln[18:]] = str(path)
+    return out
+
+
+class GitBranchElsewhere(ValueError):
+    """La rama ya está abierta en otra carpeta del mismo repositorio (worktree): la ventana ofrece ir a esa carpeta."""
+
+    def __init__(self, rama, carpeta):
+        self.rama, self.carpeta = rama, carpeta
+        super().__init__(f"La rama «{rama}» ya está abierta en otra carpeta de este mismo repositorio ({carpeta}). "
+                         "Git no deja tener la misma rama abierta en dos carpetas a la vez.")
+
+
 class GitLocalChanges(ValueError):
     """git no cambia de rama porque perdería cambios sin commit: lleva los archivos afectados para que la ventana
     ofrezca llevarlos a la otra rama o guardarlos a un lado (stash)."""
@@ -3006,6 +3029,9 @@ def git_switch(repo, name, modo=""):
         git_do(repo, "stash", "push", "-u", "-m", f"DeskLens: cambios de «{actual}» al pasar a «{name}»")
         # sin nada que guardar no se crea stash: entonces no hay que sacar ninguno (sería uno viejo, ajeno)
         guardado = git_run(repo, "rev-parse", "-q", "--verify", "refs/stash") != antes
+    otra = git_branches_elsewhere(repo, git_run(repo, "worktree", "list", "--porcelain")).get(name)
+    if otra:  # antes de guardar nada: git se negaría igual («already used by worktree»)
+        raise GitBranchElsewhere(name, str(Path(otra).resolve()))
     try:
         git_do(repo, "switch", name)
     except ValueError as e:
@@ -3537,6 +3563,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json(200, git_action(data["ruta"], str(data.get("accion", "")),
                                                       [str(a) for a in data.get("archivos") or []], str(data.get("mensaje", "")),
                                                       str(data.get("rama", "")), bool(data.get("todo")), str(data.get("modo", ""))))
+            except GitBranchElsewhere as e:  # la ventana ofrece ir a la carpeta donde está abierta
+                return self.send_json(409, {"error": str(e), "codigo": "rama_en_otra_carpeta", "rama": e.rama, "carpeta": e.carpeta})
             except GitLocalChanges as e:  # la ventana ofrece llevar los cambios o guardarlos a un lado
                 return self.send_json(409, {"error": str(e), "codigo": "cambios_locales", "archivos": e.archivos, "rama": e.destino})
             except (ValueError, subprocess.TimeoutExpired) as e:

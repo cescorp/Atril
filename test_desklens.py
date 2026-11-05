@@ -919,6 +919,14 @@ assert.deepStrictEqual(findRefs('Ver 1 Samuel 4:4 y 1 Samuel 8:5, 20; Deuteronom
     code, ov = post("/api/git/accion", {"ruta": str(rep), "accion": "revertir", "mensaje": h})
     assert code == 200 and not (rep / "i.md").exists() and not ov["cambios"]
     assert "Revert" in subprocess.run(["git", "-C", str(rep), "log", "-1", "--format=%s"], capture_output=True, text=True).stdout
+    # otra carpeta del mismo repositorio (worktree, como homeshape y homeshape_calidad): su rama sale marcada y
+    # pedirla aquí da un 409 que explica dónde está abierta (antes, el «already used by worktree» de git en inglés)
+    git(rep, "worktree", "add", "-q", str(fuera / "wt"), "-b", "en-otra")
+    ov = json.loads(get(port, "/api/git/estado?ruta=" + urllib.request.quote(str(rep)))[1])
+    assert Path(ov["en_otra_carpeta"]["en-otra"]).resolve() == (fuera / "wt").resolve()
+    code, d = post("/api/git/accion", {"ruta": str(rep), "accion": "cambiar_rama", "rama": "en-otra"})
+    assert code == 409 and d["codigo"] == "rama_en_otra_carpeta" and Path(d["carpeta"]).resolve() == (fuera / "wt").resolve()
+    git(rep, "worktree", "remove", "--force", str(fuera / "wt"))
     resumen = json.loads(get(port, "/api/git/resumen")[1])
     assert any(x["ruta"] == str(proj) for x in resumen)  # un proyecto por fila (sin git: rama None)
     srv.shutdown()

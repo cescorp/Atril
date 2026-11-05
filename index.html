@@ -266,6 +266,7 @@ dialog#dlg.sets.win.uni{width:fit-content;min-width:min(640px,calc(100vw - 32px)
 .gfst{margin:6px 8px 4px;font-size:12px;color:var(--muted);line-height:1.4}.gfst .gbok{color:#2e8b57}
 .gfside .gfb{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;row-gap:0}.gfb .gbn{font-weight:500}.gfb.on .gbn{font-weight:700;color:var(--ink)}
 .gfb .gbh{font-size:11px;color:var(--accent)}.gfb .gbs{margin-left:auto;font-size:11.5px;white-space:nowrap}
+.gbs.gbelse{color:var(--muted);font-style:italic} /* rama abierta en otra carpeta del mismo repositorio */
 .gbs.gbok{color:#2e8b57}.gbs.gbmove{color:var(--accent);font-weight:600}.gbs.gbweb{color:#2f7fd8}.gbs.gbpc{color:#b07800}
 body.gitfull #gitv .gline:has(#gRepo),body.gitfull #gitv .gline:has(#gBranch){display:none} /* ya están a la izquierda */
 .gfmain{display:grid;grid-template-rows:minmax(0,1fr) auto auto;grid-template-columns:minmax(0,1fr);min-width:0;min-height:0} /* sin la columna explícita, el grafo ensancha la central */
@@ -2306,6 +2307,19 @@ async function gitDo(accion, files = [], extra = {}) {
 }
 // Cambiar de rama. Si git se niega porque perdería cambios sin commit, se explica en español y se ofrece, como
 // VS Code: llevar los cambios a la otra rama (stash → cambiar → recuperarlos) o guardarlos aparte en el stash.
+// La rama está abierta en otra carpeta del mismo repositorio (git worktree, p. ej. homeshape y homeshape_calidad):
+// git no deja abrirla en dos carpetas a la vez. Se explica y, si esa carpeta es un proyecto de DeskLens, se ofrece ir.
+async function gitBranchElsewhere(rama, carpeta) {
+  const norm = p => p.replace(/[\\/]+$/, '').toLowerCase().replace(/\//g, '\\');
+  const p = (side?.proyectos || []).find(x => norm(x.ruta) === norm(carpeta)), nombre = carpeta.split(/[\\/]/).filter(Boolean).pop();
+  const msg = `La rama «${rama}» ya está abierta en la carpeta ${carpeta}.\n\n${gst.nombre} y ${nombre} son dos carpetas del mismo repositorio ` +
+    '(git las llama «worktrees»): comparten historial y ramas, pero cada carpeta tiene su rama abierta. Git no deja abrir la misma ' +
+    'rama en dos carpetas a la vez, para que lo que editas en una no pise a la otra.' +
+    (p ? `\n\nPara trabajar en «${rama}», ve al proyecto ${p.nombre}.` : `\n\nPara verla aquí, añade ${carpeta} como proyecto.`);
+  const ir = p && `Ir a ${p.nombre}`;
+  if (await ask('Rama abierta en otra carpeta', msg, p ? [ir, 'Cancelar'] : ['Entendido']) === ir) { LS('desklens.git.repo', p.ruta); gitLoad(); }
+  return false;
+}
 async function gitSwitch(rama, modo = '') {
   if (gbusy) return false; gbusy = true;
   gitPending(rama);
@@ -2316,6 +2330,7 @@ async function gitSwitch(rama, modo = '') {
     return true;
   } catch (e) {
     gbusy = false;
+    if (e.data?.codigo === 'rama_en_otra_carpeta') return gitBranchElsewhere(e.data.rama, e.data.carpeta);
     if (e.data?.codigo !== 'cambios_locales') { await ask('Git', e.message, ['Entendido']); gitLoad(); return false; }
     const fs = e.data.archivos, lista = fs.slice(0, 8).map(f => '• ' + f).join('\n') + (fs.length > 8 ? `\n… y ${fs.length - 8} más` : '');
     const llevar = `Llevarlos a «${rama}»`, apartar = 'Guardarlos aparte y cambiar';
@@ -2403,7 +2418,8 @@ function gitBranchMenu(anchor) {
   const remoteList = (head, verb, fn) => openMenu(anchor, [{ head }, ...rem.map(r => [r, () => fn(r), { title: `${verb} ${r}` }])]);
   openMenu(anchor, [
     ...(gitFullOn() ? [{ head: `${gst.rama} · estás aquí` }]
-      : [{ head: 'Cambiar de rama' }, ...gst.ramas.map(b => [(b === gst.rama ? '✓ ' : '  ') + b, () => b !== gst.rama && gitSwitch(b)]), '-']),
+      : [{ head: 'Cambiar de rama' }, ...gst.ramas.map(b => [(b === gst.rama ? '✓ ' : '  ') + b + (gst.en_otra_carpeta?.[b] ? ` · abierta en ${gst.en_otra_carpeta[b].split(/[\\/]/).filter(Boolean).pop()}` : ''),
+        () => b === gst.rama ? null : gst.en_otra_carpeta?.[b] ? gitBranchElsewhere(b, gst.en_otra_carpeta[b]) : gitSwitch(b)]), '-']),
     ['⇣  Pull', () => gitLong('pull'), up ? { title: `Traer los cambios de ${up}` } : gitNo('La rama no está enlazada a una rama remota')],
     ['⇣  Pull desde…', () => remoteList(`Traer a «${gst.rama}» los cambios de…`, 'Traer a la rama actual los cambios de', async r => {
       if (await ask('Pull desde', `¿Traer a «${gst.rama}» los cambios de ${r}?`, ['Traer', 'Cancelar']) === 'Traer') gitLong('pull_desde', { rama: r });
@@ -2574,7 +2590,9 @@ function gitFullSide() {
   const info = new Map((gst.ramas_info || []).map(x => [x.rama, x])), localOf = r => r.split('/').slice(1).join('/');
   const remoteOnly = [...new Set(gst.ramas_remotas.map(localOf))].filter(b => !gst.ramas.includes(b)).sort();
   const rows = [gst.rama, ...gst.ramas.filter(b => b !== gst.rama).sort(), ...remoteOnly].filter((b, i, a) => b && a.indexOf(b) === i);
+  const otra = gst.en_otra_carpeta || {}, carpetaDe = b => otra[b].split(/[\\/]/).filter(Boolean).pop();
   const state = b => {
+    if (otra[b]) return ['gbelse', `📂 abierta en ${carpetaDe(b)}`, `Abierta en ${otra[b]} (otra carpeta de este repositorio). Clic: ir allí`];
     if (!gst.ramas.includes(b)) return ['gbweb', `☁ solo en ${web}`, `Clic: traerla de ${web} y cambiar a ella`];
     const i = info.get(b);
     if (i?.borrada) return ['gbpc', '💻 ya no está en ' + web, `La rama que seguía (${i.remota}) se borró en ${web}`];
@@ -2589,7 +2607,7 @@ function gitFullSide() {
     const r = Object.assign(document.createElement('div'), { className: 'node gfb' + (cur ? ' on' : ''), title: (cur ? 'Estás en esta rama' : 'Clic: cambiar a esta rama') + ' · clic derecho: más opciones\n' + tip });
     r.dataset.rama = b;
     r.innerHTML = `<span class="gbn">${cur ? '● ' : ''}${esc(b)}</span>${cur ? '<span class="gbh">estás aquí</span>' : ''}<span class="gbs ${cls}">${esc(txt)}</span>`;
-    r.onclick = () => !cur && gitSwitch(b);
+    r.onclick = () => cur ? null : otra[b] ? gitBranchElsewhere(b, otra[b]) : gitSwitch(b);
     r.oncontextmenu = e => { e.preventDefault(); const at = { x: e.clientX, y: e.clientY }; cur ? gitBranchMenu(at) : gitOtherBranchMenu(at, b, txt); };
     B.append(r);
   }

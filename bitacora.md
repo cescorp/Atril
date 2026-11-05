@@ -8,6 +8,9 @@ Entradas nuevas arriba. Formato: `## AAAA-MM-DD · título` + 2–4 líneas (qu�
 - **Cómo trabaja el usuario:** escribe en español. **Antes de construir algo nuevo, dibujarlo en texto y esperar su «ok».** No instalar nada sin acuerdo. Ahorrar tokens. Prefiere lo simple: rechazó un panel de IA con modos (ver 2026-11-02).
 - **Para verificar sin tocar su DeskLens:** levantar `desklens.Handler` en el puerto 8799 con `CONFIG`, `CONV_DIR`, `RECOVERY_DIR` e `INDEX_DB` en una carpeta temporal y hacer captura con Edge sin ventana (`--headless=new --screenshot`). Así se probó cada paso. Ojo: en Windows dos servidores pueden escuchar el mismo puerto sin error; si hay otra sesión probando, usa otro puerto.
 
+## 2026-11-05 · Rama abierta en otra carpeta (worktree)
+`homeshape_calidad` es un worktree de `homeshape`: el mismo repositorio en dos carpetas, cada una con su rama. Pedir desde una la rama abierta en la otra daba el error de git en inglés («already used by worktree»). Ahora el estado trae `en_otra_carpeta` (de `git worktree list --porcelain`), esas ramas salen marcadas «📂 abierta en …» y `git_switch` responde 409 `rama_en_otra_carpeta` antes de tocar nada; la ventana lo explica y, si esa carpeta es un proyecto, ofrece «Ir a …». Probado con las carpetas reales (solo lectura), un worktree de prueba en la ventana y en test_desklens.py.
+
 ## 2026-11-05 · Volver a Git a pantalla completa al cerrar el archivo
 Abrir un archivo desde la pantalla completa de Git la cierra (tapa las pestañas). Ahora esa pestaña queda en `gitReturn` y, al cerrarla, se vuelve a la pantalla completa (mismo repositorio y commit seleccionado, que ya se recordaban), salvo que mientras tanto se haya ido a otra vista. «Abrir» del detalle del commit pasa por `openTab` para marcarse igual. Probado: abrir → cerrar vuelve; abrir → Explorador → cerrar no vuelve.
 
