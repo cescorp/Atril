@@ -486,6 +486,8 @@ main{display:grid;grid-template-rows:1fr auto auto;min-width:0;min-height:0}
 /* vista dividida: cada .pane tiene sus #tabs, #bar y #view; $() busca primero en la activa (.on) */
 #panes{display:grid;grid-template-columns:minmax(0,1fr);min-width:0;min-height:0}
 body.split #panes{grid-template-columns:minmax(0,var(--splitL,1fr)) 5px minmax(0,1fr)}
+body.split.splitv #panes{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,var(--splitT,1fr)) 5px minmax(0,1fr)}
+body.splitv #splitGrip{cursor:ns-resize}
 /* minmax(0,1fr): sin esto la columna implícita crece hasta el ancho del Word/PDF y el lado tapa al otro y esconde sus botones */
 .pane{position:relative;display:grid;grid-template-rows:auto auto 1fr;grid-template-columns:minmax(0,1fr);min-width:0;min-height:0}
 #splitGrip{cursor:ew-resize;background:var(--line);transition:background .15s}#splitGrip:hover,#splitGrip.drag{background:var(--accent)}
@@ -530,6 +532,7 @@ body.split .pane:not(.on) #view{opacity:.92}
 .cm-bp{width:14px}.CodeMirror .cm-bp .bp{color:#e51400;cursor:pointer;font-size:11px;padding-left:2px}.CodeMirror-gutter.cm-bp{cursor:pointer}
 .dbg-line,.code .cl.dbg{background:color-mix(in srgb,#ffc800 32%,transparent)!important}
 #runbar .dbgb{font-weight:600}
+.livetag{font-size:12px;color:var(--accent);padding:0 8px;white-space:nowrap}
 .code .cl.jump{background:color-mix(in srgb,var(--accent) 18%,transparent)}
 .crumbs{flex:1;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:13px;padding:0 8px}
 .crumbs b{font-weight:400;color:var(--ink)}
@@ -4116,6 +4119,24 @@ const syncPane = () => {
   try { Object.assign(panes[active], { editorCM, curFile, pdfCtl, findP }); } catch {} // aún sin declarar mientras carga el script
 };
 const otherShows = path => panes.some((p, i) => i !== active && p.cur === path);
+const openElsewhere = path => panes.some((p, i) => i !== active && p.tabs?.includes(path)); // la misma pestaña en el otro lado
+// Lo de un archivo cambió (entra o sale de edición): el otro lado, si lo enseña, se vuelve a dibujar ya (editor
+// enlazado, vista previa en vivo o lectura) y se vuelve al lado donde se estaba
+async function staleOthers(path) {
+  const back = active;
+  for (const i of panes.keys()) if (i !== back && panes[i].cur === path) { activatePane(i); await render(); activatePane(back); editorCM?.focus(); }
+}
+// Dirección de la vista dividida: «h» lado a lado, «v» uno encima del otro (se recuerda, igual que el tamaño de cada una)
+const splitDir = d => { document.body.classList.toggle('splitv', d === 'v'); LS('desklens.splitDir', d); };
+try { document.body.classList.toggle('splitv', localStorage.getItem('desklens.splitDir') === 'v'); } catch {} // LS aún no existe aquí
+// ◫ Duplicar a la derecha · ⊟ Duplicar abajo: la misma pestaña también en el otro lado (si no está dividida, se divide)
+function dupTab(path, d) {
+  splitDir(d);
+  if (!panes[1]) return setSplit(true, path);
+  activatePane(1 - active); openTab(path, true);
+}
+const dupItems = path => [['◫  Duplicar a la derecha', () => dupTab(path, 'h'), { title: 'La misma pestaña también en un lado a la derecha (lo escrito sale en los dos)' }],
+  ['⊟  Duplicar abajo', () => dupTab(path, 'v'), { title: 'La misma pestaña también en un lado debajo (lo escrito sale en los dos)' }]];
 const persist = () => {
   syncPane();
   const st = p => ({ tabs: p.tabs, cur: p.cur, previewTab: p.previewTab });
@@ -4193,10 +4214,10 @@ async function moveTab(path, src, dst) {
 }
 // Divide o junta. Al dividir, lo que se ve se queda y el lado nuevo se lleva la pestaña vista justo antes
 // (o empieza vacío). Al juntar, las pestañas del segundo lado pasan al primero.
-function setSplit(on) {
+function setSplit(on, dup = null) {
   if (on === !!panes[1]) return;
   if (on) {
-    const grip = Object.assign(document.createElement('div'), { id: 'splitGrip', title: 'Arrastra para cambiar el ancho · doble clic: mitad y mitad' });
+    const grip = Object.assign(document.createElement('div'), { id: 'splitGrip', title: 'Arrastra para cambiar el tamaño · doble clic: mitad y mitad' });
     const el = newPaneEl();
     $('#panes').append(grip, el);
     gripWire(grip);
@@ -4205,6 +4226,7 @@ function setSplit(on) {
     // la pestaña vista justo antes, o cualquier otra; con una sola pestaña empieza vacío
     const move = [...hist].reverse().find(p => p !== cur && tabs.includes(p)) || tabs.find(p => p !== cur) || null;
     panes.push({ el, tabs: [], cur: null, previewTab: null });
+    if (dup) { renderTabsOf(0); activatePane(1); openTab(dup, true); return; } // duplicar: el lado nuevo enseña lo mismo
     if (move) { moveTab(move, active, 1); return; }
     renderTabsOf(0); activatePane(1); render();
   } else {
@@ -4225,22 +4247,23 @@ function renderTabsOf(i) {
   renderTabs();
   ({ tabs, cur, previewTab, paneEl, active } = keep);
 }
-// El borde entre los dos lados: arrastrar cambia el reparto (15 %–85 %) y se recuerda; doble clic, mitad y mitad.
+// El borde entre los dos lados: arrastrar cambia el reparto (15 %–85 %) y se recuerda (el ancho lado a lado y el alto
+// arriba/abajo, cada uno el suyo); doble clic, mitad y mitad.
 function gripWire(grip) {
-  const P = $('#panes');
+  const P = $('#panes'), v = () => document.body.classList.contains('splitv'), key = () => v() ? 'splitT' : 'splitL';
   grip.onpointerdown = e => {
     grip.setPointerCapture(e.pointerId); grip.classList.add('drag');
     grip.onpointermove = m => {
-      const r = P.getBoundingClientRect(), f = Math.min(.85, Math.max(.15, (m.clientX - r.left) / r.width));
-      P.style.setProperty('--splitL', (f / (1 - f)).toFixed(3) + 'fr');
+      const r = P.getBoundingClientRect(), f = Math.min(.85, Math.max(.15, v() ? (m.clientY - r.top) / r.height : (m.clientX - r.left) / r.width));
+      P.style.setProperty('--' + key(), (f / (1 - f)).toFixed(3) + 'fr');
     };
     grip.onpointerup = () => {
       grip.onpointermove = null; grip.classList.remove('drag');
-      LS('desklens.splitL', P.style.getPropertyValue('--splitL'));
+      LS('desklens.' + key(), P.style.getPropertyValue('--' + key()));
     };
   };
-  grip.ondblclick = () => { P.style.removeProperty('--splitL'); LS('desklens.splitL', ''); };
-  const w = LS('desklens.splitL'); if (w) P.style.setProperty('--splitL', w);
+  grip.ondblclick = () => { P.style.removeProperty('--' + key()); LS('desklens.' + key(), ''); };
+  for (const k of ['splitL', 'splitT']) { const w = LS('desklens.' + k); if (w) P.style.setProperty('--' + k, w); }
 }
 addEventListener('keydown', e => { // Ctrl+\: dividir o juntar
   if (e.ctrlKey && !e.altKey && e.key === '\\') { e.preventDefault(); setSplit(!panes[1]); }
@@ -4259,7 +4282,7 @@ function openTab(path, pin = false, fromHist = false) {
   const usePreview = AJ.pestanas_vista_previa !== false;
   if (!tabs.includes(path)) {
     const i = usePreview ? tabs.indexOf(previewTab) : -1;
-    if (i >= 0) { edits.delete(previewTab); dropWebBox(previewTab, paneEl); tabs[i] = path; } else tabs.push(path); // la vista previa se sustituye
+    if (i >= 0) { if (!openElsewhere(previewTab)) edits.delete(previewTab); dropWebBox(previewTab, paneEl); tabs[i] = path; } else tabs.push(path); // la vista previa se sustituye
     previewTab = pin || !usePreview ? null : path;
   } else if (pin && previewTab === path) previewTab = null;
   if (!fromHist && hist[hi] !== path) { hist.splice(hi + 1); hist.push(path); hi = hist.length - 1; }
@@ -4288,14 +4311,17 @@ async function askUnsaved(path) {
 const endEdit = st => { if (st === wedit) wedit = null; if (st === iedit) iedit = null; if (st === pedit) pedit = null; };
 // Cierra una pestaña (pregunta si hay cambios), libera su web o su edición y muestra la pestaña de al lado.
 async function closeTab(path) {
-  if (!await askUnsaved(path)) return;
+  const still = openElsewhere(path); // sigue abierta en el otro lado: sus cambios y su edición se quedan allí
+  if (!still && !await askUnsaved(path)) return;
   dropWebBox(path, paneEl);
   const e = edits.get(path);
-  if (pedit?.path === path) pedit = null;
-  if (wedit?.path === path) wedit = null;
-  if (iedit?.path === path) iedit = null;
-  if (e) dropBackup(path);
-  edits.delete(path);
+  if (!still) {
+    if (pedit?.path === path) pedit = null;
+    if (wedit?.path === path) wedit = null;
+    if (iedit?.path === path) iedit = null;
+    if (e) dropBackup(path);
+    edits.delete(path);
+  }
   if (previewTab === path) previewTab = null;
   const i = tabs.indexOf(path); tabs.splice(i, 1);
   if (cur === path) cur = tabs[Math.min(i, tabs.length - 1)] ?? null;
@@ -4331,8 +4357,8 @@ function renderTabs() {
     el.oncontextmenu = e => { // las opciones del archivo, con las de la pestaña arriba
       e.preventDefault();
       const close = [['✕  Cerrar pestaña', () => closeTab(p), { title: 'También con clic central en la pestaña' }],
-        ['✕  Cerrar las demás', async () => { for (const q of tabs.filter(q => q !== p)) await closeTab(q); }, { disabled: tabs.length < 2 }], '-'];
-      if (isVirtual(p)) return openMenu({ x: e.clientX, y: e.clientY }, [{ head: name }, ...close.slice(0, 2)]);
+        ['✕  Cerrar las demás', async () => { for (const q of tabs.filter(q => q !== p)) await closeTab(q); }, { disabled: tabs.length < 2 }], ...dupItems(p), '-'];
+      if (isVirtual(p)) return openMenu({ x: e.clientX, y: e.clientY }, [{ head: name }, ...close.slice(0, -1)]);
       nodeMenu({ x: e.clientX, y: e.clientY }, p, false, null, close);
     };
     // arrastrar: sobre otra pestaña = reordenar (la raya marca dónde cae) · al chat = adjuntar
@@ -4595,6 +4621,7 @@ async function render() {
     ['Copiar ruta', () => copyText(f.ruta, 'Ruta copiada'), { title: f.ruta }]);
   // 🔍 en todas las pestañas: buscar no necesita editar (reemplazar sí: Ctrl+H pasa a edición)
   if (!wedit && !iedit && !pedit) B.append(iconBtn('search', 'Buscar (Ctrl+F)', () => findOpen(false)));
+  menu.push('-', ...dupItems(path));
   B.append(iconBtn('more', 'Más opciones', e => { e.stopPropagation(); openMenu(e.currentTarget, menu); }), maxBtn('doc'));
   S.insertAdjacentHTML('beforeend', `<span>${f.codificacion ? `${f.codificacion} · ${f.eol} · ` : ''}${fmtSize(f.tam)} · ${new Date(f.fecha * 1000).toLocaleString()}</span>`);
   if (k.lock) V.insertAdjacentHTML('beforeend', `<div class="warnbox">🔒 Archivo sensible (claves o contraseñas). ${AJ.ia_permitir_sensibles === false
@@ -4605,8 +4632,17 @@ async function render() {
   if (!(k.ext === 'pdf' && !ed && !pedit && !edgePdf.has(path))) setTimeout(() => live(seq) && !findP && findAttach(domFind(V)), 300);
 
   if (ed) {
-    if (preview && MD.has(k.ext)) return V.append(page(DOMPurify.sanitize(marked.parse(ed.text)), dir));
-    if (preview && HTML.has(k.ext)) { V.className = 'flush'; const fr = frame(''); fr.removeAttribute('src'); fr.srcdoc = ed.text; return V.append(fr); }
+    const live = isDoc && panes.some((p, i) => i !== active && p.cur === path && p.editorCM?.getWrapperElement().isConnected);
+    if ((preview || live) && MD.has(k.ext)) {
+      let pg = V.appendChild(page(DOMPurify.sanitize(marked.parse(ed.text)), dir));
+      if (live) livePreview(ed, V, () => { const n = page(DOMPurify.sanitize(marked.parse(ed.text)), dir); pg.replaceWith(n); pg = n; });
+      return;
+    }
+    if ((preview || live) && HTML.has(k.ext)) {
+      V.className = 'flush'; const fr = frame(''); fr.removeAttribute('src'); fr.srcdoc = ed.text; V.append(fr);
+      if (live) livePreview(ed, V, () => { fr.srcdoc = ed.text; }); // ponytail: vuelve arriba (el marco está aislado: no se puede leer su desplazamiento)
+      return;
+    }
     return editorView(V, ed, f.nombre, path);
   }
 
@@ -4639,7 +4675,7 @@ const norm = t => t.replace(/\r\n/g, '\n'); // el editor trabaja con \n; el serv
 function startEdit(path, f) {
   edits.set(path, { f, text: norm(f.texto), orig: norm(f.texto), shown: false });
   preview = false;
-  if (path === cur) render();
+  (path === cur ? render() : Promise.resolve()).then(() => staleOthers(path)); // primero este lado: el otro se enlaza a su editor
 }
 // «✎ línea 12: …texto…»: la primera línea distinta entre dos versiones
 function textDesc(a, b) {
@@ -4647,6 +4683,19 @@ function textDesc(a, b) {
   let i = 0; while (i < x.length && i < y.length && x[i] === y[i]) i++;
   const line = (y[i] ?? x[i] ?? '').trim();
   return `✎ Línea ${i + 1}` + (line ? `: ${line.slice(0, 60)}` : y.length < x.length ? ' (borrada)' : '');
+}
+// Vista previa en vivo (el otro lado edita el archivo): fn se llama 300 ms después de cada pausa al escribir, mientras V
+// siga enseñando esta vista; la posición de lectura se mantiene.
+function livePreview(ed, V, fn) {
+  // la marca de la barra dice si esta vista sigue ahí (la barra se rehace al redibujar el lado; el contenido no sirve:
+  // cada puesta al día lo sustituye)
+  const tag = Object.assign(document.createElement('span'), { className: 'livetag', textContent: '● Vista previa en vivo', title: 'El otro lado edita este archivo: aquí se ve cómo queda mientras escribes' });
+  $('#bar').insertBefore(tag, $('#bar').querySelector('button.primary') || null);
+  let t = 0;
+  (ed.live ??= new Set()).add(function upd() {
+    if (!tag.isConnected) return ed.live.delete(upd);
+    clearTimeout(t); t = setTimeout(() => { const y = V.scrollTop; fn(); V.scrollTop = y; }, 300);
+  });
 }
 // Editor CodeMirror del texto en edición: modo por extensión, buscar de DeskLens, copia de recuperación al
 // escribir y un paso del historial tras cada pausa.
@@ -4656,6 +4705,10 @@ function editorView(V, ed, name, path) {
     theme: isDark() ? 'material-darker' : 'default', foldGutter: true, gutters: ['cm-bp', 'CodeMirror-linenumbers', 'CodeMirror-foldgutter'],
     foldOptions: { rangeFinder: foldFinder, widget: '⋯', minFoldSize: 1 },
     extraKeys: { 'Shift-Ctrl-[': 'fold', 'Shift-Ctrl-]': 'unfold' } });
+  // el otro lado edita el mismo archivo: este usa un documento enlazado al suyo (lo escrito sale en los dos, un solo
+  // ↶; cada lado con su cursor y su desplazamiento)
+  const twin = panes.find((p, i) => i !== active && p.cur === path && p.editorCM?.getWrapperElement().isConnected)?.editorCM;
+  if (twin) cm.swapDoc(twin.getDoc().linkedDoc({ sharedHist: true }));
   // plegado: se guarda al plegar o desplegar; al abrir, se recupera cuando el modo ya cargó (lo usa para encontrar el bloque)
   const foldList = () => cm.getAllMarks().filter(m => m.__isFold).map(m => m.find()?.from.line).filter(l => l != null).map(l => [l, cm.getLine(l).trim()]);
   let foldReady = false; const foldKeep = () => { if (foldReady && !isUntitled(path)) foldSave(path, foldList()); };
@@ -4695,7 +4748,7 @@ function editorView(V, ed, name, path) {
     ed.restoring = false; ed.shown = isDirty(ed); renderTabs();
   }, fresh).then(h => h.flush = flush);
   cm.on('change', () => {
-    ed.text = cm.getValue();
+    ed.text = cm.getValue(); ed.live?.forEach(fn => fn());
     if (!ed.restoring && !isUntitled(path)) { clearTimeout(ed.histT); ed.histT = setTimeout(flush, (AJ.historial_pausa_seg || 2) * 1000); }
     backupSoon(path); // copia de recuperación (como Notepad++)
     pinTab(path); // modificar fija la pestaña
@@ -5193,7 +5246,8 @@ async function leaveEdit(path) {
   const ed = edits.get(path);
   if (isUntitled(path)) return save(path); // un "nuevo N" solo sale de edición guardándolo
   if (!await askUnsaved(path)) return;
-  dropBackup(path); edits.delete(path); preview = false; render();
+  dropBackup(path); edits.delete(path); preview = false;
+  await render(); staleOthers(path); // primero este lado: los dos a la vez se pisan
 }
 function frame(src) {
   // sandbox sin allow-same-origin: un HTML del usuario no puede tocar DeskLens
@@ -5328,7 +5382,7 @@ function codeSymbols(lines, lang) {
 // La barra: archivo › … › último ▾ (lista de lo que hay a su mismo nivel). update(línea) la pone al día; goto(línea)
 // lo hace quien la usa (lectura: desplazar y desplegar; editor: mover el cursor).
 function symBar(fileName, getSyms, goto) {
-  const B = $('#bar'); $('#symbar')?.remove();
+  const B = $('#bar'); paneEl.querySelector('#symbar')?.remove(); // solo la de este lado
   const bar = Object.assign(document.createElement('div'), { id: 'symbar' }); B.append(bar);
   let last = -2;
   const list = (anchor, items, head) => openMenu(anchor, [{ head }, ...items.map(x => [`${SYM_ICON[x.kind]}  ${x.name}`, () => goto(x.s), { title: `Línea ${x.s + 1}` }])]);
@@ -7464,7 +7518,7 @@ loadSide().finally(async () => {
   const mz = LS('desklens.max'); if (mz === 'doc' || (mz === 'ia' && document.body.classList.contains('ia'))) setMax(mz); // zona ampliada de la última vez
   const sp = savedSplit; // vista dividida de la última vez
   if (sp?.tabs) {
-    const grip = Object.assign(document.createElement('div'), { id: 'splitGrip', title: 'Arrastra para cambiar el ancho · doble clic: mitad y mitad' });
+    const grip = Object.assign(document.createElement('div'), { id: 'splitGrip', title: 'Arrastra para cambiar el tamaño · doble clic: mitad y mitad' });
     const el = newPaneEl();
     $('#panes').append(grip, el); gripWire(grip);
     document.body.classList.add('split');
