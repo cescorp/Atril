@@ -6414,8 +6414,8 @@ async function launch(start, label, cmd, cwd, ruta, onDone = null) {
   try { res = await start(); } catch (e) { return ask('No se pudo ejecutar', e.message, ['Entendido']); }
   const r = { id: res.id, label, cmd, cwd, ruta, onDone, again: start, trozos: [], fin: false, codigo: null, dur: 0 };
   runsUI.push(r); curRun = r;
-  // como mucho 7 pestañas: se quitan las terminadas más antiguas (las que siguen corriendo, nunca)
-  while (runsUI.length > 7) { const old = runsUI.find(x => x.fin && x !== r); if (!old) break; runsUI.splice(runsUI.indexOf(old), 1); }
+  // como mucho N pestañas (⚙ Ajustes › Consola): se quitan las terminadas más antiguas (las que siguen corriendo, nunca)
+  while (runsUI.length > (AJ.consola_max_pestanas || 5)) { const old = runsUI.find(x => x.fin && x !== r); if (!old) break; runsUI.splice(runsUI.indexOf(old), 1); }
   showPanel(true); drawRuns(); poll(r);
   return r;
 }
@@ -7534,7 +7534,9 @@ $('#convLink').insertAdjacentHTML('afterbegin', svg('link'));
 $('#convDel').innerHTML = svg('trash');
 idxPoll(); pdfWorker();
 loadIA().catch(() => {}).finally(() => linked ? syncConvToTab(true) : loadConvList(LS('desklens.conv')));
-setInterval(() => fetch('/api/ping', { method: 'POST' }), 20000); fetch('/api/ping', { method: 'POST' });
+const ping = () => fetch('/api/ping', { method: 'POST' }).catch(() => {});
+setInterval(ping, 20000); ping();
+addEventListener('focus', ping); document.addEventListener('visibilitychange', ping); // al volver a la ventana, ya
 setInterval(async () => { // ponytail: sondeo cada 1,5 s (una petición local vacía); un canal de eventos si algún día pesa
   if (document.hidden && !document.hasFocus()) return; // ventana minimizada: se recoge al volver
   let r; try { r = await api('/api/pendientes'); } catch { return; }
