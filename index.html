@@ -1721,6 +1721,14 @@ async function compareDialog(path, carry = null) {
   const now = vers[0], c0 = vers.find(v => v.id === log.commits[0]?.hash), c1 = vers.find(v => v.id === log.commits[1]?.hash);
   let cols = carry?.cols || +(LS('desklens.cmpcols') || 2), pick = [c0 || now, now, now], hide = LS('desklens.cmpfold') === '1', mv = null;
   if (carry) pick = carry.picks.map(p => vers.find(v => v.id === p.id) || now);
+  // «Ver» de un commit: si el disco es igual a ese commit (nada cambió después), disco ↔ commit saldría vacío;
+  // a la izquierda va entonces el padre, para ver lo que cambió el commit
+  if (carry?.antes && pick[0].id === 'disco' && pick[1] !== now && await text(pick[0]) === await text(pick[1])) {
+    const a = carry.antes;
+    let v = vers.find(x => x.id === a.id);
+    if (!v) { v = { id: a.id, label: a.label, title: a.title }; at(v, a.id, carry.antesRel || log.rel); vers.push(v); }
+    pick[0] = v;
+  }
   const setCols = n => { cols = n; LS('desklens.cmpcols', n); pick = n === 2 ? [c0 || now, now] : [c1 || c0 || now, c0 || now, now]; build(); };
   const keep = () => ({ cols, picks: pick.slice(0, cols).map(v => ({ id: v.id, label: v.label, title: v.title || v.label })) });
   // «←» lleva siempre al archivo con el que se abrió el comparador (con lo que se tenía elegido entonces)
@@ -3492,11 +3500,14 @@ async function gitCommitDetail(c) {
         + (f.mas == null ? '<td class="num gc" colspan="2">binario</td>' : `<td class="num"><i>+${f.mas}</i></td><td class="num"><em>−${f.menos}</em></td>`)
         + `<td class="num gc">${f.tam == null ? '—' : fmtSize(f.tam)}</td><td class="gact2"></td>`;
       const img = IMG_EXT.has(f.ext), canSee = f.mas != null || img;
-      // «Ver»: a la izquierda el archivo tal como está ahora en el disco, a la derecha este commit (pedido del usuario)
+      // «Ver»: a la izquierda el archivo tal como está ahora en el disco, a la derecha este commit (pedido del usuario);
+      // si son iguales, a la izquierda el padre (`antes`, ver compareDialog)
       const ver = button('Ver', () => img ? gitImageCompare(f, c) : compareDialog(f.ruta, { cols: 2, picks: [
         { id: 'disco', label: '💾 Disco (actual)', title: '' },
-        { id: c.hash, label: `${msgParts(c.mensaje)[0]} · ${fmtWhen(c.ts)}`, title: `${c.corto} · ${c.mensaje}` }] }));
-      ver.className = 'small'; ver.disabled = !canSee; ver.title = img ? 'Imagen antes y después, lado a lado' : canSee ? 'Disco (actual) ↔ este commit' : 'Archivo binario: no se compara como texto';
+        { id: c.hash, label: `${msgParts(c.mensaje)[0]} · ${fmtWhen(c.ts)}`, title: `${c.corto} · ${c.mensaje}` }],
+        antes: c.padres[0] && f.estado !== 'A' ? { id: c.padres[0], label: `Antes de este commit · ${c.padres[0].slice(0, 7)}`, title: `Padre de ${c.corto}` } : null,
+        antesRel: f.antes || f.rel }));
+      ver.className = 'small'; ver.disabled = !canSee; ver.title = img ? 'Imagen antes y después, lado a lado' : canSee ? 'Disco (actual) ↔ este commit; si son iguales, antes ↔ después del commit' : 'Archivo binario: no se compara como texto';
       const abrir = button('Abrir', () => openTab(f.ruta, true)); // openTab sale de la pantalla completa y vuelve al cerrar
       abrir.className = 'small'; abrir.disabled = f.estado === 'D' || c.lado === 'entrante'; // entrante: aún no está en tu disco
       abrir.title = abrir.disabled ? 'No está en tu disco (borrado o aún sin traer)' : 'Abrir el archivo tal como está ahora';

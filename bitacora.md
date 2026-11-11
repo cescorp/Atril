@@ -8,6 +8,9 @@ Entradas nuevas arriba. Formato: `## AAAA-MM-DD · título` + 2–4 líneas (qu�
 - **Cómo trabaja el usuario:** escribe en español. **Antes de construir algo nuevo, dibujarlo en texto y esperar su «ok».** No instalar nada sin acuerdo. Ahorrar tokens. Prefiere lo simple: rechazó un panel de IA con modos (ver 2026-11-02).
 - **Para verificar sin tocar su DeskLens:** levantar `desklens.Handler` en el puerto 8799 con `CONFIG`, `CONV_DIR`, `RECOVERY_DIR` e `INDEX_DB` en una carpeta temporal y hacer captura con Edge sin ventana (`--headless=new --screenshot`). Así se probó cada paso. Ojo: en Windows dos servidores pueden escuchar el mismo puerto sin error; si hay otra sesión probando, usa otro puerto.
 
+## 2026-11-11 · «Ver» de un commit salía vacío («0 cambios»)
+En el detalle de un commit, «Ver» compara disco ↔ ese commit; si nada cambió después (el último commit, sin cambios locales), las dos columnas eran iguales. Ahora `compareDialog` recibe `antes` (el padre, como ya hacía `gitImageCompare`) y, si disco y commit coinciden, lo pone a la izquierda: se ve lo que cambió el commit. Archivo nuevo en el commit (A): sigue disco ↔ commit. Probado con bitacora.md en dd26a99 (copia en el 8799): izquierda = padre, 1 cambio.
+
 ## 2026-11-07 · Máximo de pestañas de consola en Ajustes
 ⚙ Ajustes › Consola › «Pestañas de consola como máximo» (`consola_max_pestanas`, 5 por defecto, 1–50); antes era un 7 fijo en `launch`. Al pasar del máximo se quitan las terminadas más antiguas; las que siguen corriendo, nunca. Se aplica sin recargar. Probado en la ventana: 8 ejecuciones seguidas dejan las 5 últimas; con 3, quedan 3.
 
