@@ -4107,6 +4107,7 @@ async function settingsDialog() {
       const before = s.valores.puerto;
       AJ = (await api('/api/ajustes', values())).valores;
       d.close(); await loadSettings(); render();
+      loadSide(); // avisos de los proyectos (p. ej. «Sin reglas/bitácora») según los ajustes nuevos
       flash('✓ Ajustes guardados' + (AJ.puerto !== before ? ' · el puerto se aplica al reabrir DeskLens' : ''));
     }), { className: 'primary' }),
     button('Cancelar', () => d.close()));

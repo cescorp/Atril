@@ -1,6 +1,10 @@
 # Novedades de DeskLens
 Cada cambio es una versión nueva, la más reciente arriba. El número de la primera es el que sale en ⓘ (arriba en la cinta).
 
+## v1.108 · 2026-11-12 · Avisos «Sin reglas» y «Sin bitácora» solo si los pides
+- Ya no salen por defecto. Se activan en ⚙ Ajustes › Bitácora.
+- Sirven para trabajar con IA: `reglas.md` guarda las normas del proyecto y `bitacora.md` todo lo realizado, así un chat nuevo retoma el trabajo sin volver a explicarlo.
+
 ## v1.107 · 2026-11-12 · Novedades y número de versión
 - Icono ⓘ arriba en la cinta con la versión de esta copia; al pulsarlo, la lista de versiones y qué trae cada una.
 - Sirve para saber si una copia en otro equipo está al día: si el número no coincide, una de las dos es más vieja.

@@ -496,7 +496,9 @@ assert.deepStrictEqual(findRefs('Ver 1 Samuel 4:4 y 1 Samuel 8:5, 20; Deuteronom
         r = subprocess.run(["node", "-e", js], capture_output=True, text=True, encoding="utf-8")
         assert r.returncode == 0, r.stderr
 
-    # avisos
+    # avisos: «Sin reglas/bitácora» apagados por defecto
+    assert desklens.status(proj) == []
+    desklens.ajustes()["avisar_memoria_ia"] = True
     assert desklens.status(proj) == ["Sin bitácora"]  # reglas.md ya existe (prueba de IA); AGENTS.md no se exige
     (proj / "reglas.md").unlink()
     assert desklens.status(proj) == ["Sin reglas", "Sin bitácora"]
@@ -657,6 +659,7 @@ assert.deepStrictEqual(findRefs('Ver 1 Samuel 4:4 y 1 Samuel 8:5, 20; Deuteronom
     (fuera / "app").mkdir()
     (fuera / "app" / "artisan").write_text("")
     (fuera / "app" / ".git").mkdir()
+    desklens.ajustes()["avisar_memoria_ia"] = True  # la caché de ajustes se vació al guardar config
     code, body = get(port, "/api/explorar?ruta=" + urllib.request.quote(str(fuera)))
     items = {i["nombre"]: i for i in json.loads(body)["items"]}
     assert code == 200 and items["app"]["tipo"] == ["Laravel", "git"] and items["app"]["avisos"] == ["Sin reglas", "Sin bitácora"]

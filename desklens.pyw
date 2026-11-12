@@ -117,6 +117,7 @@ SETTINGS = [
     ("vista_max_mb", "General", "Tamaño máximo para ver y editar un archivo de texto (MB)", 2, 1, 200),
     ("indice_max_mb", "Índice", "Texto máximo indexado por archivo (MB)", 20, 1, 500),
     ("indice_repaso_min", "Índice", "Repasar los cambios cada (minutos)", 5, 1, 240),
+    ("avisar_memoria_ia", "Bitácora", "Avisar «Sin reglas» y «Sin bitácora» en los proyectos (son para trabajar con IA: reglas.md guarda las normas del proyecto y bitacora.md todo lo realizado, así cualquier chat nuevo retoma el trabajo sin volver a explicarlo)", False, None, None),
     ("bitacora_max_lineas", "Bitácora", "Aviso «Bitácora grande» a partir de (líneas)", 200, 20, 100000),
     ("bitacora_conservar", "Bitácora", "Entradas que se quedan al archivar", 20, 1, 1000),
     ("tema", "General", "Tema de la ventana (claro, oscuro o como esté Windows)", "auto",
@@ -399,12 +400,13 @@ def status(project):
     p = Path(project)
     if not p.is_dir():
         return ["No encontrado"]
-    avisos = []
-    if not (p / "reglas.md").exists():  # AGENTS.md/CLAUDE.md/GEMINI.md son opcionales: DeskLens no los necesita
+    avisos, memoria = [], ajuste("avisar_memoria_ia")  # «Sin reglas/bitácora» solo si se pidió en Ajustes
+    if memoria and not (p / "reglas.md").exists():  # AGENTS.md/CLAUDE.md/GEMINI.md son opcionales: DeskLens no los necesita
         avisos.append("Sin reglas")
     bit = p / "bitacora.md"
     if not bit.exists():
-        avisos.append("Sin bitácora")
+        if memoria:
+            avisos.append("Sin bitácora")
     else:
         with bit.open(encoding="utf-8", errors="ignore") as f:
             if sum(1 for _ in f) > ajuste("bitacora_max_lineas"):

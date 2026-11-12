@@ -131,6 +131,7 @@ EN EL CONTENIDO · Mi curso
 - Reemplaza al diálogo de Windows (tkinter), que a veces aparecía detrás de la ventana.
 
 ### Avisos por proyecto (0 tokens, solo comprueba si existen archivos)
+«Sin reglas» y «Sin bitácora» solo salen si se activan en ⚙ Ajustes › Bitácora (apagado por defecto, 2026-11-12).
 
 | Aviso | Cuándo aparece |
 |---|---|

@@ -8,6 +8,9 @@ Entradas nuevas arriba. Formato: `## AAAA-MM-DD · título` + 2–4 líneas (qu�
 - **Cómo trabaja el usuario:** escribe en español. **Antes de construir algo nuevo, dibujarlo en texto y esperar su «ok».** No instalar nada sin acuerdo. Ahorrar tokens. Prefiere lo simple: rechazó un panel de IA con modos (ver 2026-11-02).
 - **Para verificar sin tocar su DeskLens:** levantar `desklens.Handler` en el puerto 8799 con `CONFIG`, `CONV_DIR`, `RECOVERY_DIR` e `INDEX_DB` en una carpeta temporal y hacer captura con Edge sin ventana (`--headless=new --screenshot`). Así se probó cada paso. Ojo: en Windows dos servidores pueden escuchar el mismo puerto sin error; si hay otra sesión probando, usa otro puerto.
 
+## 2026-11-12 · «Sin reglas» y «Sin bitácora» por ajuste, apagado por defecto
+Pedido del usuario: los avisos llenaban el árbol en proyectos que no se trabajan con IA. ⚙ Ajustes › Bitácora › «Avisar «Sin reglas» y «Sin bitácora»» (`avisar_memoria_ia`, no por defecto), con la explicación de para qué sirven los dos archivos. `status` solo los añade si está activado; «Bitácora grande» y «No encontrado» siguen siempre. Guardar Ajustes vuelve a cargar el árbol (`loadSide`). El aviso del panel de IA («Sin reglas en … Crear») no cambia.
+
 ## 2026-11-12 · ⓘ Novedades y número de versión
 Para saber si una copia en otro equipo está al día (el zip no lleva .git ni la bitácora). `novedades.md` (en el zip) es la fuente: `## vX · AAAA-MM-DD · título` + detalle en Markdown; la primera es la versión de la copia. El servidor la sirve en `/novedades.md`; la ventana la lee una vez (`loadNews`), pone el número bajo ⓘ (arriba en la cinta) y `newsDialog` muestra versiones a la izquierda, detalle a la derecha, filtro y «⧉ Copiar». Empezó en v1.107: una versión por entrada con fecha de esta bitácora. Regla nueva en reglas.md: cada cambio añade una versión.
 
