@@ -488,7 +488,7 @@ dialog#dlg.info dl{display:grid;grid-template-columns:150px 1fr;gap:4px 12px;mar
 dialog#dlg.info dt{color:var(--muted)}dialog#dlg.info dd{margin:0;overflow-wrap:anywhere}
 dialog#dlg.info{max-height:85vh;overflow:auto}
 .proj>.node{color:var(--ink);font-weight:500}
-.badges{display:flex;flex-wrap:wrap;gap:4px;margin:2px 8px 6px 24px}
+.badges{display:flex;flex-wrap:wrap;gap:4px;margin:2px 8px 6px 24px}.badges:empty{display:none}
 .badge{font-size:11px;padding:1px 6px;border:0;border-radius:9px;background:var(--warnbg);color:var(--warn);cursor:pointer}
 .badge:hover{outline:1px solid var(--warn)}
 .ok{font-size:11px;color:var(--muted)}
@@ -1187,7 +1187,7 @@ async function loadSide() {
     if (p.lugar) root.querySelector('.n').after(Object.assign(document.createElement('span'), { className: 'plug', textContent: p.lugar }));
     if (p.nombre !== p.carpeta) root.title = `${p.ruta}\n(en DeskLens: «${p.nombre}»; la carpeta se llama «${p.carpeta}»)`;
     const b = document.createElement('div'); b.className = 'badges';
-    if (!p.avisos.length) b.innerHTML = '<span class="ok">✅ En orden</span>';
+    if (!p.avisos.length && st.avisar_memoria) b.innerHTML = '<span class="ok">✅ En orden</span>';
     for (const a of p.avisos) {
       const s = button('⚠️ ' + a, () =>
         a === 'Bitácora grande' ? archiveDialog(p) : a === 'No encontrado' ? removeMissing(p) : templateDialog(p));

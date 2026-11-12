@@ -645,6 +645,7 @@ assert.deepStrictEqual(findRefs('Ver 1 Samuel 4:4 y 1 Samuel 8:5, 20; Deuteronom
     assert get(port, "/api/estado", header=False)[0] == 403  # una web externa no puede llamar a la API
     code, body = get(port, "/api/estado")
     assert code == 200 and json.loads(body)["proyectos"][0]["avisos"] == ["Bitácora grande"]
+    assert json.loads(body)["avisar_memoria"] is desklens.ajuste("avisar_memoria_ia")  # sin él, la ventana no pone «En orden»
     code, body = get(port, "/api/abrir?ruta=" + urllib.request.quote(str(proj / "utf8.md")))
     assert code == 200 and json.loads(body)["texto"] == "# Hola ñ\n"
     assert get(port, "/api/abrir?ruta=" + urllib.request.quote(str(fuera / "secreto.txt")))[0] == 403

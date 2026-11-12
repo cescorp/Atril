@@ -423,6 +423,7 @@ def estado():
     cfg = load_config()
     return {
         "reiniciar": Path(__file__).stat().st_mtime_ns != CODE_MTIME,
+        "avisar_memoria": ajuste("avisar_memoria_ia"),  # sin este ajuste tampoco hay «✅ En orden»
         "proyectos": [{"ruta": r, **project_label(r, cfg), "avisos": status(r)} for r in cfg["proyectos"]],
         "sueltos": [{"ruta": s, "nombre": Path(s).name, "existe": Path(s).is_file(), "git": git_state(s)}
                     for s in cfg["sueltos"]],
