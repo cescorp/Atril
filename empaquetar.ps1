@@ -24,7 +24,8 @@ $Archivos = @(
     'instalar.bat', 'instalar.ps1',               # instalador del otro equipo
     'test_desklens.py',                           # la prueba final del instalador
     'desklens.sh', 'desklens.command',            # abrir en Linux y macOS
-    'README.md', 'LICENSE', 'TERCEROS.md'         # qué es, licencia y licencias de terceros
+    'README.md', 'LICENSE', 'TERCEROS.md',        # qué es, licencia y licencias de terceros
+    'novedades.md'                                # versión de la copia (ⓘ de la cinta) y qué trae cada una
 )
 $Carpetas = @('plantillas')                       # AGENTS.md, CLAUDE.md, reglas.md… para «Sin reglas / Sin bitácora»
 

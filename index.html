@@ -244,6 +244,19 @@ button.small{padding:2px 10px;font-size:12px}
 /* cinta de iconos */
 #ribbon{display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 0;background:var(--side);border-right:1px solid var(--line)}
 #ribbon .sp{flex:1}
+#ribbon .rver{font-size:9.5px;color:var(--faint);margin:-4px 0 6px;letter-spacing:-.02em}
+/* ⓘ novedades: lista de versiones a la izquierda, detalle a la derecha */
+dialog#dlg.news{width:min(1000px,calc(100vw - 32px));height:min(640px,calc(100vh - 48px))}
+.news .sbody{grid-template-columns:minmax(260px,340px) 1fr}
+.news nav a{display:grid;grid-template-columns:auto 1fr auto;gap:8px}
+.news nav a b{font-weight:600;font-variant-numeric:tabular-nums}
+.news nav a em{font-style:normal;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.news nav a.on{background:var(--hover);box-shadow:inset 2px 0 var(--accent)}.news nav a.on b{color:var(--accent)}
+.news nav a[hidden]{display:none}
+.news>header>*:not(.sfind),.news nav a span{white-space:nowrap}
+.news .ndet{overflow:auto;padding:20px 28px}
+.news .ndet h2{margin:2px 0 12px;font-size:20px}
+.news .ndet>p.ok{margin:0;font-size:12px;color:var(--faint)}
 /* barra lateral */
 aside{position:relative;display:grid;grid-template-rows:minmax(0,1fr);background:var(--side);border-right:1px solid var(--line);min-width:0;min-height:0}
 .sidescroll{overflow:auto;padding:0 8px 12px;min-height:0}
@@ -1085,6 +1098,7 @@ const set = s => new Set(s.split(' '));
 const I = {
   folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
   search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.01"/>',
   foldAll: '<path d="m7 20 5-5 5 5M7 4l5 5 5-5"/>', unfoldAll: '<path d="m7 15 5 5 5-5M7 9l5-5 5 5"/>',
   terminal: '<path d="m5 7 5 5-5 5"/><path d="M12 19h7"/>',
   git: '<circle cx="6" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="7" r="2"/><path d="M6 7v10M18 9c0 5-6 4-11 8"/>',
@@ -4104,6 +4118,46 @@ const copyText = (t, msg) => navigator.clipboard.writeText(t).catch(() => { // s
   const ok = document.execCommand('copy'); a.remove();
   if (!ok) throw new Error('sin portapapeles');
 }).then(() => flash(msg || 'Copiado'), () => flash('No se pudo copiar: usa Ctrl+C'));
+
+// ---------- ⓘ novedades: versión de esta copia ----------
+// novedades.md (junto a desklens.pyw, viaja en el zip de empaquetar) es la fuente: «## vX · AAAA-MM-DD · título»
+// y debajo el detalle en Markdown; la primera entrada es la versión de esta copia. Se lee una vez por ventana.
+let newsP = null;
+const loadNews = () => newsP ||= fetch('/novedades.md').then(r => r.ok ? r.text() : Promise.reject(new Error('Falta novedades.md junto a desklens.pyw.')))
+  .then(t => t.split(/^## /m).slice(1).map(b => {
+    const [h, ...rest] = b.split('\n'), [v = '', fecha = '', ...tit] = h.split(' · ');
+    return { v: v.trim(), fecha: fecha.trim(), titulo: tit.join(' · ').trim(), cuerpo: rest.join('\n').trim() };
+  })).catch(e => { newsP = null; throw e; });
+const newsDay = f => /^\d{4}-\d\d-\d\d$/.test(f) ? new Date(f + 'T12:00').toLocaleDateString('es', { day: 'numeric', month: 'short', year: 'numeric' }) : f;
+async function newsDialog() {
+  const d = $('#dlg');
+  d.className = 'sets news'; d.oninput = d.onchange = null; d.onclose = null;
+  d.innerHTML = '<header><b>Novedades de DeskLens</b><span class="ok">Cargando…</span></header>'; // clic al instante
+  if (!d.open) d.showModal();
+  let list;
+  try { list = await loadNews(); } catch (e) { d.close(); return ask('Novedades', e.message, ['Entendido']); }
+  if (!d.open || !d.classList.contains('news')) return;
+  if (!list.length) { d.close(); return ask('Novedades', 'novedades.md no tiene ninguna versión («## vX · fecha · título»).', ['Entendido']); }
+  const tag = `DeskLens ${list[0].v} · ${newsDay(list[0].fecha)}`;
+  d.innerHTML = `<header><b>Novedades de DeskLens</b><span>Esta copia: <b>${esc(list[0].v)}</b> · ${esc(newsDay(list[0].fecha))}</span>
+      <button class="small" data-copy title="Copia «${esc(tag)}» para compararla con la de otro equipo">⧉ Copiar</button>
+      <input type="search" class="sfind" placeholder="Filtrar versiones…" aria-label="Filtrar versiones"><span class="scount">${list.length} versiones</span></header>
+    <div class="sbody"><nav>${list.map((n, i) => `<a data-i="${i}" data-t="${esc(plainTxt(`${n.v} ${n.titulo} ${n.cuerpo}`))}">
+      <b>${esc(n.v)}</b><em>${esc(n.titulo)}</em><span>${esc(newsDay(n.fecha).replace(/ \d{4}$/, ''))}</span></a>`).join('')}</nav><div class="ndet"></div></div>
+    <footer><span class="ok">Si otro equipo muestra otro número, una de las dos copias no está al día.</span><div class="exp-actions"><button class="primary" data-x>Entendido</button></div></footer>`;
+  const nav = d.querySelector('nav'), det = d.querySelector('.ndet');
+  const show = i => {
+    const n = list[i];
+    nav.querySelectorAll('a').forEach(a => a.classList.toggle('on', +a.dataset.i === i));
+    det.replaceChildren(Object.assign(document.createElement('p'), { className: 'ok', textContent: `${n.v} · ${newsDay(n.fecha)}${i ? '' : ' · esta copia'}` }),
+      Object.assign(document.createElement('h2'), { textContent: n.titulo }), n.cuerpo ? mdEl(n.cuerpo) : Object.assign(document.createElement('p'), { className: 'ok', textContent: 'Sin más detalle.' }));
+  };
+  nav.onclick = e => { const a = e.target.closest('a'); if (a) show(+a.dataset.i); };
+  d.querySelector('.sfind').oninput = e => { const q = plainTxt(e.target.value.trim()); nav.querySelectorAll('a').forEach(a => a.hidden = !!q && !a.dataset.t.includes(q)); };
+  d.querySelector('[data-copy]').onclick = () => copyText(tag, `Copiado: ${tag}`);
+  d.querySelector('[data-x]').onclick = () => d.close();
+  show(0);
+}
 
 // ---------- pestañas ----------
 let tabs = [], cur = null, showSrc = false, preview = false;
@@ -7480,6 +7534,8 @@ async function goToLine() {
 try { if (localStorage.getItem('desklens.noside')) document.body.classList.add('noside'); } catch {}
 if (LS('desklens.bak')) document.body.classList.add('showbak');
 $('#ribbon').append(
+  iconBtn('info', 'Novedades y versión de DeskLens', newsDialog),
+  Object.assign(document.createElement('small'), { className: 'rver' }),
   ...[['e', 'folder', 'Explorador (otro clic: ocultar la barra)'], ['b', 'search', 'Buscar en nombres y contenido · Ctrl+Shift+F (otro clic: ocultar la barra)'],
     ['g', 'git', 'Git: cambios, commit, ramas, pull y push · Ctrl+Shift+G (otro clic: ocultar la barra)']]
     .map(([v, ic, t]) => { const b = iconBtn(ic, t, () => sideView(v)); b.dataset.v = v; return b; }),
@@ -7487,6 +7543,11 @@ $('#ribbon').append(
   (b => { b.dataset.st = 'off'; return b; })(iconBtn('sparkles', 'Panel de IA', () => setIA(!document.body.classList.contains('ia')))),
   Object.assign(document.createElement('div'), { className: 'sp' }),
   iconBtn('settings', 'Ajustes', settingsDialog));
+loadNews().then(([n]) => { // número de versión bajo ⓘ; sin novedades.md, solo el icono
+  if (!n) return;
+  $('#ribbon .rver').textContent = n.v;
+  $('#ribbon .rver').previousElementSibling.title = `DeskLens ${n.v} · ${newsDay(n.fecha)} · Novedades`;
+}).catch(() => {});
 $('#phTools').append(maxBtn('con'), iconBtn('down', 'Ocultar consola', () => showPanel(false)));
 $('#ia > header').append(maxBtn('ia'), iconBtn('panelRight', 'Ocultar panel de IA (✦ en la cinta lo vuelve a mostrar)', () => { setMax(null); setIA(false); }));
 drawSearchToggles();

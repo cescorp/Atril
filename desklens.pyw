@@ -3445,6 +3445,10 @@ class Handler(BaseHTTPRequestHandler):
                 if not self.guard(need_header=False):
                     return
                 return self.send_file(ROOT / "index.html", sandbox=False)
+            if url.path == "/novedades.md":  # versión y novedades de esta copia (ⓘ de la cinta)
+                if not self.guard(need_header=False):
+                    return
+                return self.send_file(ROOT / "novedades.md", sandbox=True)
             if url.path.startswith("/raw/"):
                 if not self.guard(need_header=False):
                     return

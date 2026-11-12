@@ -2,6 +2,7 @@
 import importlib.machinery
 import importlib.util
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -648,6 +649,9 @@ assert.deepStrictEqual(findRefs('Ver 1 Samuel 4:4 y 1 Samuel 8:5, 20; Deuteronom
     raw = "/raw/" + "/".join(urllib.request.quote(p) for p in str(proj / "img.png").replace("\\", "/").split("/"))
     assert get(port, raw, header=False, rng="bytes=0-3") == (206, b"\x89PNG")
     assert get(port, "/raw/" + urllib.request.quote(str(fuera / "secreto.txt").replace("\\", "/")), header=False)[0] == 404
+    # ⓘ novedades: la primera «## vX · AAAA-MM-DD · título» es la versión de esta copia
+    code, body = get(port, "/novedades.md", header=False)
+    assert code == 200 and re.search(r"^## v\d+\.\d+ · \d{4}-\d\d-\d\d · .+", body.decode("utf-8"), re.M)
 
     # explorador: lista nombres fuera de lo añadido, pero el contenido sigue bloqueado
     (fuera / "app").mkdir()
