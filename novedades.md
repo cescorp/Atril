@@ -1,6 +1,10 @@
 # Novedades de DeskLens
 Cada cambio es una versión nueva, la más reciente arriba. El número de la primera es el que sale en ⓘ (arriba en la cinta).
 
+## v1.110 · 2026-11-12 · Detalle del commit más compacto
+- La cabecera ocupa dos líneas: título, autor, fecha, rama y archivos. El resto (mensaje completo, email, padres, ramas) se abre con «▸ Ver detalle» y se recuerda.
+- Ver y Abrir pasan a la primera columna de la tabla de archivos.
+
 ## v1.109 · 2026-11-12 · «✅ En orden» también solo si lo pides
 - Va con el mismo ajuste que «Sin reglas» y «Sin bitácora» (⚙ Ajustes › Bitácora).
 

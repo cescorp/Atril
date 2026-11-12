@@ -8,6 +8,9 @@ Entradas nuevas arriba. Formato: `## AAAA-MM-DD · título` + 2–4 líneas (qu�
 - **Cómo trabaja el usuario:** escribe en español. **Antes de construir algo nuevo, dibujarlo en texto y esperar su «ok».** No instalar nada sin acuerdo. Ahorrar tokens. Prefiere lo simple: rechazó un panel de IA con modos (ver 2026-11-02).
 - **Para verificar sin tocar su DeskLens:** levantar `desklens.Handler` en el puerto 8799 con `CONFIG`, `CONV_DIR`, `RECOVERY_DIR` e `INDEX_DB` en una carpeta temporal y hacer captura con Edge sin ventana (`--headless=new --screenshot`). Así se probó cada paso. Ojo: en Windows dos servidores pueden escuchar el mismo puerto sin error; si hay otra sesión probando, usa otro puerto.
 
+## 2026-11-12 · Detalle del commit: cabecera en dos líneas y el resto plegado
+Pedido del usuario: la cabecera ocupaba mucho sobre la tabla de archivos. `gitCommitDetail`: línea 1 = «▸ Ver detalle · N líneas» (botón de acento relleno; desplegado, contorno) + título en una línea con «…» + hash/⋯; línea 2 = autor · fecha · ⎇ rama (la primera local) · archivos +/− · por subir/traer. Plegado (`.gdmore`): cuerpo del mensaje, email, aplicado por, padres y todas las ramas/etiquetas; estado en `desklens.git.detalle` (plegado por defecto). «Filtrar archivos» baja encima de la tabla; Ver/Abrir en la primera columna. Probado en el 8799 en ancho y estrecho.
+
 ## 2026-11-12 · «✅ En orden» va con el mismo ajuste
 Pedido del usuario: «En orden» es parte de la misma lógica. `/api/estado` trae `avisar_memoria` y la ventana solo pone «✅ En orden» si está activado; la fila de avisos vacía no ocupa sitio (`.badges:empty`). Probado en el 8799: apagado sin nada, encendido «✅ En orden», apagado otra vez sin nada.
 
