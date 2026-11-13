@@ -810,6 +810,27 @@ assert.deepStrictEqual(findRefs('Ver 1 Samuel 4:4 y 1 Samuel 8:5, 20; Deuteronom
     assert act("pull_rama", "main")[0] == 400 and act("push_a", "nada/x")[0] == 400 and act("push_a", "origin/-x")[0] == 400
     assert act("cancelar_fusion", "")[0] == 400  # no hay fusión en curso
     git(otro, "checkout", "-q", "main")
+    # fusionar pisaría un cambio sin commit: 409 con la tabla y no se lanza nada; «apartar» y «commit» fusionan sin perderlo
+    (rep / ".gitignore").write_text("*.log\nb\nc\n"); git(rep, "add", "-A"); git(rep, "commit", "-q", "-m", "gi")
+    git(rep, "checkout", "-q", "-b", "cesare2"); (rep / "z.md").write_text("z\n"); git(rep, "add", "-A"); git(rep, "commit", "-qm", "z")
+    git(rep, "checkout", "-q", "main"); git(rep, "checkout", "-q", "-b", "cesare"); (rep / ".gitignore").write_text("*.tmp\nb\nc\n"); git(rep, "commit", "-qam", "gi cesare")
+    git(rep, "checkout", "-q", "main"); (rep / ".gitignore").write_text("*.log\nb\nnode_modules/\n")
+    code, r = act("fusionar", "cesare")
+    assert code == 409 and r["codigo"] == "fusion_bloqueada" and r["commits"] == 1, r
+    f, = r["filas"]
+    assert (f["rel"], f["estado"], f["mas"], f["menos"], f["otra_estado"], f["otra_mas"], f["otra_autor"]) == (".gitignore", "M", 1, 1, "M", 1, "Prueba")
+    assert f["mtime"] and f["tam"] and out(rep, "rev-parse", "HEAD") == out(rep, "rev-parse", "main") and not (rep / ".git" / "MERGE_HEAD").exists()
+    code, r = post("/api/git/accion", {"ruta": str(rep), "accion": "fusionar", "rama": "cesare", "modo": "apartar", "archivos": [".gitignore"]})
+    assert r["orden"] == "git merge --no-edit cesare && git stash pop" and wait_run(r["id"])["codigo"] == 0
+    assert (rep / ".gitignore").read_text() == "*.tmp\nb\nnode_modules/\n"  # lo de cesare y lo tuyo, juntos
+    code, r = post("/api/git/accion", {"ruta": str(rep), "accion": "fusionar", "rama": "cesare2"})  # no choca: se fusiona sin preguntar
+    assert code == 200 and wait_run(r["id"])["codigo"] == 0
+    # «commit»: commit solo de esos archivos y luego la fusión (aquí cesare ya está dentro: «Already up to date»)
+    (rep / "otro.md").write_text("sin tocar\n")
+    code, r = post("/api/git/accion", {"ruta": str(rep), "accion": "fusionar", "rama": "cesare", "modo": "commit", "archivos": [".gitignore"], "mensaje": "gi local"})
+    assert code == 200 and wait_run(r["id"])["codigo"] == 0 and out(rep, "log", "-1", "--format=%s") == "gi local"
+    assert out(rep, "status", "--porcelain") == "?? otro.md"  # lo demás no entra en ese commit
+    (rep / "otro.md").unlink()
     # «Unir autores»: personas con sus firmas en config.json; una firma, una sola persona; las triviales no se guardan
     code, r = post("/api/personas", {"personas": [{"nombre": " César ", "firmas": ["CesarE", "cesare", "CesarE"]},
                                                    {"nombre": "Otro", "firmas": ["cesare", "x"]}, {"nombre": "solo", "firmas": ["solo"]}]})

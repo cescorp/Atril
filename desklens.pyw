@@ -3114,6 +3114,80 @@ class GitLocalChanges(ValueError):
                          f"{'son distintos' if n != 1 else 'es distinto'} en «{destino}». Git no cambia de rama para no perderlos.")
 
 
+class GitMergeBlocked(ValueError):
+    """Fusionar (merge o pull) pisaría cambios sin commit: git se negaría («would be overwritten by merge»).
+    Lleva la tabla de archivos afectados para que la ventana ofrezca hacer commit o guardarlos aparte."""
+
+    def __init__(self, destino, filas, commits):
+        self.destino, self.filas, self.commits = destino, filas, commits
+        n = len(filas)
+        super().__init__(f"Tienes cambios sin commit en {n} archivo{'s' if n != 1 else ''} que «{destino}» también cambia. "
+                         "Git no fusiona para no borrarlos. No se ha tocado nada.")
+
+
+def git_merge_blockers(repo, ov, target):
+    """Archivos con cambios sin commit (o nuevos sin seguimiento) que fusionar `target` cambiaría, con lo necesario
+    para la tabla de la ventana: tus +/−, fecha y tamaño en el disco, y qué hizo `target` (estado, +/−, último commit).
+    Límite: en un pull mira la remota tal como se trajo la última vez; si el pull trae algo nuevo que choca, lo dice
+    git en la consola."""
+    local = {}
+    for it in ov["preparados"] + ov["cambios"]:
+        local.setdefault(it["rel"], it["estado"])
+    base = local and git_run(repo, "merge-base", "HEAD", target)
+    if not base:
+        return []
+    q = ("-c", "core.quotePath=false")
+    theirs = {rel: st[:1] for st, _, rel in (ln.partition("\t") for ln in
+              git_run(repo, *q, "diff", "--name-status", "--no-renames", base, target).splitlines())}
+    hit = sorted(set(local) & set(theirs))
+    if not hit:
+        return []
+
+    def nums(*a):  # {rel: (+, −)}; binarios: (None, None)
+        out = {}
+        for ln in git_run(repo, *q, "diff", "--numstat", "--no-renames", *a, "--", *hit).splitlines():
+            m, d, rel = ln.split("\t", 2)
+            out[rel] = (None, None) if m == "-" else (int(m), int(d))
+        return out
+    mine, other = nums("HEAD"), nums(base, target)
+    filas = []
+    for i, rel in enumerate(hit):
+        p = repo / rel
+        st = p.stat() if p.is_file() else None
+        # ponytail: un git log por archivo (~40 ms en Windows); con más de 50 archivos el resto va sin «último commit»
+        last = git_run(repo, "log", "-1", "--format=%at\x1f%an", target, "--", rel).split("\x1f") if i < 50 else [""]
+        filas.append({"rel": rel, "ruta": str(p), "estado": local[rel], "mas": mine.get(rel, (None,))[0],
+                      "menos": mine.get(rel, (None, None))[1], "mtime": st and int(st.st_mtime), "tam": st and st.st_size,
+                      "otra_estado": theirs[rel], "otra_mas": other.get(rel, (None,))[0], "otra_menos": other.get(rel, (None, None))[1],
+                      "otra_fecha": int(last[0]) if last[0] else None, "otra_autor": last[1] if len(last) > 1 else ""})
+    return filas
+
+
+def git_before_merge(repo, ov, target, modo, files, mensaje):
+    """Antes de fusionar `target` (merge, pull, pull desde, sincronizar). Sin modo: GitMergeBlocked si la fusión
+    pisaría cambios sin commit. modo «commit»: commit solo de `files` con `mensaje`. modo «apartar»: guarda `files`
+    en el stash; devuelve True para que tras fusionar se haga «git stash pop» (si la fusión falla, siguen en el stash).
+    Las órdenes encadenadas van por cmd/sh: el nombre de la rama no puede llevar caracteres de la consola."""
+    if modo == "commit":
+        if not mensaje.strip():
+            raise ValueError("Escribe el mensaje del commit")
+        git_do(repo, "add", "-A", "--", *files)
+        git_do(repo, "commit", "-F", "-", "--", *files, stdin=mensaje.strip().encode("utf-8"))
+        return False
+    if modo == "apartar":
+        if not files:  # sin rutas, stash guardaría todos los cambios
+            raise ValueError("No hay archivos que guardar aparte")
+        if re.search(r"[\"&|<>^%!`$;\s]", target):
+            raise ValueError(f"El nombre «{target}» lleva caracteres especiales: guarda los cambios aparte a mano")
+        antes = git_run(repo, "rev-parse", "-q", "--verify", "refs/stash")
+        git_do(repo, "stash", "push", "-u", "-m", f"DeskLens: cambios antes de fusionar «{target}»", "--", *files)
+        return git_run(repo, "rev-parse", "-q", "--verify", "refs/stash") != antes
+    filas = git_merge_blockers(repo, ov, target)
+    if filas:
+        raise GitMergeBlocked(target, filas, int(git_run(repo, "rev-list", "--count", f"HEAD..{target}") or 0))
+    return False
+
+
 def git_switch(repo, name, modo=""):
     """Cambia a la rama `name`. Si git se niega por cambios sin commit, GitLocalChanges con los archivos.
     modo «llevar»: guarda los cambios (stash), cambia y los vuelve a poner en la rama nueva (como «Migrate changes»
@@ -3228,7 +3302,8 @@ def git_action(path, accion, archivos=(), mensaje="", rama="", todo=False, modo=
     elif accion in ("pull", "push", "fetch", "fusionar", "sincronizar", "pull_desde", "push_a", "pull_rama", "push_rama", "probar"):
         ov = git_overview(repo)
         if accion == "sincronizar" and ov["remota"]:  # como VS Code: primero trae y luego sube (si hay algo tuyo)
-            cmd = "git pull --no-rebase" + (" && git push" if ov["adelante"] else "")
+            pop = git_before_merge(repo, ov, ov["remota"], modo, files, mensaje)
+            cmd = "git pull --no-rebase" + (" && git stash pop" if pop else "") + (" && git push" if ov["adelante"] else "")
             return {"id": start_run(f"cmd /c {cmd}" if WINDOWS else ["sh", "-c", cmd], str(repo), "utf-8",
                                     f"git sincronizar · {repo.name}", GIT_ENV), "orden": cmd}
         if accion == "pull":
@@ -3270,6 +3345,12 @@ def git_action(path, accion, archivos=(), mensaje="", rama="", todo=False, modo=
             args = ["push", "-u", "origin" if "origin" in ov["remotos"] else ov["remotos"][0], ov["rama"]]
         else:
             raise ValueError("Este repositorio no tiene remoto: añade uno (git remote add origin <url>)")
+        target = (ov["remota"] if accion == "pull" else args[-1] if accion == "fusionar"
+                  else f"{args[-2]}/{args[-1]}" if accion == "pull_desde" else "")
+        if target and git_before_merge(repo, ov, target, modo, files, mensaje):  # sus cambios vuelven tras fusionar
+            cmd = "git " + " ".join(args) + " && git stash pop"
+            return {"id": start_run(f"cmd /c {cmd}" if WINDOWS else ["sh", "-c", cmd], str(repo), "utf-8",
+                                    f"git {accion} · {repo.name}", GIT_ENV), "orden": cmd}
         return {"id": start_run(["git", *args], str(repo), "utf-8", f"git {accion} · {repo.name}", GIT_ENV),
                 "orden": "git " + " ".join(args)}
     else:
@@ -3681,6 +3762,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json(409, {"error": str(e), "codigo": "rama_en_otra_carpeta", "rama": e.rama, "carpeta": e.carpeta})
             except GitLocalChanges as e:  # la ventana ofrece llevar los cambios o guardarlos a un lado
                 return self.send_json(409, {"error": str(e), "codigo": "cambios_locales", "archivos": e.archivos, "rama": e.destino})
+            except GitMergeBlocked as e:  # la ventana enseña la tabla y ofrece commit o guardarlos aparte
+                return self.send_json(409, {"error": str(e), "codigo": "fusion_bloqueada", "destino": e.destino,
+                                            "commits": e.commits, "filas": e.filas})
             except (ValueError, subprocess.TimeoutExpired) as e:
                 return self.send_json(400, {"error": str(e)})
         if url == "/api/git/blame":

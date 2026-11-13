@@ -1,6 +1,10 @@
 # Novedades de DeskLens
 Cada cambio es una versión nueva, la más reciente arriba. El número de la primera es el que sale en ⓘ (arriba en la cinta).
 
+## v1.111 · 2026-11-13 · Fusionar con cambios sin commit: se explica y se resuelve
+- Antes, merge o pull fallaban con «Your local changes… would be overwritten» y no decían qué hacer.
+- Ahora sale una tabla con esos archivos (tus cambios, fecha, tamaño y qué hizo la otra rama), ordenable por columnas, y dos salidas que no pierden nada: «Commit y fusionar» o «Guardar aparte y fusionar».
+
 ## v1.110 · 2026-11-12 · Detalle del commit más compacto
 - La cabecera ocupa dos líneas: título, autor, fecha, rama y archivos. El resto (mensaje completo, email, padres, ramas) se abre con «▸ Ver detalle» y se recuerda.
 - Ver y Abrir pasan a la primera columna de la tabla de archivos.

@@ -422,6 +422,15 @@ body.gitfull #gitv .shead{display:none} /* la barra de arriba ya dice «Git» */
 .gdtog{flex:none;background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
 .gdtog.on{background:none;color:var(--accent)}
 .gdmore[hidden]{display:none}.gdmore{margin-top:4px;padding-top:4px;border-top:1px dashed var(--line)}
+/* fusionar bloqueado por cambios sin commit: tabla y las dos salidas en columnas */
+dialog#dlg.sets.mblk{width:min(1200px,calc(100vw - 32px));height:fit-content;max-height:calc(100vh - 48px)}
+.mblk .mbbody{flex:1;overflow:auto;padding:12px 20px}.mblk .mbmsg{margin:0 0 10px;color:var(--muted)}
+.mblk .gdfil{display:flex;align-items:center;gap:12px}.mblk .gdfil i{font-style:normal;color:#2e8b57}.mblk .gdfil em{font-style:normal;color:#d33}
+.mblk .gdtab td{vertical-align:top}.mblk .gdtab th{top:-12px}
+.mblk h4{margin:16px 0 8px;font-size:13px;color:var(--accent)}
+.mbopts{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.mbopts section{border:1px solid var(--line);border-radius:8px;padding:10px 14px}.mbopts p{margin:4px 0 8px;font-size:12.5px;color:var(--muted)}
+.mbopts label{display:flex;align-items:center;gap:8px;font-size:12.5px}.mbopts input{flex:1;font:inherit;padding:4px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
 .gdfil{margin:4px 0 6px}.gdfil input{width:260px;font-size:12px;padding:3px 8px;border:1px solid var(--line);border-radius:6px;background:var(--paper);color:var(--ink)}
 .gdtab .gst{display:inline-block;width:14px;font:600 11px Consolas,monospace;text-align:center}
 .gst[data-s=R]{color:#2f7fd8}
@@ -2539,6 +2548,60 @@ async function gitCommit() {
   }
   if (await gitDo('commit', [], { mensaje, todo })) { $('#gMsg').value = ''; flash('✓ Commit hecho'); loadSide(); }
 }
+// Fusionar (merge, pull, pull desde, sincronizar) pisaría cambios sin commit: tabla ordenable de esos archivos (tus +/−,
+// fecha y tamaño en el disco, qué hizo la otra rama y su último commit) y dos salidas que no pierden nada:
+// commit solo de esos archivos y fusionar, o guardarlos aparte (stash), fusionar y volver a ponerlos.
+let mbSort = (() => { try { return JSON.parse(LS('desklens.git.ordenBloq') || 'null') || { col: 'rel', dir: 1 }; } catch { return { col: 'rel', dir: 1 }; } })();
+function gitMergeBlocked(accion, extra, data) {
+  const d = $('#dlg'), dest = data.destino, rels = data.filas.map(f => f.rel);
+  const files = data.filas.map(f => { const name = f.rel.split('/').pop(); return { ...f, name, dir: f.rel.slice(0, -name.length - 1) }; });
+  const mas = files.reduce((a, f) => a + (f.mas || 0), 0), menos = files.reduce((a, f) => a + (f.menos || 0), 0);
+  const when = ts => ts ? `${dayKey(ts)} ${hhmm(ts)} <span class="gc">(${fmtRel(ts)})</span>` : '—';
+  const pm = (a, b) => a == null ? '<span class="gc">binario o nuevo</span>' : `<i>+${a}</i> <em>−${b}</em>`;
+  const que = accion === 'fusionar' ? 'fusionar' : 'traer';
+  d.className = 'sets mblk'; d.oninput = d.onchange = null; d.onclose = null;
+  d.innerHTML = `<header><b>No se puede ${que} «${esc(dest)}» todavía</b><span class="scount">⎇ ${esc(gst.rama || '')} ← ⎇ ${esc(dest)}${data.commits ? ` (${data.commits} commit${data.commits === 1 ? '' : 's'})` : ''}</span></header>
+    <div class="mbbody"><p class="mbmsg">${esc(data.error)}</p>
+      <div class="gdfil"><input type="search" placeholder="Filtrar…" spellcheck="false"><span class="gc">${files.length} archivo${files.length === 1 ? '' : 's'} · <i>+${mas}</i> <em>−${menos}</em></span></div>
+      <table class="gdtab"><thead><tr></tr></thead><tbody></tbody></table>
+      <h4>¿Qué hago con tus cambios?</h4>
+      <div class="mbopts"><section><b>💾 Commit y ${que}</b><p>Hace un commit solo con ${files.length === 1 ? 'este archivo' : 'estos archivos'} y luego ${que}. Si las dos versiones chocan, salen en «Conflictos» para elegir.</p>
+          <label>Mensaje <input id="mbMsg" spellcheck="false" value="${esc(`Cambios en ${files.length === 1 ? files[0].name : files.length + ' archivos'} antes de ${que} ${dest}`)}"></label></section>
+        <section><b>📦 Guardar aparte y ${que}</b><p>Los guarda (stash), ${que} y los vuelve a poner. Si chocan, quedan en «Conflictos»; una copia sigue guardada por si acaso (⎇ › «Recuperar cambios guardados»).</p></section></div></div>
+    <footer><span class="ok">No se ha tocado nada.</span><div class="exp-actions"></div></footer>`;
+  const run = (modo, more = {}) => { d.close(); gitLong(accion, { ...extra, modo, archivos: rels, ...more }); };
+  d.querySelector('.exp-actions').append(
+    Object.assign(button(`💾 Commit y ${que}`, () => { const m = $('#mbMsg').value.trim(); if (!m) return $('#mbMsg').focus(); run('commit', { mensaje: m }); }), { className: 'primary' }),
+    button(`📦 Guardar aparte y ${que}`, () => run('apartar')), button('Cancelar', () => d.close()));
+  const cols = [['', ''], ['estado', 'Estado'], ['rel', 'Archivo'], ['dir', 'Carpeta'], ['mas', 'Tus cambios'], ['mtime', 'Modificado'], ['tam', 'Tamaño'], ['otra_fecha', `En «${dest}»`]];
+  const head = d.querySelector('thead tr'), body = d.querySelector('tbody'), q = d.querySelector('.gdfil input');
+  const draw = () => {
+    head.innerHTML = cols.map(([k, t]) => `<th data-k="${k}" class="${k && mbSort.col === k ? 'on' : ''}${['mas', 'tam'].includes(k) ? ' num' : ''}">${esc(t)}${k ? `<span>${mbSort.col === k ? (mbSort.dir > 0 ? ' ▲' : ' ▼') : ''}</span>` : ''}</th>`).join('');
+    head.querySelectorAll('th[data-k]:not([data-k=""])').forEach(th => th.onclick = () => {
+      mbSort = { col: th.dataset.k, dir: mbSort.col === th.dataset.k ? -mbSort.dir : 1 }; LS('desklens.git.ordenBloq', JSON.stringify(mbSort)); draw();
+    });
+    const w = q.value.trim().toLowerCase(), k = mbSort.col === 'rel' ? 'name' : mbSort.col;
+    const list = files.filter(f => !w || f.rel.toLowerCase().includes(w)).sort((a, b) => {
+      const x = a[k] ?? -1, y = b[k] ?? -1;
+      return (typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y), 'es', { numeric: true })) * mbSort.dir;
+    });
+    body.innerHTML = '';
+    for (const f of list) {
+      const tr = document.createElement('tr'); tr.title = f.ruta;
+      tr.innerHTML = `<td class="gact2"></td><td><span class="gst" data-s="${esc(f.estado)}">${esc(f.estado)}</span></td><td class="gn">${esc(f.name)}</td>`
+        + `<td class="gc">${esc(f.dir || '·')}</td><td class="num">${pm(f.mas, f.menos)}</td><td>${when(f.mtime)}</td>`
+        + `<td class="num gc">${f.tam == null ? '—' : fmtSize(f.tam)}</td>`
+        + `<td><span class="gst" data-s="${esc(f.otra_estado)}">${esc(f.otra_estado)}</span> ${pm(f.otra_mas, f.otra_menos)}`
+        + `${f.otra_fecha ? `<br><span class="gc">${dayKey(f.otra_fecha)} ${hhmm(f.otra_fecha)} · ${esc(f.otra_autor)}</span>` : ''}</td>`;
+      const ver = button('Ver', () => { d.close(); compareDialog(f.ruta); }), abrir = button('Abrir', () => { d.close(); openTab(f.ruta, true); });
+      ver.className = abrir.className = 'small'; ver.title = 'Tu versión sin commit ↔ el último commit'; ver.disabled = abrir.disabled = f.tam == null;
+      tr.firstChild.append(ver, abrir); body.append(tr);
+    }
+    if (!list.length) body.innerHTML = `<tr><td colspan="8" class="gc">Ningún archivo coincide.</td></tr>`;
+  };
+  q.oninput = draw; draw();
+  d.showModal();
+}
 // pull, push, fetch y merge: en la consola (su salida en vivo); al terminar, la vista y el árbol se ponen al día
 function gitLong(accion, extra = {}) {
   const ruta = gst.ruta;
@@ -2549,7 +2612,12 @@ function gitLong(accion, extra = {}) {
   // la consola se ve mientras corre y, si terminó bien, se oculta sola (la ejecución queda en su pestaña ✓ para verla);
   // si falló, o si ya estaba abierta antes, se queda como está
   const wasOpen = !$('#panel').hidden;
-  launch(() => api('/api/git/accion', { ruta, accion, ...extra }), `git ${accion} · ${gst.nombre}`, cmd,
+  // si fusionar pisaría cambios sin commit, el servidor no lanza nada y la ventana enseña la tabla (gitMergeBlocked)
+  const start = () => api('/api/git/accion', { ruta, accion, ...extra }).catch(e => {
+    if (e.data?.codigo === 'fusion_bloqueada') { e.handled = true; gitMergeBlocked(accion, extra, e.data); }
+    throw e;
+  });
+  launch(start, `git ${accion} · ${gst.nombre}`, cmd,
     gst.repositorio, ruta, r => {
       gitLoad(); loadSide();
       if (r.codigo !== 0) return flash(`✗ git ${accion} falló: mira la consola`);
@@ -6493,7 +6561,7 @@ async function runTests(path, name) {
 // Arranca un proceso en el servidor y crea su pestaña en la consola; poll() va trayendo la salida.
 async function launch(start, label, cmd, cwd, ruta, onDone = null) {
   let res;
-  try { res = await start(); } catch (e) { return ask('No se pudo ejecutar', e.message, ['Entendido']); }
+  try { res = await start(); } catch (e) { return e.handled || ask('No se pudo ejecutar', e.message, ['Entendido']); } // handled: ya lo explicó quien llamó
   const r = { id: res.id, label, cmd, cwd, ruta, onDone, again: start, trozos: [], fin: false, codigo: null, dur: 0 };
   runsUI.push(r); curRun = r;
   // como mucho N pestañas (⚙ Ajustes › Consola): se quitan las terminadas más antiguas (las que siguen corriendo, nunca)
