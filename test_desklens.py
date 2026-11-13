@@ -831,6 +831,14 @@ assert.deepStrictEqual(findRefs('Ver 1 Samuel 4:4 y 1 Samuel 8:5, 20; Deuteronom
     assert code == 200 and wait_run(r["id"])["codigo"] == 0 and out(rep, "log", "-1", "--format=%s") == "gi local"
     assert out(rep, "status", "--porcelain") == "?? otro.md"  # lo demás no entra en ese commit
     (rep / "otro.md").unlink()
+    # descartar por archivo desde la tabla: también lo preparado; luego la fusión ya no choca
+    git(rep, "checkout", "-q", "-b", "cesare3"); (rep / ".gitignore").write_text("de cesare3\n"); git(rep, "commit", "-qam", "gi 3")
+    git(rep, "checkout", "-q", "main"); (rep / ".gitignore").write_text("mío\n"); git(rep, "add", ".gitignore")
+    assert act("fusionar", "cesare3")[1]["codigo"] == "fusion_bloqueada"
+    code, ov = post("/api/git/accion", {"ruta": str(rep), "accion": "descartar", "modo": "preparado", "archivos": [".gitignore"]})
+    assert code == 200 and not ov["preparados"] and not ov["cambios"]
+    code, r = act("fusionar", "cesare3")
+    assert code == 200 and wait_run(r["id"])["codigo"] == 0 and (rep / ".gitignore").read_text() == "de cesare3\n"
     # «Unir autores»: personas con sus firmas en config.json; una firma, una sola persona; las triviales no se guardan
     code, r = post("/api/personas", {"personas": [{"nombre": " César ", "firmas": ["CesarE", "cesare", "CesarE"]},
                                                    {"nombre": "Otro", "firmas": ["cesare", "x"]}, {"nombre": "solo", "firmas": ["solo"]}]})

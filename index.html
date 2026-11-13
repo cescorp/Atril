@@ -428,7 +428,8 @@ dialog#dlg.sets.mblk{width:min(1200px,calc(100vw - 32px));height:fit-content;max
 .mblk .gdfil{display:flex;align-items:center;gap:12px}.mblk .gdfil i{font-style:normal;color:#2e8b57}.mblk .gdfil em{font-style:normal;color:#d33}
 .mblk .gdtab td{vertical-align:top}.mblk .gdtab th{top:-12px}
 .mblk h4{margin:16px 0 8px;font-size:13px;color:var(--accent)}
-.mbopts{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.mbopts{display:grid;grid-template-columns:1fr 1fr;gap:12px}.mblk .mbhint{margin:8px 0 0;font-size:12px}
+.mblk .mbdis{color:#d64545}.mblk .mbdis:hover:not(:disabled){border-color:#d64545}
 .mbopts section{border:1px solid var(--line);border-radius:8px;padding:10px 14px}.mbopts p{margin:4px 0 8px;font-size:12.5px;color:var(--muted)}
 .mbopts label{display:flex;align-items:center;gap:8px;font-size:12.5px}.mbopts input{flex:1;font:inherit;padding:4px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
 .gdfil{margin:4px 0 6px}.gdfil input{width:260px;font-size:12px;padding:3px 8px;border:1px solid var(--line);border-radius:6px;background:var(--paper);color:var(--ink)}
@@ -2553,30 +2554,45 @@ async function gitCommit() {
 // commit solo de esos archivos y fusionar, o guardarlos aparte (stash), fusionar y volver a ponerlos.
 let mbSort = (() => { try { return JSON.parse(LS('desklens.git.ordenBloq') || 'null') || { col: 'rel', dir: 1 }; } catch { return { col: 'rel', dir: 1 }; } })();
 function gitMergeBlocked(accion, extra, data) {
-  const d = $('#dlg'), dest = data.destino, rels = data.filas.map(f => f.rel);
+  const d = $('#dlg'), dest = data.destino;
   const files = data.filas.map(f => { const name = f.rel.split('/').pop(); return { ...f, name, dir: f.rel.slice(0, -name.length - 1) }; });
-  const mas = files.reduce((a, f) => a + (f.mas || 0), 0), menos = files.reduce((a, f) => a + (f.menos || 0), 0);
+  const total = () => `${files.length} archivo${files.length === 1 ? '' : 's'} · <i>+${files.reduce((a, f) => a + (f.mas || 0), 0)}</i> <em>−${files.reduce((a, f) => a + (f.menos || 0), 0)}</em>`;
   const when = ts => ts ? `${dayKey(ts)} ${hhmm(ts)} <span class="gc">(${fmtRel(ts)})</span>` : '—';
   const pm = (a, b) => a == null ? '<span class="gc">binario o nuevo</span>' : `<i>+${a}</i> <em>−${b}</em>`;
   const que = accion === 'fusionar' ? 'fusionar' : 'traer';
   d.className = 'sets mblk'; d.oninput = d.onchange = null; d.onclose = null;
   d.innerHTML = `<header><b>No se puede ${que} «${esc(dest)}» todavía</b><span class="scount">⎇ ${esc(gst.rama || '')} ← ⎇ ${esc(dest)}${data.commits ? ` (${data.commits} commit${data.commits === 1 ? '' : 's'})` : ''}</span></header>
     <div class="mbbody"><p class="mbmsg">${esc(data.error)}</p>
-      <div class="gdfil"><input type="search" placeholder="Filtrar…" spellcheck="false"><span class="gc">${files.length} archivo${files.length === 1 ? '' : 's'} · <i>+${mas}</i> <em>−${menos}</em></span></div>
+      <div class="gdfil"><input type="search" placeholder="Filtrar…" spellcheck="false"><span class="gc mbtot"></span></div>
       <table class="gdtab"><thead><tr></tr></thead><tbody></tbody></table>
       <h4>¿Qué hago con tus cambios?</h4>
       <div class="mbopts"><section><b>💾 Commit y ${que}</b><p>Hace un commit solo con ${files.length === 1 ? 'este archivo' : 'estos archivos'} y luego ${que}. Si las dos versiones chocan, salen en «Conflictos» para elegir.</p>
           <label>Mensaje <input id="mbMsg" spellcheck="false" value="${esc(`Cambios en ${files.length === 1 ? files[0].name : files.length + ' archivos'} antes de ${que} ${dest}`)}"></label></section>
-        <section><b>📦 Guardar aparte y ${que}</b><p>Los guarda (stash), ${que} y los vuelve a poner. Si chocan, quedan en «Conflictos»; una copia sigue guardada por si acaso (⎇ › «Recuperar cambios guardados»).</p></section></div></div>
+        <section><b>📦 Guardar aparte y ${que}</b><p>Los guarda (stash), ${que} y los vuelve a poner. Si chocan, quedan en «Conflictos»; una copia sigue guardada por si acaso (⎇ › «Recuperar cambios guardados»).</p></section>
+</div><p class="gc mbhint">¿Algún cambio no te sirve? «↶ Descartar» en su fila lo quita (solo ese archivo); cuando no queda ninguno, se ${que} sola.</p></div>
     <footer><span class="ok">No se ha tocado nada.</span><div class="exp-actions"></div></footer>`;
-  const run = (modo, more = {}) => { d.close(); gitLong(accion, { ...extra, modo, archivos: rels, ...more }); };
+  const run = (modo, more = {}) => { d.close(); gitLong(accion, { ...extra, modo, archivos: files.map(f => f.rel), ...more }); };
   d.querySelector('.exp-actions').append(
     Object.assign(button(`💾 Commit y ${que}`, () => { const m = $('#mbMsg').value.trim(); if (!m) return $('#mbMsg').focus(); run('commit', { mensaje: m }); }), { className: 'primary' }),
     button(`📦 Guardar aparte y ${que}`, () => run('apartar')), button('Cancelar', () => d.close()));
+  // ↶ de una fila: descarta solo ese archivo (también lo preparado); sin filas, ya no choca nada y se fusiona
+  const discard = async (f, btn) => {
+    if (await ask('Descartar cambios', `¿Descartar tus cambios en «${f.rel}»? Vuelve a como está en el último commit` +
+      (f.estado === 'U' ? ' (es nuevo: va a la papelera)' : '') + ' y se queda lo de «' + dest + '». No se puede deshacer.',
+      ['Descartar', 'Cancelar'], { danger: true }) !== 'Descartar') return;
+    if (tabs.includes(f.ruta) && !await askUnsaved(f.ruta)) return;
+    btn.disabled = true; btn.textContent = '⏳';
+    if (!await gitDo('descartar', [f], { modo: 'preparado' })) { btn.disabled = false; btn.textContent = '↶ Descartar'; return; }
+    if (tabs.includes(f.ruta)) reloadFromDisk(f.ruta).catch(() => {});
+    files.splice(files.indexOf(f), 1);
+    if (files.length) return draw();
+    d.close(); flash(`✓ Descartado · ${que === 'fusionar' ? 'fusionando' : 'trayendo'} «${dest}»…`); gitLong(accion, extra);
+  };
   const cols = [['', ''], ['estado', 'Estado'], ['rel', 'Archivo'], ['dir', 'Carpeta'], ['mas', 'Tus cambios'], ['mtime', 'Modificado'], ['tam', 'Tamaño'], ['otra_fecha', `En «${dest}»`]];
   const head = d.querySelector('thead tr'), body = d.querySelector('tbody'), q = d.querySelector('.gdfil input');
   const draw = () => {
     head.innerHTML = cols.map(([k, t]) => `<th data-k="${k}" class="${k && mbSort.col === k ? 'on' : ''}${['mas', 'tam'].includes(k) ? ' num' : ''}">${esc(t)}${k ? `<span>${mbSort.col === k ? (mbSort.dir > 0 ? ' ▲' : ' ▼') : ''}</span>` : ''}</th>`).join('');
+    d.querySelector('.mbtot').innerHTML = total();
     head.querySelectorAll('th[data-k]:not([data-k=""])').forEach(th => th.onclick = () => {
       mbSort = { col: th.dataset.k, dir: mbSort.col === th.dataset.k ? -mbSort.dir : 1 }; LS('desklens.git.ordenBloq', JSON.stringify(mbSort)); draw();
     });
@@ -2594,8 +2610,10 @@ function gitMergeBlocked(accion, extra, data) {
         + `<td><span class="gst" data-s="${esc(f.otra_estado)}">${esc(f.otra_estado)}</span> ${pm(f.otra_mas, f.otra_menos)}`
         + `${f.otra_fecha ? `<br><span class="gc">${dayKey(f.otra_fecha)} ${hhmm(f.otra_fecha)} · ${esc(f.otra_autor)}</span>` : ''}</td>`;
       const ver = button('Ver', () => { d.close(); compareDialog(f.ruta); }), abrir = button('Abrir', () => { d.close(); openTab(f.ruta, true); });
-      ver.className = abrir.className = 'small'; ver.title = 'Tu versión sin commit ↔ el último commit'; ver.disabled = abrir.disabled = f.tam == null;
-      tr.firstChild.append(ver, abrir); body.append(tr);
+      const tirar = button('↶ Descartar', () => discard(f, tirar));
+      ver.className = abrir.className = 'small'; tirar.className = 'small mbdis'; ver.title = 'Tu versión sin commit ↔ el último commit'; ver.disabled = abrir.disabled = f.tam == null;
+      tirar.title = 'Quitar tus cambios de este archivo (vuelve al último commit)';
+      tr.firstChild.append(ver, abrir, tirar); body.append(tr);
     }
     if (!list.length) body.innerHTML = `<tr><td colspan="8" class="gc">Ningún archivo coincide.</td></tr>`;
   };

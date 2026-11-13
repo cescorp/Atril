@@ -3163,10 +3163,25 @@ def git_merge_blockers(repo, ov, target):
     return filas
 
 
+def git_discard(repo, files, preparado=False):
+    """Descarta los cambios de `files`: vuelven a lo preparado o, con `preparado`, al último commit (también se
+    quitan de preparados). Los nuevos sin seguimiento van a la papelera, nunca se borran del todo."""
+    untracked = set(git_do(repo, "ls-files", "--others", "--exclude-standard", "-z", "--", *files).split("\0")) - {""}
+    tracked = [f for f in files if f not in untracked]
+    if tracked:
+        both = preparado and git_run(repo, "rev-parse", "-q", "--verify", "HEAD")
+        git_do(repo, "restore", *(["--staged", "--worktree", "--source=HEAD"] if both else []), "--", *tracked)
+    for f in untracked:
+        if not allowed(repo / f):  # repo más grande que el proyecto añadido: fuera de él no se borra nada
+            raise PermissionError(f"«{f}» está fuera de lo añadido a DeskLens")
+        to_trash(repo / f)
+
+
 def git_before_merge(repo, ov, target, modo, files, mensaje):
     """Antes de fusionar `target` (merge, pull, pull desde, sincronizar). Sin modo: GitMergeBlocked si la fusión
     pisaría cambios sin commit. modo «commit»: commit solo de `files` con `mensaje`. modo «apartar»: guarda `files`
     en el stash; devuelve True para que tras fusionar se haga «git stash pop» (si la fusión falla, siguen en el stash).
+    Descartar va por archivo, aparte (acción «descartar» con modo «preparado»).
     Las órdenes encadenadas van por cmd/sh: el nombre de la rama no puede llevar caracteres de la consola."""
     if modo == "commit":
         if not mensaje.strip():
@@ -3235,15 +3250,8 @@ def git_action(path, accion, archivos=(), mensaje="", rama="", todo=False, modo=
             git_do(repo, "rm", "-r", "--cached", "-q", "--", *(files or ["."]))
         else:
             git_do(repo, "restore", "--staged", "--", *(files or ["."]))
-    elif accion == "descartar":
-        untracked = set(git_do(repo, "ls-files", "--others", "--exclude-standard", "-z", "--", *files).split("\0")) - {""}
-        tracked = [f for f in files if f not in untracked]
-        if tracked:
-            git_do(repo, "restore", "--", *tracked)
-        for f in untracked:
-            if not allowed(repo / f):  # repo más grande que el proyecto añadido: fuera de él no se borra nada
-                raise PermissionError(f"«{f}» está fuera de lo añadido a DeskLens")
-            to_trash(repo / f)
+    elif accion == "descartar":  # modo «preparado»: también lo preparado (desde la tabla de fusionar bloqueado)
+        git_discard(repo, files, preparado=modo == "preparado")
     elif accion == "commit":
         if not mensaje.strip():
             raise ValueError("Escribe el mensaje del commit")
