@@ -1,6 +1,10 @@
 # Novedades de DeskLens
 Cada cambio es una versión nueva, la más reciente arriba. El número de la primera es el que sale en ⓘ (arriba en la cinta).
 
+## v1.113 · 2026-11-13 · Ctrl+A selecciona solo el documento
+- En lectura, Ctrl+A selecciona solo el texto del archivo abierto (sin árbol, pestañas ni números de línea); con la vista dividida, solo el lado activo.
+- En cuadros de texto, el editor y la consola sigue como siempre.
+
 ## v1.112 · 2026-11-13 · Descartar un cambio desde el aviso de fusionar
 - En la tabla de «No se puede fusionar», cada archivo tiene «↶ Descartar» (pide confirmación). Cuando ya no queda ninguno, se fusiona sola.
 

@@ -5164,6 +5164,25 @@ function findReplace(all) {
     else if (e.key === 'Escape' && !$('#find').hidden && !e.target.closest?.('input, textarea')) { e.stopImmediatePropagation(); findClose(); }
   });
 }
+// Ctrl+A en lectura: solo el contenido del documento del lado activo (sin árbol, pestañas, migas ni números de
+// línea). En cuadros de texto, editores y la consola manda el navegador/CodeMirror. Vistas sin texto (imagen, vídeo,
+// ficha): no selecciona nada. PDF: solo el texto de las páginas ya dibujadas.
+addEventListener('keydown', e => {
+  if (!e.ctrlKey || e.altKey || e.shiftKey || e.key.toLowerCase() !== 'a' || e.defaultPrevented || modalOpen()) return;
+  const t = e.target;
+  if (t.closest?.('input, textarea, select, [contenteditable=""], [contenteditable=true], .CodeMirror, #panel, #ia, #find, aside')) return;
+  const V = $('#view');
+  if (!V) return;
+  e.preventDefault();
+  const cm = V.querySelector('.CodeMirror')?.CodeMirror; // editor visible sin foco: todo su texto
+  if (cm) { cm.focus(); return cm.execCommand('selectAll'); }
+  // por prioridad (no en orden del documento): código, Word, Markdown/texto, páginas del PDF, tabla
+  const el = ['.code code.hljs', '.docx-wrapper', '.page', '.md'].map(s => V.querySelector(s)).find(Boolean)
+    || V.querySelector('.textLayer')?.closest('[data-n]')?.parentElement || V.querySelector('table');
+  if (!el) return getSelection().removeAllRanges();
+  const r = document.createRange(); r.selectNodeContents(el);
+  getSelection().removeAllRanges(); getSelection().addRange(r);
+});
 CodeMirror.commands.save = () => cur && (edits.has(cur) ? save(cur) : wedit?.path === cur ? wordSave() : iedit?.path === cur ? imageSave() : pedit?.path === cur && pdfSave());
 addEventListener('keydown', e => {
   // si el foco está en el editor, CodeMirror ya lo gestionó (defaultPrevented): evita guardar dos veces
