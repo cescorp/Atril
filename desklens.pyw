@@ -155,6 +155,9 @@ SETTINGS = [
     ("historial_dias", "Historial de cambios", "Borrar el historial de un archivo tras (días sin editarlo)", 7, 1, 3650),
     ("historial_mb", "Historial de cambios", "Espacio máximo de todo el historial (MB)", 1000, 50, 100000),
     ("historial_pausa_seg", "Historial de cambios", "Al escribir, un paso nuevo tras una pausa de (segundos)", 2, 1, 30),
+    ("historial_fuera", "Historial de cambios", "Guardar también los cambios hechos fuera de DeskLens (otros programas, IA…) en los proyectos y sueltos", True, None, None),
+    ("historial_fuera_seg", "Historial de cambios", "Cambios hechos fuera: guardar cuando el archivo lleva (segundos) sin cambiar", 10, 2, 600),
+    ("historial_fuera_mb", "Historial de cambios", "Cambios hechos fuera: tamaño máximo del archivo (MB)", 1, 1, 50),
     # lista de opciones: valor por defecto de texto y en «mínimo» las opciones (valor, nombre)
     ("web_buscador", "Web", "Buscador de la pestaña web (Google, Bing, Yahoo y Wikipedia se ven dentro de DeskLens; los demás, con «Abrir en el navegador»)",
      "google", [("google", "Google"), ("bing", "Bing"), ("yahoo", "Yahoo"), ("wikipedia", "Wikipedia (español)"),
@@ -2124,25 +2127,112 @@ def line_history_git(path, texto, linea):
     return {"git": True, "versiones": vers}
 
 
+# ---------- cambios hechos fuera de DeskLens (otros programas, IA…) ----------
+# Los detecta el índice (en cada repaso) y, en Windows, el vigilante de carpetas tras unos segundos sin cambios.
+# Cada uno es un paso «📂 Cambiado fuera» (tipo «fuera») con el archivo entero comprimido, como los demás pasos.
+HIST_SKIP = {".git", "node_modules", "vendor", "__pycache__", ".venv", "venv", "dist", "build"}  # carpetas generadas
+
+
+def hist_external(path, before=None):
+    """Guarda el archivo tal como está en disco si cambió fuera de DeskLens (no hay paso con su mtime).
+    before: su texto anterior (el del índice); solo se usa si el archivo aún no tiene historial, como punto de partida.
+    Solo texto de hasta N MB y fuera de carpetas generadas y del propio historial. True si añadió un paso."""
+    p = Path(path)
+    if (not ajuste("historial_fuera") or hist_kind(p) != "texto" or HIST_SKIP & set(p.parts)
+            or p.is_relative_to(HIST_DIR.parent)):
+        return False
+    try:
+        st = p.stat()
+        if st.st_size > ajuste("historial_fuera_mb") * 1_000_000:
+            return False
+        text, _, cut = read_text(p)
+    except OSError:
+        return False
+    if text is None or cut:
+        return False
+    data, m = text.replace("\r\n", "\n").encode("utf-8"), str(st.st_mtime_ns)
+    with _hist_lock:
+        meta = hist_meta(p)
+        if hist_disk_node(p, meta):
+            return False  # ya está (lo guardó DeskLens o ya se anotó)
+        last = meta["actual"] and next((n for n in meta["nodos"] if n["id"] == meta["actual"]), None)
+        f = last and hist_dir(p) / f"{last['id']}.dat"
+        if f and f.exists() and gzip.decompress(f.read_bytes()) == data:
+            last["mtime"] = m  # solo cambió la fecha: el paso actual ya es este contenido
+            _hist_write_meta(p, meta)
+            return False
+        if not meta["nodos"] and before is not None and before.replace("\r\n", "\n").encode("utf-8") != data:
+            _hist_add(meta, p, None, "📂 Antes (lo que tenía el índice)", before.replace("\r\n", "\n").encode("utf-8"),
+                      {"tipo": "abierto"})
+        _hist_add(meta, p, meta["actual"], "📂 Cambiado fuera de DeskLens", data, {"tipo": "fuera", "mtime": m})
+        _hist_thin(hist_dir(p), meta)
+        _hist_write_meta(p, meta)
+    return True
+
+
+def _hist_drop(d, meta, nid):
+    """Quita un paso del árbol: sus hijos pasan a colgar de su padre (deshacer sigue llegando más atrás)."""
+    node = next(n for n in meta["nodos"] if n["id"] == nid)
+    for n in meta["nodos"]:
+        if n.get("padre") == nid:
+            n["padre"] = node.get("padre")
+    meta["nodos"].remove(node)
+    for ext in ("dat", "base"):
+        (d / f"{nid}.{ext}").unlink(missing_ok=True)
+
+
+def _hist_thin(d, meta, now=None):
+    """Aclarado de los pasos «Cambiado fuera» de un archivo: todos los de la última hora, uno por hora en el último
+    día y uno por día antes (el más nuevo de cada tramo). Así una IA que escribe mucho no llena el disco."""
+    now = now or time.time()
+    keep, seen = {meta.get("actual")}, set()
+    for n in sorted((n for n in meta["nodos"] if n.get("tipo") == "fuera"), key=lambda n: n["id"], reverse=True):
+        t = int(n["id"], 16) / 1e9
+        age = now - t
+        slot = n["id"] if age < 3600 else ("h", int(t // 3600)) if age < 86400 else ("d", int(t // 86400))
+        if slot in seen and n["id"] not in keep:
+            _hist_drop(d, meta, n["id"])
+        seen.add(slot)
+
+
 def hist_cleanup():
-    """Borra el historial de los archivos sin actividad desde hace N días y, si todo pasa del tope, los más viejos.
+    """Borra el historial de los archivos sin actividad desde hace N días y, si todo pasa del tope, los pasos más viejos
+    de todos los archivos de texto (nunca el paso actual ni copias de partida); si aún no basta, archivos enteros.
     Corre en el hilo del índice (al arrancar y en cada repaso), no en cada paso: recorre todo el historial."""
     if not HIST_DIR.is_dir():
         return
     with _hist_lock:  # no borra una carpeta mientras hist_step escribe en ella
         limit, cap = time.time() - ajuste("historial_dias") * 86400, ajuste("historial_mb") * 1_000_000
-        folders = []
+        folders, metas = [], {}
         for d in HIST_DIR.iterdir():
             try:
-                last = json.loads((d / "meta.json").read_text(encoding="utf-8")).get("ultimo", 0)
+                meta = json.loads((d / "meta.json").read_text(encoding="utf-8"))
+                last = meta.get("ultimo", 0)
             except (OSError, ValueError):
-                last = d.stat().st_mtime
+                meta, last = None, d.stat().st_mtime
             if last < limit:
                 shutil.rmtree(d, ignore_errors=True)
             else:
                 folders.append((last, d, sum(f.stat().st_size for f in d.iterdir())))
+                if meta and hist_kind(meta.get("ruta", "")) == "texto":
+                    metas[d] = meta
         total = sum(s for _, _, s in folders)
-        for last, d, size in sorted(folders):  # ponytail: se borra el historial entero del archivo más viejo, no paso a paso
+        if total > cap:  # primero, pasos sueltos: del más viejo al más nuevo, en todos los archivos a la vez
+            steps = sorted((n["id"], d) for d, meta in metas.items() for n in meta["nodos"]
+                           if n["id"] != meta.get("actual") and not n.get("base"))
+            touched = set()
+            for nid, d in steps:
+                if total <= cap:
+                    break
+                size = sum(f.stat().st_size for f in (d / f"{nid}.dat", d / f"{nid}.base") if f.exists())
+                _hist_drop(d, metas[d], nid)
+                total -= size
+                touched.add(d)
+            for d in touched:  # sin tocar «ultimo»: aclarar no es actividad
+                (d / "meta.tmp").write_text(json.dumps(metas[d], ensure_ascii=False), encoding="utf-8")
+                os.replace(d / "meta.tmp", d / "meta.json")
+            folders = [(last, d, sum(f.stat().st_size for f in d.iterdir())) for last, d, _ in folders if d.exists()]
+        for last, d, size in sorted(folders):  # si los pasos no bastan: el historial entero del archivo más viejo
             if total <= cap:
                 break
             shutil.rmtree(d, ignore_errors=True)
@@ -2364,8 +2454,10 @@ def idx_conn():
     return c
 
 
-def idx_file(c, p, root):
-    """Indexa un archivo si cambió (tamaño o fecha). True si hizo algo."""
+def idx_file(c, p, root, hist=False):
+    """Indexa un archivo si cambió (tamaño o fecha). True si hizo algo.
+    hist: el cambio vino de fuera de DeskLens (repaso o vigilante): se anota en el historial, con el texto que tenía
+    el índice como «antes». Los guardados de DeskLens no (su paso lo marca la ventana)."""
     try:
         st = p.stat()
     except OSError:
@@ -2373,6 +2465,12 @@ def idx_file(c, p, root):
     row = c.execute("select size, mtime from files where path=?", (str(p),)).fetchone()
     if row and row[0] == st.st_size and row[1] == st.st_mtime_ns:
         return False
+    if row and hist:
+        old = c.execute("select body from docs where path=? and page=0", (str(p),)).fetchone()
+        try:
+            hist_external(p, old and old[0])
+        except Exception:  # el historial nunca para el índice
+            pass
     estado, error, text = "ok", None, None
     try:
         if p.suffix.lower() == ".pdf":
@@ -2385,7 +2483,8 @@ def idx_file(c, p, root):
             estado = "ok" if text is not None else "binario"
     except Exception as e:  # cualquier archivo raro no debe parar el índice
         estado, error = "error", str(e)[:300]
-    c.execute("delete from docs where path=?", (str(p),))
+    if row:  # FTS5 no tiene índice por ruta: este borrado recorre la tabla; en la primera indexación no hace falta
+        c.execute("delete from docs where path=?", (str(p),))
     if text:
         c.execute("insert into docs values (?, 0, ?)", (str(p), text))
     c.execute("insert or replace into files values (?,?,?,?,?,?,?,?,?,?,?)",
@@ -2443,7 +2542,7 @@ def idx_pass():
     try:
         for i, (p, root) in enumerate(targets, 1):
             idx_state.update(actual=str(p), hechos=i)
-            if idx_file(c, p, root) and i % 100 == 0:
+            if idx_file(c, p, root, hist=True) and i % 100 == 0:
                 c.commit()  # cada 100: si se cierra DeskLens, lo hecho queda guardado
             idx_rest()
         c.commit()
@@ -2465,13 +2564,14 @@ def idx_pass():
 
 def indexer():
     """Hilo del índice: una pasada al arrancar y luego cada N minutos, o antes si se añade un proyecto (idx_wake).
-    En cada vuelta también limpia el historial de cambios (días y tope de MB)."""
+    En cada vuelta también limpia el historial de cambios (días y tope de MB) y pone al día el vigilante."""
     idx_background()
     while True:
         try:
             hist_cleanup()
         except OSError:
             pass
+        watch_sync()
         try:
             idx_pass()
         except Exception as e:
@@ -2480,12 +2580,91 @@ def indexer():
         idx_wake.clear()
 
 
-def idx_update(path):
-    """Tras guardar o crear desde DeskLens: el índice queda al día al momento."""
+# ---------- vigilante (Windows): avisos de cambios en las carpetas, sin recorrerlas ----------
+# Un hilo por carpeta de proyecto (con subcarpetas) y por carpeta de sueltos (solo esos archivos) espera los avisos de
+# Windows (ReadDirectoryChangesW); sin cambios no gasta nada. Cada archivo avisado espera N segundos sin cambiar
+# (una IA que hace 30 ediciones seguidas deja un solo paso) y entonces se reindexa y se anota en el historial.
+# Lo que se escape (DeskLens cerrado, demasiados avisos de golpe) lo recoge el siguiente repaso del índice.
+_watching = {}  # carpeta → None (proyecto, con subcarpetas) o conjunto de sueltos (normcase) que se vigilan en ella
+_pending = {}  # archivo → momento del último aviso
+
+
+def watch_sync():
+    """Arranca un hilo por cada carpeta nueva que vigilar y deja ir las que ya no están (o con el ajuste apagado).
+    ponytail: solo Windows; en macOS/Linux los cambios de fuera se anotan en el repaso del índice."""
+    if os.name != "nt":
+        return
+    cfg, want = load_config(), {}
+    if ajuste("historial_fuera"):
+        for r in cfg.get("proyectos", []):
+            want[os.path.normcase(str(Path(r)))] = None
+        for s in cfg.get("sueltos", []):
+            k = os.path.normcase(str(Path(s).parent))
+            if want.get(k, set()) is not None:
+                want.setdefault(k, set()).add(os.path.normcase(str(Path(s))))
+    for k in list(_watching):
+        if k not in want:
+            del _watching[k]  # su hilo termina con el siguiente aviso
+    for k, files in want.items():
+        if k in _watching:
+            _watching[k] = files
+        elif os.path.isdir(k):  # si no se alcanza ahora (disco desconectado), se reintenta en el próximo repaso
+            _watching[k] = files
+            threading.Thread(target=watch_dir, args=(k,), daemon=True).start()
+
+
+def watch_dir(root):
+    """Espera avisos de Windows en una carpeta y apunta cada archivo cambiado, creado o renombrado en _pending."""
+    import ctypes
+    from ctypes import wintypes
+    k = ctypes.windll.kernel32
+    k.CreateFileW.restype = wintypes.HANDLE
+    # FILE_LIST_DIRECTORY, compartida para leer/escribir/borrar, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS (carpeta)
+    h = k.CreateFileW(root, 0x1, 0x7, None, 3, 0x02000000, None)
+    if not h or h == wintypes.HANDLE(-1).value:
+        _watching.pop(root, None)
+        return
+    buf, got = ctypes.create_string_buffer(65536), wintypes.DWORD()
+    try:
+        while root in _watching:
+            files = _watching.get(root)
+            # subcarpetas solo en proyectos; avisos de nombre (guardar = temporal + renombrar) y de escritura
+            if not k.ReadDirectoryChangesW(h, buf, len(buf), files is None, 0x1 | 0x10, ctypes.byref(got), None, None):
+                return
+            raw, off = buf.raw[:got.value], 0
+            while off + 12 <= len(raw):  # FILE_NOTIFY_INFORMATION: siguiente, acción, largo del nombre, nombre UTF-16
+                nxt, action, ln = (int.from_bytes(raw[off + i:off + i + 4], "little") for i in (0, 4, 8))
+                p = os.path.join(root, raw[off + 12:off + 12 + ln].decode("utf-16-le"))
+                if action in (1, 3, 5) and (files is None or os.path.normcase(p) in files):  # creado, cambiado, renombrado
+                    _pending[p] = time.monotonic()
+                if not nxt:
+                    break
+                off += nxt
+    finally:
+        k.CloseHandle(h)
+
+
+def watch_flush():
+    """Cada segundo: los archivos que llevan N segundos sin avisos se reindexan y se anotan en el historial."""
+    idx_background()
+    own = os.path.normcase(str(HIST_DIR.parent)) + os.sep  # historial/ (índice incluido): cambiarlo no avisa a nadie
+    while True:
+        time.sleep(1)
+        quiet, now = ajuste("historial_fuera_seg"), time.monotonic()
+        for p, t in list(_pending.items()):
+            if now - t >= quiet and _pending.get(p) == t:
+                del _pending[p]
+                if not os.path.normcase(p).startswith(own) and os.path.isfile(p):
+                    idx_update(p, hist=True)
+
+
+def idx_update(path, hist=False):
+    """Tras guardar o crear desde DeskLens: el índice queda al día al momento.
+    hist=True: lo llama el vigilante (cambio hecho fuera), que además se anota en el historial."""
     p = Path(path).resolve()
     try:
         c = idx_conn()
-        idx_file(c, p, project_of(p) or p.parent)
+        idx_file(c, p, project_of(p) or p.parent, hist)
         c.commit()
         c.close()
     except sqlite3.Error:
@@ -2893,28 +3072,9 @@ def git_do(repo, *args, timeout=60, stdin=None):
     return r.stdout.decode("utf-8", "replace")
 
 
-def git_overview(path):
-    """Estado del repositorio para la vista Git: rama, remota, commits por subir/bajar, ramas locales y los archivos
-    preparados, con cambios y en conflicto (estado de una letra como VS Code: M, A, D, R, U = sin seguimiento)."""
-    repo = repo_of(path)
-    # en Windows cada proceso de git cuesta ~40 ms: las consultas sueltas van en paralelo mientras corre el status
-    with ThreadPoolExecutor(8) as ex:
-        q = {k: ex.submit(git_run, repo, *a) for k, a in {
-            "ramas": ("branch", "--format=%(refname:short)"),
-            "remotas": ("branch", "-r", "--format=%(refname:short)"),
-            "head": ("rev-parse", "-q", "--verify", "HEAD"),
-            "up": ("rev-parse", "-q", "--verify", "@{u}"),
-            "remotos": ("remote",),
-            "stash": ("-c", "core.quotePath=false", "stash", "list", "--format=%gd\x1f%s\x1f%cr"),
-            "merge": ("rev-parse", "-q", "--verify", "MERGE_HEAD"),
-            "revert": ("rev-parse", "-q", "--verify", "REVERT_HEAD"),
-            # cada rama local con la remota que sigue y cuánto va por delante/detrás: «[ahead 3, behind 2]», «[gone]»
-            "track": ("for-each-ref", "--format=%(refname:short)\x1f%(upstream:short)\x1f%(upstream:track)", "refs/heads"),
-            "urls": ("config", "--get-regexp", r"^remote\..*\.url$"),
-            "worktrees": ("worktree", "list", "--porcelain")}.items()}
-        fetched = ex.submit(git_fetch_time, repo)
-        out = git_do(repo, "-c", "core.quotePath=false", "status", "--porcelain=v1", "-z", "--branch", "--untracked-files=all")
-        q = {k: f.result() for k, f in q.items()}
+def git_status_parse(out, repo=Path()):
+    """Salida de «git status --porcelain=v1 -z --branch» → rama, remota, adelante, atrás y las listas de archivos
+    preparados, con cambios y en conflicto ({estado, rel, ruta})."""
     entries = out.split("\0")
     head = entries[0][3:] if entries and entries[0].startswith("## ") else ""
     # «main...origin/main [ahead 1, behind 2]» · «No commits yet on main» · «HEAD (no branch)»
@@ -2940,9 +3100,35 @@ def git_overview(path):
                 staged.append(item(xy[0]))
             if xy[1] not in " ?!":
                 changes.append(item(xy[1]))
+    return branch, upstream, num("ahead"), num("behind"), staged, changes, conflicts
+
+
+def git_overview(path):
+    """Estado del repositorio para la vista Git: rama, remota, commits por subir/bajar, ramas locales y los archivos
+    preparados, con cambios y en conflicto (estado de una letra como VS Code: M, A, D, R, U = sin seguimiento)."""
+    repo = repo_of(path)
+    # en Windows cada proceso de git cuesta ~40 ms: las consultas sueltas van en paralelo mientras corre el status
+    with ThreadPoolExecutor(8) as ex:
+        q = {k: ex.submit(git_run, repo, *a) for k, a in {
+            "ramas": ("branch", "--format=%(refname:short)"),
+            "remotas": ("branch", "-r", "--format=%(refname:short)"),
+            "head": ("rev-parse", "-q", "--verify", "HEAD"),
+            "up": ("rev-parse", "-q", "--verify", "@{u}"),
+            "remotos": ("remote",),
+            "stash": ("-c", "core.quotePath=false", "stash", "list", "--format=%gd\x1f%s\x1f%cr"),
+            "merge": ("rev-parse", "-q", "--verify", "MERGE_HEAD"),
+            "revert": ("rev-parse", "-q", "--verify", "REVERT_HEAD"),
+            # cada rama local con la remota que sigue y cuánto va por delante/detrás: «[ahead 3, behind 2]», «[gone]»
+            "track": ("for-each-ref", "--format=%(refname:short)\x1f%(upstream:short)\x1f%(upstream:track)", "refs/heads"),
+            "urls": ("config", "--get-regexp", r"^remote\..*\.url$"),
+            "worktrees": ("worktree", "list", "--porcelain")}.items()}
+        fetched = ex.submit(git_fetch_time, repo)
+        out = git_do(repo, "-c", "core.quotePath=false", "status", "--porcelain=v1", "-z", "--branch", "--untracked-files=all")
+        q = {k: f.result() for k, f in q.items()}
+    branch, upstream, ahead, behind, staged, changes, conflicts = git_status_parse(out, repo)
     git_cache.pop(repo, None)  # el punto de color del árbol se pone al día con lo que se acaba de ver
     return {"repositorio": str(repo), "nombre": repo.name, "rama": branch, "remota": upstream,
-            "adelante": num("ahead"), "atras": num("behind"),
+            "adelante": ahead, "atras": behind,
             "ramas": q["ramas"].splitlines(),
             "ramas_remotas": [b for b in q["remotas"].splitlines() if not b.endswith("/HEAD") and "/" in b],
             "punta": q["head"] + ":" + q["up"],
@@ -3151,11 +3337,12 @@ def git_fetch_time(repo):
 
 def git_summary():
     """Estado de git de cada proyecto para el selector de la vista Git: rama, ↓↑ y número de cambios (None si no es git)."""
-    def one(r):
+    def one(r):  # un solo «git status» por proyecto (git_overview lanza ~13 procesos: el menú tardaba)
         try:
-            ov = git_overview(r)
-            return {"ruta": r, "rama": ov["rama"], "remota": ov["remota"], "adelante": ov["adelante"],
-                    "atras": ov["atras"], "cambios": len(ov["cambios"]) + len(ov["preparados"]) + len(ov["conflictos"])}
+            out = git_do(repo_of(r), "-c", "core.quotePath=false", "status", "--porcelain=v1", "-z", "--branch", "--untracked-files=all")
+            branch, upstream, ahead, behind, staged, changes, conflicts = git_status_parse(out)
+            return {"ruta": r, "rama": branch, "remota": upstream, "adelante": ahead, "atras": behind,
+                    "cambios": len(changes) + len(staged) + len(conflicts)}
         except (ValueError, OSError, subprocess.TimeoutExpired):
             return {"ruta": r, "rama": None}
     with ThreadPoolExecutor(4) as ex:  # los proyectos a la vez, no uno tras otro
@@ -4775,6 +4962,7 @@ def main():
     if server:
         threading.Thread(target=watchdog, args=(server,), daemon=True).start()
         threading.Thread(target=indexer, daemon=True).start()  # también limpia el historial de cambios
+        threading.Thread(target=watch_flush, daemon=True).start()  # cambios hechos fuera → historial
         threading.Thread(target=git_autofetch, daemon=True).start()  # ↓ al día sin pulsar Fetch
         server.serve_forever()
         for r in runs.values():  # al cerrar la ventana no quedan programas corriendo

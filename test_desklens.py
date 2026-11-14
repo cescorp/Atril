@@ -2,6 +2,7 @@
 import importlib.machinery
 import importlib.util
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -560,6 +561,45 @@ assert.deepStrictEqual(findRefs('Ver 1 Samuel 4:4 y 1 Samuel 8:5, 20; Deuteronom
     # freno del indexador: al 20 %, 0,1 s de trabajo → 0,4 s de descanso
     desklens._idx_busy[0] = time.monotonic() - 0.1; t0 = time.monotonic(); desklens.idx_rest()
     assert 0.3 < time.monotonic() - t0 < 1
+
+    # cambios hechos fuera de DeskLens: el repaso los anota con el texto del índice como «antes»
+    hist_bak = desklens.HIST_DIR; desklens.HIST_DIR = tmp / "hfuera" / "versiones"  # su carpeta padre no se vigila
+    ext = proj / "fuera.txt"; ext.write_text("uno\n", encoding="utf-8"); desklens.idx_pass()
+    assert desklens.hist_public(ext)["nodos"] == []  # recién llegado: solo se indexa
+    ext.write_text("uno\ndos\n", encoding="utf-8"); os.utime(ext, ns=(time.time_ns(), time.time_ns() + 10**9)); desklens.idx_pass()
+    h = desklens.hist_public(ext)
+    assert [n.get("tipo") for n in h["nodos"]] == ["abierto", "fuera"] and h["disco"] == h["actual"]
+    assert desklens.hist_data(ext, h["nodos"][0]["id"]) == b"uno\n" and desklens.hist_data(ext, h["actual"]) == b"uno\ndos\n"
+    os.utime(ext, ns=(time.time_ns(), time.time_ns() + 2 * 10**9)); desklens.idx_pass()  # solo la fecha: no hay paso nuevo
+    assert len(desklens.hist_public(ext)["nodos"]) == 2 and desklens.hist_public(ext)["disco"]
+    (proj / "node_modules").mkdir(); gen = proj / "node_modules" / "x.js"; gen.write_text("a"); desklens.idx_pass()
+    gen.write_text("ab"); os.utime(gen, ns=(time.time_ns(), time.time_ns() + 10**9)); desklens.idx_pass()
+    assert desklens.hist_public(gen)["nodos"] == []  # carpetas generadas: no
+    # aclarado: de 6 pasos «ext» (2 en la última hora, 2 en la misma hora de ayer, 2 el mismo día hace una semana)
+    now = time.time() // 86400 * 86400 + 12.5 * 3600  # a media hora y medio día: los pares caen en el mismo tramo
+    ids = [f"{int((now - a) * 1e9):x}" for a in (7 * 86400 + 60, 7 * 86400, 7200 + 60, 7200, 120, 60)]
+    meta = {"nodos": [{"id": x, "padre": ids[i - 1] if i else None, "tipo": "fuera"} for i, x in enumerate(ids)], "actual": ids[-1]}
+    dd = tmp / "thin"; dd.mkdir(); desklens._hist_thin(dd, meta, now)
+    assert [n["id"] for n in meta["nodos"]] == [ids[1], ids[3], ids[4], ids[5]] and meta["nodos"][1]["padre"] == ids[1]
+    # tope: sobran pasos → se quitan los más viejos de todos los archivos, nunca el actual
+    used = sum(f.stat().st_size for f in desklens.hist_dir(ext).iterdir())
+    desklens.ajustes()["historial_mb"] = (used - 1) / 1e6; desklens.hist_cleanup(); desklens._settings = None
+    h = desklens.hist_public(ext)
+    assert [n["id"] for n in h["nodos"]] == [h["actual"]] and desklens.hist_data(ext, h["actual"]) == b"uno\ndos\n"
+    # vigilante (Windows): un cambio llega a _pending al momento, sin recorrer nada
+    if os.name == "nt":
+        desklens.watch_sync(); time.sleep(0.3)
+        ext.write_text("uno\ndos\ntres\n", encoding="utf-8")
+        for _ in range(30):
+            if any(os.path.normcase(p) == os.path.normcase(str(ext)) for p in desklens._pending):
+                break
+            time.sleep(0.1)
+        else:
+            raise AssertionError("el vigilante no avisó")
+        desklens.idx_update(ext, hist=True)
+        assert desklens.hist_data(ext, desklens.hist_public(ext)["actual"]) == b"uno\ndos\ntres\n"
+        desklens._watching.clear()
+    desklens.HIST_DIR = hist_bak
 
     # git: estado por archivo con un repositorio real y metadatos del modal (i)
     if shutil.which("git"):
