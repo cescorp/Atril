@@ -1,6 +1,14 @@
 # Novedades de DeskLens
 Cada cambio es una versión nueva, la más reciente arriba. El número de la primera es el que sale en ⓘ (arriba en la cinta).
 
+## v1.128 · 2026-11-14 · Fusionar: «Se fusionan sin problemas» en una barra verde y pestaña elegida sin fondo
+- «Se unen solos» pasa a llamarse «✓ Se fusionan sin problemas», con la frase «git los junta automáticamente: no hay nada que elegir».
+- Es una barra con fondo verde suave: se nota que está todo bien, y un clic en cualquier parte de la barra abre o cierra la lista.
+- La pestaña elegida al ver un archivo ya no lleva fondo verde: queda blanca, con el borde y el título en verde.
+- Las dos listas (los archivos por decidir y los que se fusionan sin problemas) llevan una primera columna «#» con el número de cada fila.
+- «👁 Ver cambios» de un archivo que se fusiona sin problemas enseña dos columnas, «lo que tienes ahora | así quedará», con una frase arriba: si solo cambió la otra rama, si las dos cambiaron partes distintas (git junta las dos), si llega nuevo o si se borra.
+- La barra de cambios de la derecha es más ancha y hace de barra de desplazamiento: marca con un recuadro el trozo que se ve, se puede arrastrar, y una línea cambiada sale mitad roja, mitad verde.
+
 ## v1.127 · 2026-11-14 · Fusionar: la opción elegida se ve en verde
 - La pestaña de la opción elegida se marca en verde fuerte (fondo, borde y título).
 - Con una opción ya elegida, el botón de arriba dice «✓ Guardar y volver», en verde y más grande; «Guardar y volver a la lista» de «Editar manualmente» también va en verde.
