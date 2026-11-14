@@ -1,6 +1,11 @@
 # Novedades de DeskLens
 Cada cambio es una versión nueva, la más reciente arriba. El número de la primera es el que sale en ⓘ (arriba en la cinta).
 
+## v1.126 · 2026-11-14 · Fusionar: los archivos por decidir en una tabla
+- En vez de una tarjeta grande por archivo, una tabla: archivo, ubicación, qué pasa y una lista para elegir cómo queda. Un clic en el título de una columna la ordena; si la ubicación es larga se ve su final.
+- «Ver y elegir» ahora se llama «Ver detalles» (elegir ya se puede desde la tabla). Los commits que llegan van plegados.
+- «Falta decidir N archivos» sale en rojo y no deja fusionar hasta decidirlos todos.
+
 ## v1.125 · 2026-11-14 · Historial de lo que cambia fuera de DeskLens
 - Lo que cambias con otros programas o con una IA en tus proyectos y sueltos queda en el historial del archivo como «📂 Cambiado fuera de DeskLens». En Windows se guarda cuando el archivo lleva 10 segundos sin cambiar (si la IA escribe muchas veces seguidas, queda un solo paso); lo que pase con DeskLens cerrado se anota en el siguiente repaso.
 - Solo texto de hasta 1 MB, sin carpetas generadas (node_modules, vendor, dist, build…). Para no llenar el disco se quedan todos los de la última hora, uno por hora del último día y uno por día de antes; y al pasar del tope de MB se borran primero los pasos más viejos de todos los archivos, no el historial entero de uno.

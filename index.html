@@ -791,6 +791,17 @@ dialog#dlg.sets.mg{width:min(1200px,calc(100vw - 32px));height:min(760px,calc(10
 .mgone .mgrow{padding:12px 16px}.mgone .mgrow.ok{background:color-mix(in srgb,#2e8b57 6%,transparent);border-color:color-mix(in srgb,#2e8b57 35%,var(--line))}
 .mgone .mgrow.lock{background:color-mix(in srgb,#d33 6%,transparent);border-color:color-mix(in srgb,#d33 35%,var(--line))}
 .mgone .mghead b{font-size:14.5px}.mgwhy{margin:4px 0 10px;color:var(--muted)}
+.mgsum{margin:0 0 12px;padding:8px 12px;border-radius:8px;background:color-mix(in srgb,#c08a00 10%,var(--paper));font-size:13px}
+.mgcommits{margin-bottom:10px}.mgcommits summary{cursor:pointer;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase}
+.mgtab{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed}
+.mgtab th{text-align:left;font-size:11.5px;color:var(--muted);font-weight:600;padding:6px 8px;border-bottom:1px solid var(--line);cursor:pointer;user-select:none;white-space:nowrap}
+.mgtab th:hover{color:var(--ink)}.mgtab th:nth-child(1){width:24px}.mgtab th:nth-child(2){width:18%}.mgtab th:nth-child(3){width:20%}.mgtab th:nth-child(5){width:190px}.mgtab th:nth-child(6){width:100px;cursor:default}
+.mgtab td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:middle;overflow:hidden;text-overflow:ellipsis}
+.mgtab td:nth-child(2){white-space:nowrap}.mgtab td:nth-child(4){font-size:12px}.mgtab select{width:100%}
+.mgtab .mgdir{white-space:nowrap;direction:rtl;text-align:left}.mgtab .mgdir>span{direction:ltr;unicode-bidi:embed}/* ruta larga: se ve el final */
+.mgtab tr.ok{background:color-mix(in srgb,#2e8b57 6%,transparent)}.mgtab tr.lock{background:color-mix(in srgb,#d33 6%,transparent)}
+.mgtab tr.todo td:first-child{color:#c08a00}.mgtab tr.ok td:first-child{color:#2e8b57}
+small.mgleft{color:#d33!important;font-weight:700;font-size:12.5px!important}
 .mgradios{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:8px}
 .mgradios label{display:flex;gap:10px;align-items:flex-start;padding:9px 12px;border:1px solid var(--line);border-radius:8px;cursor:pointer;background:var(--paper)}
 .mgradios label:hover{border-color:var(--navyhov)}.mgradios label.on{border-color:var(--navy);background:var(--navybg)}
@@ -2720,6 +2731,25 @@ async function mergeOneDialog(accion, rama, dec = {}, txt = {}) {
   const pl = (n, s, p = s + 's') => `${n} ${n === 1 ? s : p}`;
   const recheck = () => mergeOneDialog(accion, rama, dec, txt);
   const done = f => dec[f.rel] && (dec[f.rel] !== 'mano' || txt[f.rel] != null);
+  // Tabla de lo que hay que decidir: una fila por archivo, se ordena con un clic en el título de la columna
+  let sk = '', sdir = 1;
+  const dirOf = rel => rel.includes('/') ? rel.slice(0, rel.lastIndexOf('/')) : '';
+  const COLS = [['est', ''], ['nom', 'Archivo'], ['dir', 'Ubicación'], ['why', 'Qué pasa'], ['op', 'Quedará así']];
+  const key = (f, k) => k === 'est' ? (f.problema === 'bloqueado' ? 0 : done(f) ? 2 : 1) : k === 'nom' ? f.rel.split('/').pop() : k === 'dir' ? dirOf(f.rel)
+    : k === 'why' ? mergeWhy(f, from) : mergeChosen(f, from, dec, txt);
+  const mergeTable = () => {
+    const idx = items.map((_, i) => i);
+    if (sk) idx.sort((a, b) => sdir * String(key(items[a], sk)).localeCompare(String(key(items[b], sk)), 'es', { numeric: true }));
+    return `<table class="mgtab"><thead><tr>${COLS.map(([k, t]) => `<th data-sort="${k}" title="Ordenar">${t}${sk === k ? (sdir > 0 ? ' ▲' : ' ▼') : ''}</th>`).join('')}<th></th></tr></thead><tbody>${idx.map(i => {
+      const f = items[i], lock = f.problema === 'bloqueado', opts = mergeOptions(f, from), cur = dec[f.rel] || '';
+      const sel = lock ? '<span class="gc">🔒 Ciérralo en el otro programa</span>'
+        : `<select data-i="${i}" title="${esc(opts.find(o => o[0] === cur)?.[2] || 'Elige qué queda en este archivo')}">${cur ? '' : '<option value="">— elige —</option>'}${opts.map(([id, label, sub]) =>
+          `<option value="${id}" title="${esc(sub)}"${cur === id ? ' selected' : ''}>${esc(id === 'mano' && txt[f.rel] != null ? '✎ Editado manualmente' : label)}</option>`).join('')}</select>`;
+      return `<tr class="${lock ? 'lock' : done(f) ? 'ok' : 'todo'}"><td>${lock ? '🔒' : done(f) ? '✓' : '⚠'}</td><td title="${esc(f.rel)}"><b>${esc(f.rel.split('/').pop())}</b></td>
+        <td class="mgdir" title="${esc(dirOf(f.rel))}"><span>${esc(dirOf(f.rel)) || '<span class="gc">(raíz)</span>'}</span></td><td class="gc">${esc(mergeWhy(f, from))}</td><td>${sel}</td>
+        <td>${lock ? '' : `<button class="small" data-v="${i}">Ver detalles</button>`}</td></tr>`;
+    }).join('')}</tbody></table>`;
+  };
   const draw = () => {
     const locked = items.filter(f => f.problema === 'bloqueado'), todo = items.filter(f => f.problema !== 'bloqueado');
     const left = todo.filter(f => !done(f)).length;
@@ -2730,27 +2760,20 @@ async function mergeOneDialog(accion, rama, dec = {}, txt = {}) {
       al_dia: [`✅ Ya tienes todo lo de «${esc(from)}»`, 'No hay nada que traer.', '<button class="primary" data-x2>Cerrar</button>'],
     }[c.bloqueo];
     const card = BLOQ ? `<div class="mgcard ${c.bloqueo === 'al_dia' ? 'ok' : 'stop'}"><b>${BLOQ[0]}</b><p>${BLOQ[1]}</p><div class="mgcardacts">${BLOQ[2]}</div></div>`
-      : items.length ? `<div class="mgcard warn"><b>⚠️ Antes de fusionar, ${locked.length && !todo.length ? `cierra ${pl(locked.length, 'archivo')}` : `decide ${pl(items.length, 'archivo')}`}</b>
-          <p>Traes ${pl(c.commits, 'commit')} de «${esc(from)}» que ${c.commits === 1 ? 'cambia' : 'cambian'} ${pl(items.length + c.solos.length, 'archivo')}.${c.solos.length ? ` ${pl(c.solos.length, 'se une solo', 'se unen solos')}.` : ''}</p>
-          <p>En ${pl(items.length, 'archivo')} hay algo que elegir: abajo, cada uno dice qué pasa y qué hará cada opción. Nada se toca hasta pulsar «Fusionar».</p></div>`
+      : items.length ? `<p class="mgsum">⚠ <b>${locked.length && !todo.length ? `Cierra ${pl(locked.length, 'archivo')}` : `${pl(items.length, 'archivo')} por decidir`}</b> · traes ${pl(c.commits, 'commit')} de «${esc(from)}» que ${c.commits === 1 ? 'cambia' : 'cambian'} ${pl(items.length + c.solos.length, 'archivo')}${c.solos.length ? ` (${pl(c.solos.length, 'se une solo', 'se unen solos')})` : ''} · nada se toca hasta «${pull ? 'Traer' : 'Fusionar'}»</p>`
       : `<div class="mgcard ok"><b>✅ Se puede fusionar sin problemas</b><p>Traes ${pl(c.commits, 'commit')} de «${esc(from)}» que ${c.commits === 1 ? 'cambia' : 'cambian'} ${pl(c.solos.length, 'archivo')}. Nada choca con lo tuyo: git lo une solo.</p></div>`;
     d.className = 'sets mg mgone';
     d.innerHTML = `<header><b>${pull ? `Traer «${esc(from)}» a «${esc(gst.rama)}»` : `Fusionar «${esc(from)}» en «${esc(gst.rama)}»`}</b><span class="sp"></span>
         <button class="small" data-re title="Vuelve a mirarlo todo (p. ej. tras cerrar un archivo en otro programa)">⟳ Comprobar otra vez</button><button class="ic" data-x title="Cerrar (Esc)">✕</button></header>
       <div class="mgbody">${card}
-        ${c.bloqueo && c.bloqueo !== 'a_medias' ? '' : c.lista.length ? `<h4>Commits que llegan (${c.commits})</h4><div class="mglist">${c.lista.map(x => `<div>⎇ <span class="gc">${esc(dayKey(x.fecha))} ${hhmm(x.fecha)} · ${esc(x.autor)} ·</span> «${esc(x.mensaje)}»</div>`).join('')}${c.commits > c.lista.length ? `<div class="gc">… y ${c.commits - c.lista.length} más</div>` : ''}</div>` : ''}
-        ${items.length ? `<h4>Debes decidir (${items.length}${todo.length - left ? ` · ${todo.length - left} listo${todo.length - left === 1 ? '' : 's'}` : ''})</h4>${items.map((f, i) => `<section class="mgrow${f.problema === 'bloqueado' ? ' lock' : done(f) ? ' ok' : ''}">
-          <div class="mghead"><b>${f.problema === 'bloqueado' ? '🔒' : done(f) ? '✓' : '⚠'} ${esc(f.rel)}</b>${done(f) ? `<span class="mgchip">${esc(mergeChosen(f, from, dec, txt))}</span>` : ''}<span class="sp"></span>
-            ${f.problema === 'bloqueado' ? '' : `${dec[f.rel] === 'mano' && txt[f.rel] != null ? `<button class="small" data-ed="${i}">✎ Volver a editar</button>` : ''}<button class="small" data-v="${i}">👁 Ver y elegir</button>`}</div>
-          <p class="mgwhy">${esc(mergeWhy(f, from))}</p>
-          ${f.problema === 'bloqueado' ? '' : `<div class="mgradios">${mergeOptions(f, from).map(([id, label, sub]) => `<label class="${dec[f.rel] === id ? 'on' : ''}"><input type="radio" name="mg${i}" data-i="${i}" value="${id}" ${dec[f.rel] === id ? 'checked' : ''}><span><b>${esc(label)}</b><small>${esc(sub)}</small></span></label>`).join('')}</div>`}
-        </section>`).join('')}` : ''}
+        ${c.bloqueo && c.bloqueo !== 'a_medias' ? '' : c.lista.length ? `<details class="mgcommits"${items.length ? '' : ' open'}><summary>Commits que llegan (${c.commits})</summary><div class="mglist">${c.lista.map(x => `<div>⎇ <span class="gc">${esc(dayKey(x.fecha))} ${hhmm(x.fecha)} · ${esc(x.autor)} ·</span> «${esc(x.mensaje)}»</div>`).join('')}${c.commits > c.lista.length ? `<div class="gc">… y ${c.commits - c.lista.length} más</div>` : ''}</div></details>` : ''}
+        ${items.length ? `<h4>Debes decidir (${items.length}${todo.length - left ? ` · ${todo.length - left} listo${todo.length - left === 1 ? '' : 's'}` : ''})</h4>${mergeTable()}` : ''}
         ${c.solos.length ? `<details class="mgsolos"${items.length ? '' : ' open'}><summary><h4>Se unen solos (${c.solos.length})</h4></summary><div class="mglist">${c.solos.map((f, i) => `<div class="mgfile"><span class="ic2">${{ A: '➕', D: '🗑' }[f.estado] || '✓'}</span>
           <b title="${esc(f.rel)}">${esc(f.rel)}</b><span class="what">${esc({ A: `llega nuevo de «${from}»`, D: `se borra («${from}» lo borró)` }[f.estado] || `se actualiza con lo de «${from}»`)}</span>
           ${f.mas == null ? '<span class="gc">—</span>' : `<span class="pm"><i>+${f.mas}</i> <em>−${f.menos}</em></span>`}<button class="small" data-s="${i}">👁 Ver cambios</button></div>`).join('')}</div></details>` : ''}
       </div>
       <footer><div class="mgacts">${c.bloqueo ? '' : `<div><button class="primary" data-go ${left || locked.length ? 'disabled' : ''}>⤵ ${pull ? 'Traer' : 'Fusionar'}</button>
-          <small>${locked.length ? `Cierra ${pl(locked.length, 'archivo')} y pulsa ⟳ Comprobar otra vez.` : left ? `Falta decidir ${pl(left, 'archivo')}.` : `Trae ${c.commits === 1 ? 'el commit' : `los ${c.commits} commits`} y aplica lo que elegiste.`}</small></div>`}
+          <small${locked.length || left ? ' class="mgleft"' : ''}>${locked.length ? `Cierra ${pl(locked.length, 'archivo')} y pulsa ⟳ Comprobar otra vez.` : left ? `Falta decidir ${pl(left, 'archivo')}.` :`Trae ${c.commits === 1 ? 'el commit' : `los ${c.commits} commits`} y aplica lo que elegiste.`}</small></div>`}
         <div><button data-x3>Cancelar</button><small>No hace nada.</small></div></div></footer>`;
     d.querySelector('[data-x]').onclick = leave;
     d.querySelectorAll('[data-x2], [data-x3]').forEach(b => b.onclick = leave);
@@ -2760,12 +2783,12 @@ async function mergeOneDialog(accion, rama, dec = {}, txt = {}) {
     d.querySelector('[data-login]')?.addEventListener('click', () => { d.close(); gitLong('probar'); });
     const redraw = () => { const y = d.querySelector('.mgbody').scrollTop; draw(); d.querySelector('.mgbody').scrollTop = y; };
     // «Editar manualmente» abre el editor; si se cancela sin guardar, la fila vuelve a lo que tenía
-    d.querySelectorAll('input[type=radio]').forEach(r => r.onchange = () => {
+    d.querySelectorAll('.mgtab select').forEach(r => r.onchange = () => {
       const f = items[+r.dataset.i];
       if (r.value === 'mano' && txt[f.rel] == null) return mergeTwoView(f, from, c, dec, txt, redraw, true);
       dec[f.rel] = r.value; redraw();
     });
-    d.querySelectorAll('[data-ed]').forEach(b => b.onclick = () => mergeTwoView(items[+b.dataset.ed], from, c, dec, txt, redraw, true));
+    d.querySelectorAll('[data-sort]').forEach(th => th.onclick = () => { const k = th.dataset.sort; sdir = sk === k ? -sdir : 1; sk = k; redraw(); });
     d.querySelectorAll('[data-v]').forEach(b => b.onclick = () => mergeTwoView(items[+b.dataset.v], from, c, dec, txt, redraw));
     d.querySelectorAll('[data-s]').forEach(b => b.onclick = () => mergeSoloView(c.solos[+b.dataset.s], from, c));
     d.querySelector('[data-go]')?.addEventListener('click', async e => {
