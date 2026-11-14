@@ -1,6 +1,11 @@
 # Novedades de DeskLens
 Cada cambio es una versión nueva, la más reciente arriba. El número de la primera es el que sale en ⓘ (arriba en la cinta).
 
+## v1.123 · 2026-11-14 · El índice no molesta a otros programas y no se borra por error
+- Nuevo ajuste «Uso máximo del procesador al indexar» (Índice, 20 % de entrada): indexar tarda más pero ya no frena a los demás programas. En Windows, además, el índice va en segundo plano (CPU y disco con prioridad baja). Los PDF también respetan ese límite.
+- Si config.json falta o está vacío (por ejemplo, al moverlo a otra carpeta), el índice ya no se vacía. Lo de un proyecto en un disco desconectado también se conserva.
+- config.json se lee aunque el Bloc de notas le haya puesto BOM; si está roto, se guarda una copia en config.roto.json antes de que se escriba encima.
+
 ## v1.122 · 2026-11-13 · Sombrear lo que seleccionas y ver los cambios al editar a mano
 - Al seleccionar una palabra o trozo de una línea, todas sus apariciones se sombrean en amarillo: en el editor, en la lectura y en las comparaciones al fusionar (en el editor también se marcan en la barra de scroll).
 - «Editar manualmente» colorea en verde las líneas distintas de lo que tienes ahora y pone una raya roja donde se quitó algo; la barra de la derecha lo resume y lleva a cada cambio.

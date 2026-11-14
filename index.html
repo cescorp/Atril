@@ -4469,9 +4469,12 @@ async function pdfWorker() {
       for (let n = 1; n <= doc.numPages; n++) {
         pdfWork.pagina = n;
         if (n % 5 === 1) drawIdx();
+        const t0 = performance.now();
         const tc = await (await doc.getPage(n)).getTextContent();
         paginas.push({ n, texto: tc.items.map(it => it.str + (it.hasEOL ? '\n' : ' ')).join('') });
-        await sleep(15);
+        // mismo freno que el indexador: con «Uso máximo del procesador» al 20 %, 1 de trabajo y 4 de descanso
+        const pct = AJ.indice_cpu || 20;
+        await sleep(Math.max(15, (performance.now() - t0) * (100 - pct) / pct));
       }
       doc.destroy();
     } catch (e) { error = String(e?.message || e).slice(0, 300); }

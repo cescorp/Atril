@@ -548,6 +548,18 @@ assert.deepStrictEqual(findRefs('Ver 1 Samuel 4:4 y 1 Samuel 8:5, 20; Deuteronom
     t0 = time.time(); desklens.idx_pass(); assert time.time() - t0 < 5  # 2.ª pasada: solo lo que cambió
     (proj / "notas arca.md").unlink(); desklens.idx_pass()
     assert not desklens.search("filisteos")["contenido"] or all(x["nombre"] != "notas arca.md" for x in desklens.search("filisteos")["contenido"])
+    # config.json movido (sin proyectos): el índice no se vacía; roto: se aparta una copia; con BOM: se lee
+    cfg_txt, n = desklens.CONFIG.read_text(encoding="utf-8"), desklens.idx_status()["archivos"]
+    desklens.CONFIG.unlink(); desklens.idx_pass()
+    assert desklens.idx_status()["archivos"] == n > 0
+    desklens.CONFIG.write_text("{roto", encoding="utf-8")
+    roto = desklens.CONFIG.with_name("config.roto.json")
+    assert desklens.load_config()["proyectos"] == [] and roto.read_text(encoding="utf-8") == "{roto"
+    desklens.CONFIG.write_text(cfg_txt, encoding="utf-8-sig")
+    assert desklens.load_config() == json.loads(cfg_txt); roto.unlink()
+    # freno del indexador: al 20 %, 0,1 s de trabajo → 0,4 s de descanso
+    desklens._idx_busy[0] = time.monotonic() - 0.1; t0 = time.monotonic(); desklens.idx_rest()
+    assert 0.3 < time.monotonic() - t0 < 1
 
     # git: estado por archivo con un repositorio real y metadatos del modal (i)
     if shutil.which("git"):

@@ -96,10 +96,17 @@ def set_project_name(root, name):
 
 
 def load_config():
-    """config.json (proyectos, sueltos, ajustes, IA, ventana…); si falta o está roto, una configuración vacía."""
+    """config.json (proyectos, sueltos, ajustes, IA, ventana…); si falta o está roto, una configuración vacía.
+    utf-8-sig: también lo lee si el Bloc de notas le puso BOM. Si está roto, antes se aparta una copia
+    (config.roto.json): el próximo save_config escribiría encima uno vacío y se perderían los proyectos."""
     try:
-        return json.loads(CONFIG.read_text(encoding="utf-8"))
-    except (FileNotFoundError, ValueError):
+        return json.loads(CONFIG.read_text(encoding="utf-8-sig"))
+    except FileNotFoundError:
+        return {"proyectos": [], "sueltos": []}
+    except ValueError:
+        roto = CONFIG.with_name("config.roto.json")
+        if not roto.exists():
+            shutil.copy2(CONFIG, roto)
         return {"proyectos": [], "sueltos": []}
 
 
@@ -117,6 +124,7 @@ SETTINGS = [
     ("vista_max_mb", "General", "Tamaño máximo para ver y editar un archivo de texto (MB)", 2, 1, 200),
     ("indice_max_mb", "Índice", "Texto máximo indexado por archivo (MB)", 20, 1, 500),
     ("indice_repaso_min", "Índice", "Repasar los cambios cada (minutos)", 5, 1, 240),
+    ("indice_cpu", "Índice", "Uso máximo del procesador al indexar (%; menos tarda más pero no frena a los demás programas)", 20, 5, 100),
     ("avisar_memoria_ia", "Bitácora", "Avisar «Sin reglas» y «Sin bitácora» en los proyectos (son para trabajar con IA: reglas.md guarda las normas del proyecto y bitacora.md todo lo realizado, así cualquier chat nuevo retoma el trabajo sin volver a explicarlo)", False, None, None),
     ("bitacora_max_lineas", "Bitácora", "Aviso «Bitácora grande» a partir de (líneas)", 200, 20, 100000),
     ("bitacora_conservar", "Bitácora", "Entradas que se quedan al archivar", 20, 1, 1000),
@@ -2386,11 +2394,35 @@ def idx_file(c, p, root):
     return True
 
 
+_idx_busy = [time.monotonic()]  # desde cuándo trabaja el indexador sin descansar
+
+
+def idx_rest():
+    """Freno del indexador: tras cada tramo de trabajo duerme lo justo para no pasar del % de ⚙ Ajustes
+    (20 % → trabaja 50 ms y duerme 200 ms). Mide tiempo real, así que también cuenta la espera del disco."""
+    pct = ajuste("indice_cpu")
+    worked = time.monotonic() - _idx_busy[0]
+    if pct < 100 and worked >= 0.05:
+        time.sleep(worked * (100 - pct) / pct)
+    if worked >= 0.05:
+        _idx_busy[0] = time.monotonic()
+
+
+def idx_background():
+    """Windows: el hilo del indexador pasa a «segundo plano» (prioridad baja de CPU, disco y memoria), así cualquier
+    programa en uso va antes. ponytail: solo Windows; en macOS/Linux queda el freno de idx_rest."""
+    if os.name == "nt":
+        import ctypes
+        k = ctypes.windll.kernel32
+        k.SetThreadPriority(k.GetCurrentThread(), 0x00010000)  # THREAD_MODE_BACKGROUND_BEGIN
+
+
 def idx_targets():
     """Todos los archivos a indexar: los de cada proyecto (sin .git) y los sueltos, cada uno con su proyecto."""
     cfg = load_config()
     for r in map(Path, cfg["proyectos"]):
         for d, dirs, files in os.walk(r):
+            idx_rest()  # recorrer 200 000 archivos también gasta
             dirs[:] = [x for x in dirs if x != ".git"]  # la base interna de git no son archivos del usuario
             for f in files:
                 yield Path(d) / f, r
@@ -2401,7 +2433,10 @@ def idx_targets():
 
 def idx_pass():
     """Una pasada del indexador: añade o actualiza lo que cambió (por mtime y tamaño) y borra lo que ya no existe.
-    Hace commit cada 100 archivos para que, si DeskLens se cierra, lo hecho no se repita."""
+    Hace commit cada 100 archivos para que, si DeskLens se cierra, lo hecho no se repita.
+    Nunca vacía el índice por error: sin proyectos ni sueltos (config.json movido, vacío o roto) no borra nada,
+    y tampoco lo de un proyecto cuya carpeta no se alcanza ahora (disco externo o de red desconectado)."""
+    cfg = load_config()
     targets = list(idx_targets())
     idx_state.update(fase="indexando", total=len(targets), hechos=0, inicio=time.time(), fin=None)
     c = idx_conn()
@@ -2410,12 +2445,19 @@ def idx_pass():
             idx_state.update(actual=str(p), hechos=i)
             if idx_file(c, p, root) and i % 100 == 0:
                 c.commit()  # cada 100: si se cierra DeskLens, lo hecho queda guardado
-        seen = {str(p) for p, _ in targets}
-        for (path,) in c.execute("select path from files").fetchall():  # borrados o ya fuera de DeskLens
-            if path not in seen:
-                c.execute("delete from files where path=?", (path,))
-                c.execute("delete from docs where path=?", (path,))
+            idx_rest()
         c.commit()
+        if cfg.get("proyectos") or cfg.get("sueltos"):
+            seen = {str(p) for p, _ in targets}
+            projects = {str(Path(r)) for r in cfg.get("proyectos", [])}
+            away = {}  # proyecto de la lista cuya carpeta no se alcanza ahora: lo suyo se conserva
+            for path, root in c.execute("select path, root from files").fetchall():  # borrados o ya fuera de DeskLens
+                if root not in away:
+                    away[root] = root in projects and not os.path.isdir(root)
+                if path not in seen and not away[root]:
+                    c.execute("delete from files where path=?", (path,))
+                    c.execute("delete from docs where path=?", (path,))
+            c.commit()
     finally:
         c.close()
     idx_state.update(fase="al día", actual="", fin=time.time())
@@ -2424,6 +2466,7 @@ def idx_pass():
 def indexer():
     """Hilo del índice: una pasada al arrancar y luego cada N minutos, o antes si se añade un proyecto (idx_wake).
     En cada vuelta también limpia el historial de cambios (días y tope de MB)."""
+    idx_background()
     while True:
         try:
             hist_cleanup()
