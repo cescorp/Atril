@@ -160,6 +160,10 @@ for (const [name, exts] of [['PostgreSQL', ['psql', 'pgsql']], ['VBScript', ['ba
 /* Estilo inspirado en Obsidian: grises neutros, acento morado, árbol con líneas guía */
 :root{--bg:#fff;--side:#f6f6f6;--paper:#fff;--ink:#222;--muted:#5c5c5c;--faint:#ababab;--line:#e3e3e3;--accent:#7c5cdb;--hover:rgba(0,0,0,.05);--active:rgba(0,0,0,.085);--chip:#f0f0f0;--warn:#a35a00;--warnbg:#fbecd6;--lock:#8a2f2f;--lockbg:#f6dede}
 @media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#1e1e1e;--side:#262626;--paper:#1e1e1e;--ink:#dadada;--muted:#a3a3a3;--faint:#666;--line:#363636;--accent:#a68af9;--hover:rgba(255,255,255,.06);--active:rgba(255,255,255,.1);--chip:#2a2a2a;--warn:#f0b46a;--warnbg:#3a2c18;--lock:#f0a0a0;--lockbg:#3a2020}}
+/* azul marino: elegir versión al fusionar (sobrio; el morado queda para los botones generales) */
+:root{--navy:#1f4e79;--navybg:#eef3f8;--navyhov:#9fb4c9}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--navy:#8fb3d9;--navybg:#1d2733;--navyhov:#4d6680}}
+:root[data-theme=dark]{--navy:#8fb3d9;--navybg:#1d2733;--navyhov:#4d6680}
 :root[data-theme=dark]{--bg:#1e1e1e;--side:#262626;--paper:#1e1e1e;--ink:#dadada;--muted:#a3a3a3;--faint:#666;--line:#363636;--accent:#a68af9;--hover:rgba(255,255,255,.06);--active:rgba(255,255,255,.1);--chip:#2a2a2a;--warn:#f0b46a;--warnbg:#3a2c18;--lock:#f0a0a0;--lockbg:#3a2020}
 *{box-sizing:border-box}
 /* overflow:clip y no hidden: hidden deja que scrollIntoView() desplace la página entera aunque no haya barra */
@@ -746,6 +750,107 @@ dialog#dlg.fcmp[open]{display:flex}
 .code pre:last-child{flex:1}:where(.code .cl.hov,.code .nl.hov){background:var(--hover)}.code .nl.hov{color:var(--accent)}
 :where(.page) :is(p,h1,h2,h3,h4,h5,h6,blockquote,pre,tr,.cell):hover,:where(.page) li:hover:not(:has(li:hover)){background:var(--hover);border-radius:4px}
 table.grid tr:hover td{background:var(--hover)}
+/* fusión: aviso en la vista Git, vista previa, elegir versión, diferencias y resumen. Cada botón lleva debajo qué hará */
+.gmb{margin:6px 0 10px;padding:10px 12px;border:1px solid color-mix(in srgb,var(--accent) 40%,var(--line));border-radius:8px;background:color-mix(in srgb,var(--accent) 6%,var(--paper));font-size:12.5px}
+.gmb.warn{border-color:color-mix(in srgb,#c08a00 55%,var(--line));background:color-mix(in srgb,#c08a00 8%,var(--paper))}
+.gmb p{margin:4px 0 8px}.gmb>div{margin-top:6px}.gmb small{display:block;color:var(--muted);font-size:11.5px;margin-top:2px}
+dialog#dlg.sets.mg{width:min(1200px,calc(100vw - 32px));height:min(760px,calc(100vh - 48px))}
+.mg>header .sp{flex:1}.mgbody{flex:1;overflow:auto;padding:14px 20px;min-height:0}
+.mgbody .gdtab .gn{max-width:420px;overflow:hidden;text-overflow:ellipsis}.mgbody tr.mgwarn td{background:color-mix(in srgb,#c08a00 10%,transparent)}
+.mgacts{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start;width:100%}.mgacts>div{display:flex;flex-direction:column;align-items:flex-start;gap:3px;max-width:300px}
+.mgacts small{color:var(--muted);font-size:11.5px}.mgacts button.on{border-color:var(--accent);color:var(--accent);font-weight:600}
+.mgrow{border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin-bottom:10px}.mgrow.ok{background:color-mix(in srgb,#2e8b57 7%,transparent)}
+.mgrow.busy{opacity:.6;pointer-events:none}.mghead{display:flex;align-items:center;gap:8px;font-size:13px}.mghead .sp{flex:1}
+.mgopts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
+.mgopts button{display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:10px 14px;text-align:left;border-radius:8px}
+.mgopts button small{color:var(--muted);font-size:11.5px;font-weight:400}.mgopts button:hover{background:color-mix(in srgb,var(--accent) 7%,transparent)}
+.mg3{flex:1;display:grid;grid-template-columns:1fr 1fr 1fr;min-height:0;border-top:1px solid var(--line)}
+.mg3 section{display:flex;flex-direction:column;min-height:0;border-right:1px solid var(--line)}.mg3 section.res{background:color-mix(in srgb,var(--accent) 4%,transparent)}
+.mg3 h4{margin:0;padding:8px 14px;font-size:11.5px;color:var(--muted);border-bottom:1px solid var(--line)}
+.mgcol{flex:1;overflow:auto;padding:8px 0;font:12.5px/1.55 Consolas,"Cascadia Mono",monospace}.mgcol>div{padding:0 14px;white-space:pre-wrap;word-break:break-word}
+.mgcol .ctx{color:var(--muted)}.mgcol .hit{background:color-mix(in srgb,var(--accent) 12%,transparent)}.mgcol p{padding:0 14px}
+.mgcode{flex:1;overflow:auto;min-height:0;border-top:1px solid var(--line);font:12.5px/1.55 Consolas,"Cascadia Mono",monospace}
+.mgcode .ld{display:flex;gap:8px;padding:0 12px}.mgcode .ld i{width:42px;text-align:right;color:var(--faint);font-style:normal;flex:none}.mgcode .ld span{width:10px;flex:none;color:var(--muted)}
+.mgcode .ld code{white-space:pre-wrap;word-break:break-word;font:inherit}.mgcode .ld.del{background:color-mix(in srgb,#d33 10%,transparent)}.mgcode .ld.add{background:color-mix(in srgb,#2e8b57 11%,transparent)}
+/* vista previa de la fusión: la respuesta en grande, luego commits y archivos en letra normal */
+.mgprev .mgbody{font-size:14px}.mgcard{padding:16px 20px;border-radius:10px;border:1px solid;margin-bottom:18px}
+.mgcard b{display:block;font-size:20px;margin-bottom:6px}.mgcard p{margin:3px 0;font-size:14px}
+.mgcard.ok{border-color:color-mix(in srgb,#2e8b57 45%,var(--line));background:color-mix(in srgb,#2e8b57 9%,var(--paper))}
+.mgcard.warn{border-color:color-mix(in srgb,#c08a00 55%,var(--line));background:color-mix(in srgb,#c08a00 10%,var(--paper))}
+.mgprev .mgintro{margin:0 0 10px}.mgprev h4{margin:16px 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.mglist>div{padding:7px 10px;border-bottom:1px solid var(--line)}.mglist>div:last-child{border-bottom:0}
+.mgfile{display:grid;grid-template-columns:24px minmax(160px,1.2fr) 2fr auto auto;gap:12px;align-items:center}
+.mgfile b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.mgfile .what{color:var(--muted)}
+.mgfile.warn{background:color-mix(in srgb,#c08a00 9%,transparent);border-radius:6px}.mgfile .pm{font:13px Consolas,monospace}.mgfile .pm i{font-style:normal;color:#2e8b57}.mgfile .pm em{font-style:normal;color:#d33}
+/* pantalla única de fusionar: problemas con sus opciones (radio con frase) y el segundo modal (#dlg2) de vistas previas */
+.mgone .mgbody{font-size:14px}.mgone h4{margin:18px 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.mgcard.stop{border-color:color-mix(in srgb,#d33 45%,var(--line));background:color-mix(in srgb,#d33 7%,var(--paper))}
+.mgcardacts{display:flex;gap:10px;margin-top:10px}
+.mgone .mgrow{padding:12px 16px}.mgone .mgrow.ok{background:color-mix(in srgb,#2e8b57 6%,transparent);border-color:color-mix(in srgb,#2e8b57 35%,var(--line))}
+.mgone .mgrow.lock{background:color-mix(in srgb,#d33 6%,transparent);border-color:color-mix(in srgb,#d33 35%,var(--line))}
+.mgone .mghead b{font-size:14.5px}.mgwhy{margin:4px 0 10px;color:var(--muted)}
+.mgradios{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:8px}
+.mgradios label{display:flex;gap:10px;align-items:flex-start;padding:9px 12px;border:1px solid var(--line);border-radius:8px;cursor:pointer;background:var(--paper)}
+.mgradios label:hover{border-color:var(--navyhov)}.mgradios label.on{border-color:var(--navy);background:var(--navybg)}
+.mgradios input{margin-top:3px;accent-color:var(--navy)}.mgradios b{display:block;font-size:13.5px}.mgradios small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+.mgsolos summary{cursor:pointer;list-style:none}.mgsolos summary h4{display:inline-block}.mgsolos summary::before{content:"▸ ";color:var(--muted)}.mgsolos[open] summary::before{content:"▾ "}
+dialog#dlg2{border:1px solid var(--line);border-radius:10px;background:var(--paper);color:var(--ink);padding:0;width:min(1200px,80vw);height:80vh;max-width:none;max-height:none;display:none;flex-direction:column;box-shadow:0 10px 40px rgba(0,0,0,.25)}
+dialog#dlg2[open]{display:flex}.mgv>header{display:flex;align-items:center;gap:14px;padding:12px 20px;border-bottom:1px solid var(--line)}.mgv>header .sp{flex:1}
+.mgvbody{flex:1;display:flex;flex-direction:column;min-height:0}.mgvbody>footer{padding:12px 20px;border-top:1px solid var(--line)}
+.mgvbody>.mgcode{flex:1}.mglegend{margin:0;padding:8px 20px;font-size:12.5px}.mglegend .del{color:#d33;font-weight:600}.mglegend .add{color:#2e8b57;font-weight:600}
+.mgv .mg3 .mgcode{flex:1;border-top:0}.mgnone{padding:16px;font-size:13.5px}
+.mgchip{margin-left:10px;padding:2px 10px;border-radius:10px;font-size:12px;font-weight:600;background:color-mix(in srgb,#2e8b57 14%,var(--paper));color:#2e8b57;white-space:nowrap}
+/* vista previa: cada versión es una tarjeta (hover → borde y fondo; clic → se elige); cambios en negrita, el resto tenue */
+.mgv .mgcode{position:relative}.mgv .ld{opacity:.42}.mgv .ld.del,.mgv .ld.add{opacity:1;font-weight:700}
+.mgedit{flex:1;min-height:0;border-top:1px solid var(--line)}.mgedit .CodeMirror{height:100%;font-size:13px}
+/* pestañas de opciones: la activa unida al contenido (borde azul marino arriba); la elegida lleva ✓ */
+.mgtabs{display:flex;gap:4px;padding:10px 16px 0;border-bottom:1px solid var(--line);background:var(--side)}
+.mgtabs button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;flex:1 1 0;min-width:0;padding:8px 12px;text-align:left;border:1px solid var(--line);border-bottom:0;border-radius:8px 8px 0 0;background:var(--bg);margin-bottom:-1px;cursor:pointer}
+.mgtabs button b{font-size:13px;font-weight:600}.mgtabs button small{font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.mgtabs button:hover{border-color:var(--navyhov)}
+.mgtabs button.on{background:var(--paper);border-color:var(--line);border-top:3px solid var(--navy);padding-top:6px}.mgtabs button.on b{color:var(--navy)}
+.mgtabs button.chosen b{color:var(--navy)}
+.mgv .mglegend{padding:8px 16px;line-height:26px}.mgv .mglegend button{float:right;margin-left:10px}
+.mgscroll{flex:1;display:flex;min-height:0;border-top:1px solid var(--line)}.mgscroll .mgcode{flex:1;border-top:0}
+/* comparación en dos columnas alineadas (una sola caja con scroll: se mueven juntas) */
+.mgcode.sbs .sr{display:grid;grid-template-columns:1fr 1fr}.mgcode.sbs .c{display:flex;gap:8px;padding:0 10px;min-width:0;opacity:.45}
+.mgcode.sbs .c+.c{border-left:1px solid var(--line)}.mgcode.sbs .c i{width:36px;flex:none;text-align:right;color:var(--faint);font-style:normal}
+.mgcode.sbs .c code{white-space:pre-wrap;word-break:break-word;font:inherit}
+.mgcode.sbs .sr.mgchg .c,.mgcode.sbs.same .c{opacity:1}.mgcode.sbs .c.del{background:color-mix(in srgb,#d33 11%,transparent);font-weight:700}
+.mgcode.sbs .c.add{background:color-mix(in srgb,#2e8b57 12%,transparent);font-weight:700}
+.mgcode.sbs .c.gap{background:repeating-linear-gradient(135deg,transparent 0 6px,var(--hover) 6px 8px)}
+.mgcode.sbs .sr.hd{position:sticky;top:0;z-index:1;background:var(--side);border-bottom:1px solid var(--line)}
+.mgcode.sbs .sr.hd .c{opacity:1;font:600 11px Inter,sans-serif;color:var(--muted);padding:6px 10px;letter-spacing:.04em}
+.mgnote{margin:0;padding:8px 16px;font-weight:600;color:#2e8b57;background:color-mix(in srgb,#2e8b57 8%,transparent);border-top:1px solid var(--line)}
+.mgbar{position:relative;width:12px;flex:none;background:var(--side);border-left:1px solid var(--line);cursor:pointer}
+.mgbar i{position:absolute;left:2px;right:2px;height:4px;border-radius:2px}.mgbar i.del{background:#d33}.mgbar i.add{background:#2e8b57}
+.mgmsg{display:flex;align-items:center;gap:10px;margin-top:14px;font-size:13px}.mgmsg input{flex:1;font:inherit;padding:5px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
+/* historial de una línea: 💾 disco en azul, ⎇ git en morado (el color de git en DeskLens) */
+:root{--lhd:#2f7fd8}
+.lhbadge{position:absolute;right:26px;z-index:5;display:flex;gap:6px;padding:0 6px;height:18px;margin-top:1px;border:1px solid var(--line);border-radius:9px;background:var(--paper);font:600 11px/16px Inter,sans-serif;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.lhbadge[hidden]{display:none}.lhbadge .lhd{color:var(--lhd)}.lhbadge .lhg{color:var(--accent)}.lhbadge:hover{border-color:var(--accent)}
+dialog#dlg.sets.lhist{width:min(1200px,calc(100vw - 32px));height:min(720px,calc(100vh - 48px))}
+.lhist>header .sp{flex:1}.lhist .lhnow{padding:8px 20px;font-size:13px;color:var(--muted)}.lhist .lhnow code{color:var(--ink);font:13px Consolas,monospace}
+.lhtabs{display:flex;gap:6px;padding:0 20px 8px}.lhtabs button{border-radius:6px 6px 0 0;border-bottom:3px solid transparent;font-weight:600}
+.lhtabs button span{margin-left:4px;font-weight:400;color:var(--muted)}
+.lhtabs .lhd.on{border-bottom-color:var(--lhd);background:color-mix(in srgb,var(--lhd) 10%,transparent);color:var(--lhd)}
+.lhtabs .lhg.on{border-bottom-color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent);color:var(--accent)}
+.lhbody{flex:1;display:grid;grid-template-columns:minmax(260px,340px) 1fr;min-height:0;border-top:1px solid var(--line)}
+.lhbody nav{overflow:auto;padding:8px;background:var(--side);border-right:1px solid var(--line)}
+.lhbody nav a{display:block;padding:6px 10px;margin-bottom:2px;border-radius:5px;cursor:pointer;font-size:12.5px;border-left:3px solid var(--lhc)}
+.lhbody nav a span{display:block;color:var(--muted);font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lhbody nav a:hover{background:var(--hover)}.lhbody nav a.on{background:color-mix(in srgb,var(--lhc) 12%,transparent)}
+.lhbody.lhd{--lhc:var(--lhd)}.lhbody.lhg{--lhc:var(--accent)}
+.lhbody>section{overflow:auto;padding:16px 24px}.lhhead{margin:0 0 12px;font-size:13px}.lhhead code{font:12px Consolas,monospace}
+.lhdiff{font:13px/1.6 Consolas,"Cascadia Mono",monospace;border:1px solid var(--line);border-radius:6px;overflow:auto}
+.lhdiff>div{padding:4px 10px;white-space:pre-wrap;word-break:break-word}
+.lhdel{background:color-mix(in srgb,#d33 9%,transparent)}.lhdel mark{background:color-mix(in srgb,#d33 30%,transparent);color:inherit}
+.lhadd{background:color-mix(in srgb,#2e8b57 10%,transparent)}.lhadd mark{background:color-mix(in srgb,#2e8b57 32%,transparent);color:inherit}
+.lhdiff p{margin:0;padding:4px 10px;font:12px Inter,sans-serif}.lhfoot{margin:10px 0}.lhempty{margin:20px 0}
+.lhctx .lhcode{flex:1;overflow:auto;min-height:0;border-top:1px solid var(--line)}
+.lhctx .lhcode .code div{opacity:.38}.lhctx .lhcode .code div.on{opacity:1;background:color-mix(in srgb,var(--lhc) 16%,transparent)}
+.lhctx.lhd{--lhc:var(--lhd)}.lhctx.lhg{--lhc:var(--accent)}.lhctx>header b{color:var(--lhc)}
+.lhctx .gdtab tr.lhme td{background:color-mix(in srgb,var(--accent) 12%,transparent)}
 /* edición: fila bajo el ratón y la del cursor (addon active-line), con su número */
 .CodeMirror-code>div:hover,.CodeMirror-code>div:hover .CodeMirror-gutter-elt{background:var(--hover)}
 .CodeMirror-code>div:hover .CodeMirror-linenumber,.CodeMirror-activeline-gutter .CodeMirror-linenumber{color:var(--accent)}
@@ -2417,7 +2522,7 @@ function gitDraw() {
   }
   gst.stashes ||= []; // servidor anterior a esta función: sin cambios guardados que mostrar
   if (gst.stashes.length) L.insertAdjacentHTML('beforeend', `<p class="gnote">📦 ${gst.stashes.length} cambio${gst.stashes.length === 1 ? '' : 's'} guardado${gst.stashes.length === 1 ? '' : 's'} aparte: ⎇ ▾ › «Recuperar cambios guardados».</p>`);
-  if (gst.fusionando) L.insertAdjacentHTML('beforeend', '<p class="gnote">⚠ Fusión en curso: resuelve los conflictos, márcalos con + y haz commit.</p>');
+  if (gst.fusionando) L.append(gitMergeBanner());
   const sec = (key, title, list, acts) => {
     if (!list.length && key !== 'cambios') return;
     const S = document.createElement('div'); S.className = 'gsec' + (gfold.has(key) ? ' fold' : '');
@@ -2468,13 +2573,443 @@ function gitSyncDraw(ok) {
 function gitMergeBtn(e) {
   e.stopPropagation();
   if (!gst.fusionando) return gitMergeMenu(e.currentTarget);
+  const n = gst.conflictos.length;
   openMenu(e.currentTarget, [{ head: 'Fusión en curso' },
-    ['✓  Terminar', () => { $('#gMsg').focus(); flash('Resuelve los conflictos, márcalos con + y haz commit'); },
-      { title: 'Resuelve cada archivo en «Conflictos», prepáralo con + y haz commit: eso termina la fusión' }],
-    ['✕  Cancelar fusión', async () => {
-      if (await ask('Cancelar fusión', 'Todo vuelve a como estaba antes de fusionar. Se pierde lo que hayas resuelto de los conflictos.',
-        ['Cancelar fusión', 'Seguir'], { danger: true }) === 'Cancelar fusión' && await gitDo('cancelar_fusion')) flash('Fusión cancelada');
-    }, { title: 'Volver a como estaba antes de empezar a fusionar' }]]);
+    n ? ['⚔  Ver y elegir (' + n + ')', mergeChooseDialog, { title: 'Elegir qué versión queda en cada archivo que no se pudo unir solo' }]
+      : ['✓  Confirmar la fusión', mergeFinalDialog, { title: 'Ver cómo queda y hacer el commit de la fusión' }],
+    ['✕  Cancelar la fusión', mergeCancel, { title: 'Deja todo como estaba antes de fusionar' }]]);
+}
+// ---------- fusión: vista previa, elegir versión en los conflictos, ver diferencias y confirmar ----------
+// Todo dice qué va a pasar con palabras («Dejar mi cambio», «Se borra»…), nunca ours/theirs. Lo de la otra rama
+// se nombra por su rama (gst.fusion_de, de MERGE_MSG). Nada se toca hasta pulsar un botón que lo diga.
+const mergeFrom = () => gst.fusion_de || 'la otra rama';
+const mergeChoices = new Map(); // rel → lo elegido en esta sesión («MI versión», «la de cesare»…), para el resumen
+async function mergeCancel() {
+  if (await ask('Cancelar la fusión', 'Todo vuelve a como estaba antes de fusionar. Se pierde lo que hayas elegido en los conflictos.',
+    ['Cancelar la fusión', 'Seguir'], { danger: true }) !== 'Cancelar la fusión') return;
+  if (await gitDo('cancelar_fusion')) { mergeChoices.clear(); $('#dlg').open && $('#dlg').classList.contains('mg') && $('#dlg').close(); flash('Fusión cancelada: todo como antes'); loadSide(); }
+}
+// Aviso de la vista Git durante una fusión: qué se fusiona, si hay conflictos y los botones con su frase
+function gitMergeBanner() {
+  const n = gst.conflictos.length, m = gst.preparados.length, el = document.createElement('div');
+  el.className = 'gmb' + (n ? ' warn' : '');
+  el.innerHTML = `<b>⤵ Fusionando «${esc(mergeFrom())}» en «${esc(gst.rama || '')}»</b>
+    <p>${n ? `⚠ ${n} archivo${n === 1 ? '' : 's'} no se ${n === 1 ? 'pudo' : 'pudieron'} unir solo${n === 1 ? '' : 's'}.` : `✓ No hay conflictos. Faltan ${m} cambio${m === 1 ? '' : 's'} por confirmar.`}</p>`;
+  const act = (label, sub, fn, cls = '') => { const w = document.createElement('div'); const b = Object.assign(button(label, fn), { className: 'small ' + cls }); w.append(b, Object.assign(document.createElement('small'), { textContent: sub })); el.append(w); };
+  if (n) act(`⚔ Ver y elegir (${n})`, 'Te enseña cada archivo para que elijas qué versión queda.', mergeChooseDialog, 'primary');
+  else act('✓ Confirmar la fusión', `Hace el commit «Fusión de ${mergeFrom()} en ${gst.rama}».`, mergeFinalDialog, 'primary');
+  act('✕ Cancelar la fusión', 'Deja todo como estaba antes de fusionar.', mergeCancel);
+  return el;
+}
+// Filas de diferencias línea a línea (a → b) del archivo entero, con números; las cambiadas en rojo/verde
+function lineDiffRows(a, b) {
+  const dmp = new diff_match_patch(), { chars1, chars2, lineArray } = dmp.diff_linesToChars_(a, b);
+  const ds = dmp.diff_main(chars1, chars2, false); dmp.diff_charsToLines_(ds, lineArray);
+  let na = 0, nb = 0, html = '';
+  for (const [op, t] of ds) for (const l of t.replace(/\n$/, '').split('\n')) {
+    const n = op < 0 ? ++na : op > 0 ? ++nb : (na++, ++nb);
+    html += `<div class="ld${op < 0 ? ' del' : op > 0 ? ' add' : ''}"><i>${n}</i><span>${op < 0 ? '−' : op > 0 ? '+' : ' '}</span><code>${esc(l) || ' '}</code></div>`;
+  }
+  return html;
+}
+// Dos columnas alineadas fila a fila: a la izquierda `a` (lo que tienes ahora) y a la derecha `b` (así quedará).
+// Las líneas iguales van enfrentadas; un bloque cambiado empareja quitadas (rojo, izquierda) con puestas (verde,
+// derecha) y rellena con huecos el lado más corto. Una sola caja con scroll: las dos columnas se mueven juntas.
+function sideBySideRows(a, b) {
+  const dmp = new diff_match_patch(), { chars1, chars2, lineArray } = dmp.diff_linesToChars_(a, b);
+  const ds = dmp.diff_main(chars1, chars2, false); dmp.diff_charsToLines_(ds, lineArray);
+  const lines = t => t.replace(/\n$/, '').split('\n');
+  const cell = (n, l, cls) => n == null ? `<div class="c gap"></div>` : `<div class="c ${cls}"><i>${n}</i><code>${esc(l) || ' '}</code></div>`;
+  let na = 0, nb = 0, html = '', dels = [];
+  const flush = adds => {
+    for (let k = 0; k < Math.max(dels.length, adds.length); k++) {
+      const L = dels[k], R = adds[k];
+      html += `<div class="sr mgchg">${L == null ? cell(null) : cell(++na, L, 'del')}${R == null ? cell(null) : cell(++nb, R, 'add')}</div>`;
+    }
+    dels = [];
+  };
+  for (const [op, t] of ds) {
+    if (op < 0) { dels.push(...lines(t)); continue; }
+    if (op > 0) { flush(lines(t)); continue; }
+    flush([]);
+    for (const l of lines(t)) html += `<div class="sr">${cell(++na, l, '')}${cell(++nb, l, '')}</div>`;
+  }
+  flush([]);
+  return html;
+}
+// 👁 un archivo antes → después (vista previa, resumen): el archivo entero con lo que cambia pintado; ← Volver
+async function mergeFileView(title, sub, get, back) {
+  const d = $('#dlg');
+  d.className = 'sets mg mgview';
+  d.innerHTML = `<header><button class="small" data-back>← Volver</button><b>${esc(title)}</b><span class="gc">${esc(sub)}</span><span class="sp"></span><button class="ic" data-x title="Cerrar (Esc)">✕</button></header>
+    <div class="mgcode"><p class="gc" style="padding:16px">Cargando…</p></div>`;
+  d.querySelector('[data-x]').onclick = () => d.close(); d.querySelector('[data-back]').onclick = back;
+  let a, b;
+  try { [[a, b]] = await Promise.all([get(), loadMerge()]); } catch (e) { d.querySelector('.mgcode').innerHTML = `<p class="err">${esc(e.message)}</p>`; return; }
+  if (!d.classList.contains('mgview')) return;
+  const box = d.querySelector('.mgcode'); box.innerHTML = lineDiffRows(norm(a ?? ''), norm(b ?? ''));
+  const first = box.querySelector('.del, .add'); if (first) box.scrollTop = first.offsetTop - 80;
+}
+const repoFile = rel => gst.repositorio + '\\' + rel.replace(/\//g, '\\');
+const gitText = (rel, hash) => api(`/api/git/version?ruta=${encodeURIComponent(repoFile(rel))}&hash=${hash}&rel=${encodeURIComponent(rel)}`).then(r => r.texto, () => '');
+// 1. Pantalla única de fusionar (⤵ Fusionar, Pull, Pull desde): el servidor lo comprueba todo sin tocar nada
+// (git_merge_check) y aquí solo se listan los problemas, cada uno con sus opciones y lo que hará cada una. Las vistas
+// previas se abren siempre en otro modal encima (#dlg2); lo elegido allí se marca en la fila. «Fusionar» aplica todo
+// de una vez (git_merge_apply); solo «Editar manualmente» sin texto deja la fusión abierta para terminarla en el editor.
+function mergeOptions(f, from) {
+  const t = f.tuyo, pm = (a, b) => a == null ? '' : `+${a} −${b}`;
+  const hand = ['mano', 'Editar manualmente', 'Escribes tú cómo queda, combinando los dos cambios. Se guarda al volver a la lista.'];
+  if (f.problema === 'ambos') return [
+    ...(f.juntar ? [['juntar', 'Unificar cambios', `Recomendado: quedan tus cambios (${pm(t.mas, t.menos)}) y los de «${from}» (${pm(f.mas, f.menos)}).`]] : []),
+    ['mia', 'Dejar mi cambio', `El archivo queda como lo tienes; lo de «${from}» no entra en él.`],
+    ['llega', 'Dejar cambio que llega', 'Queda como en «' + from + '»; tus cambios sin commit en este archivo se pierden.'],
+    hand]; // editar siempre se puede, aunque git sepa unificarlos (quizá quieras retocar el resultado)
+  if (f.problema === 'tuyo_nuevo') return [['mia', 'Dejar mi archivo', 'Tu archivo queda; el que llega no entra.'], ['llega', 'Dejar archivo que llega', 'El tuyo va a la papelera.']];
+  if (f.tipo === 'borrado_suyo') return [['conservar', 'Conservarlo', 'Se queda tu versión.'], ['borrar', 'Borrarlo', `Se borra, como en «${from}».`]];
+  if (f.tipo === 'borrado_mio') return [['mia', 'Dejarlo borrado', 'Sigue borrado, como lo tienes tú.'], ['llega', 'Recuperarlo', `Vuelve con la versión de «${from}».`]];
+  return [['mia', 'Dejar mi cambio', `El archivo queda como lo tienes tú; lo de «${from}» no entra.`],
+    ['llega', 'Dejar cambio que llega', `Queda como en «${from}»; tu versión se pierde.`],
+    ...(f.binario ? [] : [hand])];
+}
+// Qué se eligió en un archivo, para la marca de su fila: «✓ Dejar mi cambio» o «✎ Editado manualmente»
+const mergeChosen = (f, from, dec, txt) => dec[f.rel] === 'mano' ? (txt[f.rel] != null ? '✎ Editado manualmente' : '')
+  : dec[f.rel] ? '✓ ' + (mergeOptions(f, from).find(o => o[0] === dec[f.rel])?.[1] || '').replace(' (recomendado)', '') : '';
+function mergeWhy(f, from) {
+  const t = f.tuyo, sin = t ? ` Además tienes cambios sin commit en él${t.mtime ? ` (${fmtRel(t.mtime)})` : ''}.` : '';
+  if (f.problema === 'bloqueado') return 'Está abierto en otro programa (Excel, Word, un servidor…) y Windows no deja cambiarlo. Ciérralo y pulsa ⟳ Comprobar otra vez.';
+  if (f.problema === 'ambos') return `Tienes cambios sin commit${t.mtime ? ` (${fmtRel(t.mtime)})` : ''} y «${from}» también lo cambió.`;
+  if (f.problema === 'tuyo_nuevo') return `Tienes un archivo nuevo con este nombre (sin commit) y «${from}» trae otro.`;
+  if (f.tipo === 'borrado_suyo') return `Tú lo cambiaste y «${from}» lo borró.` + sin;
+  if (f.tipo === 'borrado_mio') return `Tú lo borraste y «${from}» lo cambió.` + sin;
+  return `Las dos ramas cambiaron las mismas líneas${f.binario ? ' (no es texto: no se puede editar manualmente)' : ''}.` + sin;
+}
+// dec: {ruta: opción}; txt: {ruta: texto} de «Editar manualmente» (solo en la ventana hasta «Fusionar»)
+async function mergeOneDialog(accion, rama, dec = {}, txt = {}) {
+  const d = $('#dlg'), pull = accion !== 'fusionar';
+  d.className = 'sets mg mgone'; d.oninput = d.onchange = null; d.onclose = null;
+  // cerrar con archivos editados a mano pregunta antes (lo escrito no está en el disco todavía)
+  const leave = async () => {
+    const n = Object.keys(txt).length;
+    if (n && await ask('Cerrar', `Se perderá lo que editaste a mano en ${n} archivo${n === 1 ? '' : 's'}.`, ['Cerrar y perderlo', 'Seguir'], { danger: true }) !== 'Cerrar y perderlo') return;
+    d.oncancel = null; d.close();
+  };
+  d.oncancel = e => { if (Object.keys(txt).length) { e.preventDefault(); leave(); } };
+  d.innerHTML = `<header><b>${pull ? 'Traer cambios' : `Fusionar «${esc(rama)}» en «${esc(gst.rama)}»`}</b><span class="sp"></span><button class="ic" data-x title="Cerrar (Esc)">✕</button></header>
+    <div class="mgbody"><p class="gc">${pull ? 'Trayendo lo último del remoto y comprobando…' : 'Comprobando…'}</p></div>`;
+  d.querySelector('[data-x]').onclick = () => d.close();
+  if (!d.open) d.showModal();
+  let c;
+  try { c = await api(`/api/git/fusion?ruta=${encodeURIComponent(gst.ruta)}&accion=${accion}&rama=${encodeURIComponent(rama || '')}`); }
+  catch (e) {
+    d.close();
+    if (await ask('Fusionar', `No se pudo comprobar (${e.message}).`, ['Entendido']));
+    return;
+  }
+  if (!d.open || !d.classList.contains('mgone')) return;
+  const from = c.destino || rama, items = c.filas;
+  for (const f of items) if (!(f.rel in dec) && f.problema === 'ambos' && f.juntar) dec[f.rel] = 'juntar'; // la recomendada, ya marcada
+  const pl = (n, s, p = s + 's') => `${n} ${n === 1 ? s : p}`;
+  const recheck = () => mergeOneDialog(accion, rama, dec, txt);
+  const done = f => dec[f.rel] && (dec[f.rel] !== 'mano' || txt[f.rel] != null);
+  const draw = () => {
+    const locked = items.filter(f => f.problema === 'bloqueado'), todo = items.filter(f => f.problema !== 'bloqueado');
+    const left = todo.filter(f => !done(f)).length;
+    const BLOQ = {
+      a_medias: ['⛔ Hay una fusión anterior sin terminar', 'Termínala o cancélala antes de empezar otra.', `<button class="primary" data-fin>Ver la fusión a medias</button><button data-cancel>✕ Cancelarla</button>`],
+      sin_conexion: ['⛔ No se pudo traer del remoto', esc(c.motivo || ''), '<button class="primary" data-re>⟳ Reintentar</button><button data-login>🔑 Iniciar sesión / comprobar acceso</button>'],
+      sin_historia: [`⛔ «${esc(from)}» y «${esc(gst.rama)}» no tienen nada en común`, 'Ningún commit es de las dos: casi siempre es la rama equivocada. Revisa cuál querías fusionar.', '<button class="primary" data-x2>Cerrar</button>'],
+      al_dia: [`✅ Ya tienes todo lo de «${esc(from)}»`, 'No hay nada que traer.', '<button class="primary" data-x2>Cerrar</button>'],
+    }[c.bloqueo];
+    const card = BLOQ ? `<div class="mgcard ${c.bloqueo === 'al_dia' ? 'ok' : 'stop'}"><b>${BLOQ[0]}</b><p>${BLOQ[1]}</p><div class="mgcardacts">${BLOQ[2]}</div></div>`
+      : items.length ? `<div class="mgcard warn"><b>⚠️ Antes de fusionar, ${locked.length && !todo.length ? `cierra ${pl(locked.length, 'archivo')}` : `decide ${pl(items.length, 'archivo')}`}</b>
+          <p>Traes ${pl(c.commits, 'commit')} de «${esc(from)}» que ${c.commits === 1 ? 'cambia' : 'cambian'} ${pl(items.length + c.solos.length, 'archivo')}.${c.solos.length ? ` ${pl(c.solos.length, 'se une solo', 'se unen solos')}.` : ''}</p>
+          <p>En ${pl(items.length, 'archivo')} hay algo que elegir: abajo, cada uno dice qué pasa y qué hará cada opción. Nada se toca hasta pulsar «Fusionar».</p></div>`
+      : `<div class="mgcard ok"><b>✅ Se puede fusionar sin problemas</b><p>Traes ${pl(c.commits, 'commit')} de «${esc(from)}» que ${c.commits === 1 ? 'cambia' : 'cambian'} ${pl(c.solos.length, 'archivo')}. Nada choca con lo tuyo: git lo une solo.</p></div>`;
+    d.className = 'sets mg mgone';
+    d.innerHTML = `<header><b>${pull ? `Traer «${esc(from)}» a «${esc(gst.rama)}»` : `Fusionar «${esc(from)}» en «${esc(gst.rama)}»`}</b><span class="sp"></span>
+        <button class="small" data-re title="Vuelve a mirarlo todo (p. ej. tras cerrar un archivo en otro programa)">⟳ Comprobar otra vez</button><button class="ic" data-x title="Cerrar (Esc)">✕</button></header>
+      <div class="mgbody">${card}
+        ${c.bloqueo && c.bloqueo !== 'a_medias' ? '' : c.lista.length ? `<h4>Commits que llegan (${c.commits})</h4><div class="mglist">${c.lista.map(x => `<div>⎇ <span class="gc">${esc(dayKey(x.fecha))} ${hhmm(x.fecha)} · ${esc(x.autor)} ·</span> «${esc(x.mensaje)}»</div>`).join('')}${c.commits > c.lista.length ? `<div class="gc">… y ${c.commits - c.lista.length} más</div>` : ''}</div>` : ''}
+        ${items.length ? `<h4>Debes decidir (${items.length}${todo.length - left ? ` · ${todo.length - left} listo${todo.length - left === 1 ? '' : 's'}` : ''})</h4>${items.map((f, i) => `<section class="mgrow${f.problema === 'bloqueado' ? ' lock' : done(f) ? ' ok' : ''}">
+          <div class="mghead"><b>${f.problema === 'bloqueado' ? '🔒' : done(f) ? '✓' : '⚠'} ${esc(f.rel)}</b>${done(f) ? `<span class="mgchip">${esc(mergeChosen(f, from, dec, txt))}</span>` : ''}<span class="sp"></span>
+            ${f.problema === 'bloqueado' ? '' : `${dec[f.rel] === 'mano' && txt[f.rel] != null ? `<button class="small" data-ed="${i}">✎ Volver a editar</button>` : ''}<button class="small" data-v="${i}">👁 Ver y elegir</button>`}</div>
+          <p class="mgwhy">${esc(mergeWhy(f, from))}</p>
+          ${f.problema === 'bloqueado' ? '' : `<div class="mgradios">${mergeOptions(f, from).map(([id, label, sub]) => `<label class="${dec[f.rel] === id ? 'on' : ''}"><input type="radio" name="mg${i}" data-i="${i}" value="${id}" ${dec[f.rel] === id ? 'checked' : ''}><span><b>${esc(label)}</b><small>${esc(sub)}</small></span></label>`).join('')}</div>`}
+        </section>`).join('')}` : ''}
+        ${c.solos.length ? `<details class="mgsolos"${items.length ? '' : ' open'}><summary><h4>Se unen solos (${c.solos.length})</h4></summary><div class="mglist">${c.solos.map((f, i) => `<div class="mgfile"><span class="ic2">${{ A: '➕', D: '🗑' }[f.estado] || '✓'}</span>
+          <b title="${esc(f.rel)}">${esc(f.rel)}</b><span class="what">${esc({ A: `llega nuevo de «${from}»`, D: `se borra («${from}» lo borró)` }[f.estado] || `se actualiza con lo de «${from}»`)}</span>
+          ${f.mas == null ? '<span class="gc">—</span>' : `<span class="pm"><i>+${f.mas}</i> <em>−${f.menos}</em></span>`}<button class="small" data-s="${i}">👁 Ver cambios</button></div>`).join('')}</div></details>` : ''}
+      </div>
+      <footer><div class="mgacts">${c.bloqueo ? '' : `<div><button class="primary" data-go ${left || locked.length ? 'disabled' : ''}>⤵ ${pull ? 'Traer' : 'Fusionar'}</button>
+          <small>${locked.length ? `Cierra ${pl(locked.length, 'archivo')} y pulsa ⟳ Comprobar otra vez.` : left ? `Falta decidir ${pl(left, 'archivo')}.` : `Trae ${c.commits === 1 ? 'el commit' : `los ${c.commits} commits`} y aplica lo que elegiste.`}</small></div>`}
+        <div><button data-x3>Cancelar</button><small>No hace nada.</small></div></div></footer>`;
+    d.querySelector('[data-x]').onclick = leave;
+    d.querySelectorAll('[data-x2], [data-x3]').forEach(b => b.onclick = leave);
+    d.querySelectorAll('[data-re]').forEach(b => b.onclick = recheck);
+    d.querySelector('[data-fin]')?.addEventListener('click', () => gst.conflictos.length ? mergeChooseDialog() : mergeFinalDialog());
+    d.querySelector('[data-cancel]')?.addEventListener('click', mergeCancel);
+    d.querySelector('[data-login]')?.addEventListener('click', () => { d.close(); gitLong('probar'); });
+    const redraw = () => { const y = d.querySelector('.mgbody').scrollTop; draw(); d.querySelector('.mgbody').scrollTop = y; };
+    // «Editar manualmente» abre el editor; si se cancela sin guardar, la fila vuelve a lo que tenía
+    d.querySelectorAll('input[type=radio]').forEach(r => r.onchange = () => {
+      const f = items[+r.dataset.i];
+      if (r.value === 'mano' && txt[f.rel] == null) return mergeTwoView(f, from, c, dec, txt, redraw, true);
+      dec[f.rel] = r.value; redraw();
+    });
+    d.querySelectorAll('[data-ed]').forEach(b => b.onclick = () => mergeTwoView(items[+b.dataset.ed], from, c, dec, txt, redraw, true));
+    d.querySelectorAll('[data-v]').forEach(b => b.onclick = () => mergeTwoView(items[+b.dataset.v], from, c, dec, txt, redraw));
+    d.querySelectorAll('[data-s]').forEach(b => b.onclick = () => mergeSoloView(c.solos[+b.dataset.s], from, c));
+    d.querySelector('[data-go]')?.addEventListener('click', async e => {
+      const btn = e.currentTarget; btn.disabled = true; btn.textContent = '⏳ ' + (pull ? 'Trayendo…' : 'Fusionando…');
+      try {
+        const r = await api('/api/git/fusion', { ruta: gst.ruta, accion, rama: rama || '', decisiones: dec, textos: txt });
+        d.oncancel = null; d.close(); mergeChoices.clear();
+        for (const f of [...items, ...c.solos]) if (tabs.includes(f.ruta)) reloadFromDisk(f.ruta).catch(() => {});
+        await gitLoad(); loadSide();
+        if (r.hecho) return flash(`✓ ${pull ? 'Traído' : 'Fusionado'} «${from}» en «${gst.rama}»`);
+        flash(`Falta editar manualmente ${pl(r.mano.length, 'archivo')}: deja una versión en cada sitio, borra las líneas <<<<<<< ======= >>>>>>> y guarda`);
+        await openTab(r.mano[0], true);
+        for (let i = 0; i < 20 && !(curFile && cur === r.mano[0]); i++) await new Promise(ok => setTimeout(ok, 100)); // la pestaña termina de cargar
+        if (cur === r.mano[0] && curFile && !edits.has(cur)) startEdit(cur, curFile);
+      } catch (err) { await ask('No se pudo fusionar', err.message, ['Entendido']); recheck(); }
+    });
+  };
+  draw();
+}
+// Segundo modal (encima de la pantalla única) para las vistas previas; ✕ o «← Volver» lo cierran y se vuelve tal cual
+function dlg2() {
+  let d = document.getElementById('dlg2');
+  if (!d) { d = Object.assign(document.createElement('dialog'), { id: 'dlg2' }); document.body.append(d); }
+  d.onclose = null;
+  return d;
+}
+const mgCol = (base, text, gone) => gone ? `<p class="gc mgnone">${gone}</p>` : `<div class="mgcode">${lineDiffRows(norm(base ?? ''), norm(text ?? ''))}</div>`;
+// 👁 Ver un archivo con algo que elegir: una pestaña por opción y su contenido es el archivo tal como quedará,
+// comparado con lo que tienes ahora en el disco (rojo: lo que se quita de tu archivo; verde: lo que se añade).
+// Pulsar una pestaña la elige; «Editar manualmente» es un editor que empieza con los dos cambios juntos (marcas
+// <<<<<<< donde chocan) y «Guardar y volver» deja el texto en txt[rel] (el disco no se toca hasta «Fusionar»).
+async function mergeTwoView(f, from, c, dec, txt, back, editNow = false) {
+  const d = dlg2();
+  d.className = 'mgv';
+  d.innerHTML = `<header><button class="small" data-back>← Volver a la lista</button><b>${esc(f.rel)}</b><span class="sp"></span><button class="ic" data-x title="Cerrar (Esc)">✕</button></header><div class="mgvbody"><p class="gc" style="padding:16px">Cargando…</p></div>`;
+  let v, cm = null, tab = editNow ? 'mano' : dec[f.rel] || null;
+  const start = () => txt[f.rel] ?? v?.mezcla ?? v?.tuya ?? v?.llega ?? '';
+  const close = async () => {
+    if (tab === 'mano' && cm && cm.getValue() !== start() && await ask('Editar manualmente', 'Tienes cambios sin guardar en este archivo.', ['Descartarlos', 'Seguir editando'], { danger: true }) !== 'Descartarlos') return;
+    d.onclose = null; d.oncancel = null; d.close(); back();
+  };
+  d.querySelector('[data-x]').onclick = d.querySelector('[data-back]').onclick = close;
+  d.oncancel = e => { e.preventDefault(); close(); }; // Esc pasa por la misma pregunta
+  if (!d.open) d.showModal();
+  try { [v] = await Promise.all([api(`/api/git/fusion/archivo?ruta=${encodeURIComponent(gst.ruta)}&rel=${encodeURIComponent(f.rel)}&destino=${encodeURIComponent(from)}&arbol=${c.arbol}`), loadMerge()]); }
+  catch (e) { d.querySelector('.mgvbody').innerHTML = `<p class="err">${esc(e.message)}</p>`; return; }
+  const opts = mergeOptions(f, from), ICON = { juntar: '⇄', mia: '◧', conservar: '◧', llega: '◨', borrar: '🗑', mano: '✎' };
+  tab ??= opts[0][0];
+  const now = v.tuya; // lo que tienes ahora en el disco (null: no existe)
+  const result = id => id === 'juntar' ? v.juntado : id === 'mia' || id === 'conservar' ? v.tuya : id === 'borrar' ? null : id === 'llega' ? v.llega : txt[f.rel];
+  const draw = () => {
+    const chosen = dec[f.rel], editing = tab === 'mano' && (txt[f.rel] == null || d.dataset.edit === '1');
+    const res = result(tab), same = res != null && now != null && norm(res) === norm(now);
+    const label = esc(opts.find(o => o[0] === tab)[1]);
+    // siempre las dos columnas: lo que tienes ahora | así quedará (también si no cambia o se borra: se ve el archivo)
+    const note = res == null && tab !== 'mano' ? (now == null ? '✓ Sigue borrado: tu archivo no cambia.' : '🗑 Con esta opción el archivo se borra.')
+      : same ? '✓ Tu archivo no cambia: queda exactamente como lo tienes.' : '';
+    const body = editing ? '<div class="mgedit"></div>'
+      : `${note ? `<p class="mgnote">${note}</p>` : ''}<div class="mgscroll"><div class="mgcode sbs${same ? ' same' : ''}">
+          <div class="sr hd"><div class="c">LO QUE TIENES AHORA${now == null ? ' · (no existe)' : ''}</div><div class="c">ASÍ QUEDARÁ CON «${label}»${res == null ? ' · (no existe)' : ''}</div></div>
+          ${sideBySideRows(norm(now ?? ''), norm(res ?? ''))}</div><div class="mgbar"></div></div>`;
+    d.querySelector('.mgvbody').innerHTML = `<nav class="mgtabs">${opts.map(([id, label, sub]) => `<button data-t="${id}" class="${tab === id ? 'on' : ''}${chosen === id && (id !== 'mano' || txt[f.rel] != null) ? ' chosen' : ''}">
+        <b>${ICON[id] || ''} ${esc(label)}${chosen === id && (id !== 'mano' || txt[f.rel] != null) ? ' ✓' : ''}</b><small>${esc(sub)}</small></button>`).join('')}</nav>
+      <p class="mglegend">${editing ? '<button class="small primary" data-save>✓ Guardar y volver a la lista</button>' + (/^<{7} /m.test(start())
+          ? 'Escribe cómo debe quedar el archivo. Donde chocan los dos cambios hay unas líneas «&lt;&lt;&lt;&lt;&lt;&lt;&lt;», «=======» y «&gt;&gt;&gt;&gt;&gt;&gt;&gt;» que solo los separan: deja lo que quieras de cada uno y bórralas.'
+          : 'Empieza con los dos cambios ya juntos: retoca lo que quieras.')
+        : tab === 'mano' ? `Así queda con lo que escribiste. <button class="small" data-reedit>✎ Volver a editar</button>`
+        : `A la izquierda tu archivo tal como está; a la derecha cómo queda con «${label}». En <span class="del">rojo</span> lo que se quita y en <span class="add">verde</span> lo que se añade.`}</p>
+      ${body}`;
+    d.querySelectorAll('[data-t]').forEach(b => b.onclick = () => {
+      if (b.dataset.t === tab && b.dataset.t !== 'mano') return;
+      tab = b.dataset.t; d.dataset.edit = '';
+      if (tab !== 'mano') dec[f.rel] = tab; // la pestaña que ves es la que eliges
+      draw();
+    });
+    d.querySelector('[data-reedit]')?.addEventListener('click', () => { d.dataset.edit = '1'; draw(); });
+    d.querySelector('[data-save]')?.addEventListener('click', async () => {
+      const t = cm.getValue();
+      if (/^(<{7}|={7}|>{7})( |$)/m.test(t)) return ask('Editar manualmente', 'Todavía hay líneas <<<<<<<, ======= o >>>>>>>. Solo marcan dónde chocan los dos cambios: deja lo que quieras de cada uno y bórralas.', ['Seguir editando']);
+      txt[f.rel] = t; dec[f.rel] = 'mano'; d.onclose = null; d.oncancel = null; d.close(); back();
+    });
+    cm = null;
+    if (editing) {
+      cm = CodeMirror(d.querySelector('.mgedit'), { value: start(), lineNumbers: true, lineWrapping: true, theme: isDark() ? 'material-darker' : 'default', styleActiveLine: true });
+      const info = CodeMirror.findModeByFileName(f.rel.split('/').pop());
+      if (info) { cm.setOption('mode', info.mime || info.mimes?.[0]); CodeMirror.autoLoadMode(cm, info.mode); }
+      const m = cm.getValue().split('\n').findIndex(l => l.startsWith('<<<<<<<'));
+      setTimeout(() => { cm.refresh(); cm.focus(); if (m >= 0) { cm.setCursor(m, 0); cm.scrollIntoView({ line: m, ch: 0 }, cm.getScrollInfo().clientHeight / 2); } });
+    }
+    mgCenter(d); mgMarks(d);
+  };
+  draw();
+}
+// Cada vista de diferencias se abre con su primer cambio en el centro vertical
+function mgCenter(root) {
+  for (const box of root.querySelectorAll('.mgcode')) {
+    const row = box.querySelector('.ld.del, .ld.add, .sr.mgchg');
+    if (row) box.scrollTop = row.offsetTop - box.clientHeight / 2 + row.offsetHeight / 2;
+  }
+}
+// Barra de marcas a la derecha: una raya roja o verde por cada bloque de cambios, en su altura proporcional;
+// clic en la barra lleva a ese punto (centrado)
+function mgMarks(root) {
+  for (const bar of root.querySelectorAll('.mgbar')) {
+    const box = bar.previousElementSibling, H = box.scrollHeight || 1;
+    let html = '', last = null;
+    for (const r of box.querySelectorAll('.ld.del, .ld.add, .sr.mgchg')) {
+      const top = r.offsetTop / H * 100, kind = r.classList.contains('del') || r.querySelector('.c.del') ? 'del' : 'add';
+      if (last && last.kind === kind && top - last.top < 0.6) continue; // líneas seguidas: una sola raya
+      last = { top, kind }; html += `<i class="${kind}" style="top:${top.toFixed(2)}%"></i>`;
+    }
+    bar.innerHTML = html;
+    bar.onclick = e => { const y = (e.clientY - bar.getBoundingClientRect().top) / bar.clientHeight; box.scrollTop = y * H - box.clientHeight / 2; };
+  }
+}
+// 👁 Ver cambios de un archivo que se une solo: así quedará, frente al último commit
+async function mergeSoloView(f, from, c) {
+  const d = dlg2();
+  d.className = 'mgv';
+  d.innerHTML = `<header><button class="small" data-back>← Volver a la lista</button><b>${esc(f.rel)}</b><span class="gc">${f.estado === 'D' ? `se borra («${esc(from)}» lo borró)` : `así quedará con lo de «${esc(from)}»`}</span><span class="sp"></span><button class="ic" data-x title="Cerrar (Esc)">✕</button></header><div class="mgvbody"><p class="gc" style="padding:16px">Cargando…</p></div>`;
+  d.querySelector('[data-x]').onclick = d.querySelector('[data-back]').onclick = () => d.close();
+  if (!d.open) d.showModal();
+  let v;
+  try { [v] = await Promise.all([api(`/api/git/fusion/archivo?ruta=${encodeURIComponent(gst.ruta)}&rel=${encodeURIComponent(f.rel)}&destino=${encodeURIComponent(from)}&arbol=${c.arbol}`), loadMerge()]); }
+  catch (e) { d.querySelector('.mgvbody').innerHTML = `<p class="err">${esc(e.message)}</p>`; return; }
+  d.querySelector('.mgvbody').innerHTML = `<p class="gc mglegend">En <span class="del">rojo</span> lo que se quita y en <span class="add">verde</span> lo que se añade.</p>${mgCol(v.base, v.resultado ?? '')}`;
+  mgCenter(d);
+}
+// 2. Conflictos: un archivo por fila, dos botones grandes con lo que harán (según quién cambió o borró el archivo)
+async function mergeChooseDialog() {
+  const d = $('#dlg'), from = mergeFrom();
+  d.className = 'sets mg'; d.oninput = d.onchange = null; d.onclose = null;
+  d.innerHTML = `<header><b>Elegir qué versión queda · fusión de «${esc(from)}» en «${esc(gst.rama)}»</b><span class="sp"></span><button class="ic" data-x title="Cerrar (Esc)">✕</button></header><div class="mgbody"><p class="gc">Cargando…</p></div>`;
+  d.querySelector('[data-x]').onclick = () => d.close();
+  if (!d.open) d.showModal();
+  const info = await Promise.all(gst.conflictos.map(c => api('/api/git/conflicto?ruta=' + encodeURIComponent(c.ruta)).then(r => ({ ...c, ...r }), () => ({ ...c, tipo: 'contenido', choques: 0 }))));
+  if (!d.open || !d.classList.contains('mg')) return;
+  const done = [...mergeChoices].filter(([rel]) => !gst.conflictos.some(c => c.rel === rel));
+  const OPTS = {
+    contenido: f => [['mio', 'Dejar mi cambio', `Se queda el archivo como lo tienes tú, sin lo de «${from}».`, 'MI versión'],
+      ['suyo', 'Dejar cambio que llega', `Se queda como lo dejó «${from}»; se pierde lo tuyo.`, `la de «${from}»`]],
+    borrado_suyo: () => [['mio', 'Conservar el archivo', 'Se queda con tus cambios.', 'conservarlo'], ['suyo', 'Borrar el archivo', `Se borra, como hizo «${from}».`, 'borrarlo']],
+    borrado_mio: () => [['mio', 'Dejarlo borrado', 'Sigue borrado, como lo tenías.', 'dejarlo borrado'], ['suyo', `Recuperarlo con lo de «${from}»`, `Vuelve el archivo con los cambios de «${from}».`, 'recuperarlo']],
+  };
+  const WHAT = { contenido: f => `las dos ramas cambiaron las mismas líneas${f.choques ? ` (${f.choques} sitio${f.choques === 1 ? '' : 's'})` : ''}`,
+    borrado_suyo: () => `tú lo cambiaste, «${from}» lo borró`, borrado_mio: () => `tú lo borraste, «${from}» lo cambió` };
+  const total = info.length + done.length;
+  d.innerHTML = `<header><b>Elegir qué versión queda · fusión de «${esc(from)}» en «${esc(gst.rama)}»</b><span class="gc">${done.length} de ${total} listos</span><span class="sp"></span><button class="ic" data-x title="Cerrar (Esc)">✕</button></header>
+    <div class="mgbody">${info.map((f, i) => `<section class="mgrow" data-i="${i}"><div class="mghead"><b>${esc(f.rel)}</b><span class="gc">· ${esc(WHAT[f.tipo](f))}</span><span class="sp"></span>
+        <button class="small" data-diff="${i}">👁 Ver diferencias</button></div>
+      <div class="mgopts">${OPTS[f.tipo](f).map(([modo, label, sub], k) => `<button data-c="${i}:${k}"><b>${esc(label)}</b><small>${esc(sub)}</small></button>`).join('')}</div></section>`).join('')}
+      ${done.map(([rel, what]) => `<section class="mgrow ok"><div class="mghead"><b>✓ ${esc(rel)}</b><span class="gc">· elegiste: ${esc(what)}</span><span class="sp"></span>
+        <button class="small" data-undo="${esc(rel)}" title="Vuelve a estar en conflicto para elegir otra vez">↶ Cambiar elección</button></div></section>`).join('')}
+      ${!info.length && !done.length ? '<p class="gc">No queda ningún conflicto.</p>' : ''}</div>
+    <footer><div class="mgacts"><div><button class="primary" data-ok ${info.length ? 'disabled' : ''}>✓ Confirmar la fusión</button><small>${info.length ? 'Se activa cuando todos estén listos.' : 'Te enseña cómo queda y hace el commit.'}</small></div>
+      <div><button data-cancel>✕ Cancelar</button><small>Todo vuelve a como estaba.</small></div></div></footer>`;
+  d.querySelector('[data-x]').onclick = () => d.close();
+  d.querySelector('[data-cancel]').onclick = mergeCancel;
+  d.querySelector('[data-ok]').onclick = mergeFinalDialog;
+  d.querySelectorAll('[data-c]').forEach(btn => btn.onclick = async () => {
+    const [i, k] = btn.dataset.c.split(':').map(Number), f = info[i], [modo, , , what] = OPTS[f.tipo](f)[k];
+    btn.closest('.mgrow').classList.add('busy'); btn.querySelector('b').textContent = '⏳ ' + btn.querySelector('b').textContent;
+    if (await gitDo('elegir', [f], { modo })) { mergeChoices.set(f.rel, what); if (tabs.includes(f.ruta)) reloadFromDisk(f.ruta).catch(() => {}); }
+    mergeChooseDialog();
+  });
+  d.querySelectorAll('[data-undo]').forEach(btn => btn.onclick = async () => {
+    btn.textContent = '⏳';
+    if (await gitDo('elegir', [{ rel: btn.dataset.undo }], { modo: 'deshacer' })) mergeChoices.delete(btn.dataset.undo);
+    mergeChooseDialog();
+  });
+  d.querySelectorAll('[data-diff]').forEach(btn => btn.onclick = () => mergeDiffView(info[+btn.dataset.diff], OPTS));
+}
+// Trozos en conflicto del archivo de trabajo (marcas <<<<<<< ||||||| ======= >>>>>>>) con 3 líneas de contexto
+function conflictHunks(text) {
+  const L = text.split('\n'), out = [];
+  for (let i = 0; i < L.length; i++) {
+    if (!L[i].startsWith('<<<<<<<')) continue;
+    const h = { mio: [], suyo: [], antes: L.slice(Math.max(0, i - 3), i), linea: i + 1 }; let side = 'mio';
+    for (i++; i < L.length && !L[i].startsWith('>>>>>>>'); i++) {
+      if (L[i].startsWith('|||||||')) side = 'base'; else if (L[i].startsWith('=======')) side = 'suyo'; else if (side !== 'base') h[side].push(L[i]);
+    }
+    h.despues = L.slice(i + 1, i + 4).filter(l => !l.startsWith('<<<<<<<')); out.push(h);
+  }
+  return out;
+}
+// 3. Ver diferencias de un archivo en conflicto: MI VERSIÓN | la de la otra rama | 👁 ASÍ QUEDARÁ (según lo que elijas aquí)
+async function mergeDiffView(f, OPTS, at = 0, pick = null) {
+  const d = $('#dlg'), from = mergeFrom();
+  const hunks = f.tipo === 'contenido' ? conflictHunks(f.trabajo || '') : [{ mio: (f.mio ?? '').split('\n'), suyo: (f.suyo ?? '').split('\n'), antes: [], despues: [], linea: 1, entero: true }];
+  at = Math.max(0, Math.min(at, hunks.length - 1));
+  const h = hunks[at], opts = OPTS[f.tipo](f), chosen = pick && opts.find(o => o[0] === pick);
+  const col = (lines, gone) => gone ? '<p class="gc">(borrado)</p>' : [...h.antes.map(l => `<div class="ctx">${esc(l) || ' '}</div>`),
+    ...lines.map(l => `<div class="hit">${esc(l) || ' '}</div>`), ...h.despues.map(l => `<div class="ctx">${esc(l) || ' '}</div>`)].join('');
+  const result = !chosen ? `<p class="gc">⚔ Elige abajo y aquí verás cómo queda.</p>`
+    : col(pick === 'mio' ? h.mio : h.suyo, pick === 'mio' ? f.mio == null : f.suyo == null) + `<p class="gc mgfrom">(de: ${pick === 'mio' ? 'MI versión' : `la de «${esc(from)}»`})</p>`;
+  d.className = 'sets mg mgview';
+  d.innerHTML = `<header><button class="small" data-back>← Volver a la lista</button><b>${esc(f.rel)}</b><span class="gc">${h.entero ? 'archivo entero' : `sitio ${at + 1} de ${hunks.length} · línea ${h.linea}`}</span><span class="sp"></span>
+      ${hunks.length > 1 ? `<button class="small" data-p ${at ? '' : 'disabled'}>◀</button><button class="small" data-n ${at < hunks.length - 1 ? '' : 'disabled'}>▶</button>` : ''}<button class="ic" data-x title="Cerrar (Esc)">✕</button></header>
+    <div class="mg3"><section><h4>MI VERSIÓN («${esc(gst.rama)}»)</h4><div class="mgcol">${col(h.mio, f.mio == null)}</div></section>
+      <section><h4>VERSIÓN DE «${esc(from)}»</h4><div class="mgcol">${col(h.suyo, f.suyo == null)}</div></section>
+      <section class="res"><h4>👁 ASÍ QUEDARÁ</h4><div class="mgcol">${result}</div></section></div>
+    <footer><div class="mgacts">${opts.map(([modo, label, sub]) => `<div><button data-pk="${modo}" class="${pick === modo ? 'on' : ''}">${esc(label)}</button><small>${esc(sub)}</small></div>`).join('')}
+      ${f.tipo === 'contenido' ? '<div><button data-hand>✎ Editar manualmente</button><small>Abre el archivo en el editor con las dos partes marcadas; al guardarlo sin marcas queda listo.</small></div>' : ''}
+      ${chosen ? `<div><button class="primary" data-apply>✓ Aplicar y volver</button><small>${esc(chosen[2])}</small></div>` : ''}</div></footer>`;
+  d.querySelector('[data-x]').onclick = () => d.close();
+  d.querySelector('[data-back]').onclick = mergeChooseDialog;
+  d.querySelector('[data-p]')?.addEventListener('click', () => mergeDiffView(f, OPTS, at - 1, pick));
+  d.querySelector('[data-n]')?.addEventListener('click', () => mergeDiffView(f, OPTS, at + 1, pick));
+  d.querySelectorAll('[data-pk]').forEach(b => b.onclick = () => mergeDiffView(f, OPTS, at, b.dataset.pk));
+  d.querySelector('[data-apply]')?.addEventListener('click', async e => {
+    e.currentTarget.textContent = '⏳ Aplicando…';
+    if (await gitDo('elegir', [f], { modo: pick })) { mergeChoices.set(f.rel, chosen[3]); if (tabs.includes(f.ruta)) reloadFromDisk(f.ruta).catch(() => {}); }
+    mergeChooseDialog();
+  });
+  d.querySelector('[data-hand]')?.addEventListener('click', async () => {
+    d.close(); await openTab(f.ruta, true);
+    for (let i = 0; i < 20 && !(curFile && cur === f.ruta); i++) await new Promise(ok => setTimeout(ok, 100)); // la pestaña termina de cargar
+    if (cur === f.ruta && curFile && !edits.has(cur)) startEdit(cur, curFile);
+    flash('Deja una sola versión en cada sitio, borra las líneas <<<<<<< ======= >>>>>>> y guarda: quedará resuelto');
+  });
+}
+// 4. Antes de confirmar: cómo queda la rama (lo preparado frente al último commit) y el commit de la fusión
+async function mergeFinalDialog() {
+  const d = $('#dlg'), from = mergeFrom(), head = (gst.punta || '').split(':')[0];
+  if (gst.conflictos.length) return mergeChooseDialog();
+  const WHAT = { M: `cambia como en «${from}»`, A: `llega nuevo de «${from}»`, D: `se borra («${from}» lo borró)` };
+  const rows = gst.preparados.map(f => ({ ...f, que: mergeChoices.has(f.rel) ? 'elegiste: ' + mergeChoices.get(f.rel) : WHAT[f.estado] || 'cambia' }));
+  d.className = 'sets mg'; d.oninput = d.onchange = null; d.onclose = null;
+  const draw = () => {
+    d.className = 'sets mg';
+    d.innerHTML = `<header><b>Antes de confirmar: así queda «${esc(gst.rama)}»</b><span class="gc">${rows.length} archivo${rows.length === 1 ? '' : 's'}</span><span class="sp"></span><button class="ic" data-x title="Cerrar (Esc)">✕</button></header>
+      <div class="mgbody"><table class="gdtab"><thead><tr><th>Estado</th><th>Archivo</th><th>Qué pasa</th><th></th></tr></thead><tbody>${rows.map((f, i) =>
+        `<tr><td><span class="gst" data-s="${esc(f.estado)}">${esc(f.estado)}</span></td><td class="gn" title="${esc(f.rel)}">${esc(f.rel)}</td><td>${esc(f.que)}</td><td><button class="small" data-v="${i}" title="Ver el archivo: antes → después">👁</button></td></tr>`).join('')}</tbody></table>
+        <label class="mgmsg">Mensaje del commit <input id="mgMsg" spellcheck="false" value="${esc(`Fusión de ${from} en ${gst.rama}`)}"></label></div>
+      <footer><div class="mgacts"><div><button class="primary" data-ok>✓ Confirmar la fusión</button><small>Hace el commit con este mensaje; la fusión queda terminada.</small></div>
+        <div><button data-back>← Seguir eligiendo</button><small>Vuelve a la lista de conflictos.</small></div>
+        <div><button data-cancel>✕ Cancelar la fusión</button><small>Todo vuelve a como estaba.</small></div></div></footer>`;
+    d.querySelector('[data-x]').onclick = () => d.close();
+    d.querySelector('[data-back]').onclick = mergeChooseDialog;
+    d.querySelector('[data-cancel]').onclick = mergeCancel;
+    d.querySelector('[data-ok]').onclick = async e => {
+      const m = $('#mgMsg').value.trim(); if (!m) return $('#mgMsg').focus();
+      e.currentTarget.textContent = '⏳ Confirmando…'; e.currentTarget.disabled = true;
+      if (await gitDo('commit', [], { mensaje: m })) { mergeChoices.clear(); d.close(); flash('✓ Fusión confirmada'); loadSide(); }
+      else draw();
+    };
+    d.querySelectorAll('[data-v]').forEach(x => x.onclick = () => {
+      const f = rows[+x.dataset.v];
+      mergeFileView(f.rel, f.que, () => Promise.all([gitText(f.rel, head), f.estado === 'D' ? '' : api('/api/abrir?ruta=' + encodeURIComponent(f.ruta)).then(r => r.texto ?? '', () => '')]), draw);
+    });
+  };
+  draw();
+  if (!d.open) d.showModal();
 }
 async function gitSync() {
   if (!gst.remota) return gitPush(); // publicar la rama
@@ -2667,8 +3202,7 @@ const gitNo = title => ({ disabled: true, title });
 const gitMergeable = () => [...gst.ramas.filter(b => b !== gst.rama),
   ...gst.ramas_remotas.filter(r => !gst.ramas.includes(r.split('/').slice(1).join('/')))];
 async function gitMerge(b) {
-  if (await ask('Fusionar', `¿Traer los cambios de «${b}» a «${gst.rama}»? Si hay conflictos, aparecen en la lista para resolverlos.`,
-    ['Fusionar', 'Cancelar']) === 'Fusionar') gitLong('fusionar', { rama: b });
+  mergeOneDialog('fusionar', b); // pantalla única: nada se toca hasta «⤵ Fusionar»
 }
 function gitMergeMenu(anchor) {
   const bs = gitMergeable();
@@ -2682,9 +3216,9 @@ function gitBranchMenu(anchor) {
     ...(gitFullOn() ? [{ head: `${gst.rama} · estás aquí` }]
       : [{ head: 'Cambiar de rama' }, ...gst.ramas.map(b => [(b === gst.rama ? '✓ ' : '  ') + b + (gst.en_otra_carpeta?.[b] ? ` · abierta en ${gst.en_otra_carpeta[b].split(/[\\/]/).filter(Boolean).pop()}` : ''),
         () => b === gst.rama ? null : gst.en_otra_carpeta?.[b] ? gitBranchElsewhere(b, gst.en_otra_carpeta[b]) : gitSwitch(b)]), '-']),
-    ['⇣  Pull', () => gitLong('pull'), up ? { title: `Traer los cambios de ${up}` } : gitNo('La rama no está enlazada a una rama remota')],
+    ['⇣  Pull', () => mergeOneDialog('pull'), up ? { title: `Traer los cambios de ${up}` } : gitNo('La rama no está enlazada a una rama remota')],
     ['⇣  Pull desde…', () => remoteList(`Traer a «${gst.rama}» los cambios de…`, 'Traer a la rama actual los cambios de', async r => {
-      if (await ask('Pull desde', `¿Traer a «${gst.rama}» los cambios de ${r}?`, ['Traer', 'Cancelar']) === 'Traer') gitLong('pull_desde', { rama: r });
+      mergeOneDialog('pull_desde', r); // la pantalla única ya pregunta y dice qué llega
     }), rem.length ? { title: `Traer los cambios de otra rama remota a «${gst.rama}»` } : gitNo('No hay ramas remotas')],
     ['⇡  Push', gitPush, hasRemote ? { title: up ? `Subir tus commits a ${up}` : `Publicar «${gst.rama}» en ${web}` } : gitNo('Este repositorio no tiene remoto')],
     ['⇡  Push a…', () => openMenu(anchor, [{ head: `Subir «${gst.rama}» a…` },
@@ -2816,7 +3350,7 @@ function gitFullOpen() {
   G.querySelector('.gfright').append($('#gitv'));
   $('#gfAll').checked = LS('desklens.git.todas') === '1';
   $('#gfAll').onchange = e => { LS('desklens.git.todas', e.target.checked ? '1' : ''); gfKey = ''; gitFullDraw(); };
-  $('#gfPull').onclick = () => gitLong('pull'); $('#gfPush').onclick = gitPush; $('#gfFetch').onclick = () => gitLong('fetch');
+  $('#gfPull').onclick = () => mergeOneDialog('pull'); $('#gfPush').onclick = gitPush; $('#gfFetch').onclick = () => gitLong('fetch');
   document.body.classList.add('gitfull', 'vgit');
   gitfullLayout(false);
   gfKey = ''; gfSel = gfL.sel[gst.ruta] || null; gfRestore = true; gitFullDraw();
@@ -4874,6 +5408,156 @@ function livePreview(ed, V, fn) {
     clearTimeout(t); t = setTimeout(() => { const y = V.scrollTop; fn(); V.scrollTop = y; }, 300);
   });
 }
+// ---------- historial de una línea: 💾 ediciones en disco (pasos del historial) y ⎇ commits de git ----------
+// [💾N ⎇N] al borde derecho de la línea bajo el ratón (o, sin ratón encima, la del cursor). Los contadores se piden
+// 300 ms después de parar en una línea y se guardan por número + texto de la línea (si cambia, se vuelven a pedir).
+function lineHistBadge(cm, path) {
+  const w = cm.getWrapperElement(), b = Object.assign(document.createElement('button'), { className: 'lhbadge', hidden: true });
+  w.append(b);
+  const cache = new Map();
+  let line = -1, hoverL = -1, t = 0;
+  const counts = l => {
+    const k = l + '\x01' + cm.getLine(l);
+    if (!cache.has(k)) cache.set(k, Promise.all(['disco', 'git'].map(f => api('/api/hist/linea', { ruta: path, texto: cm.getValue(), linea: l + 1, fuente: f })
+      .then(r => r.versiones.length, () => 0))));
+    return cache.get(k);
+  };
+  const place = () => {
+    if (line < 0 || line >= cm.lineCount() || !b.textContent) return b.hidden = true;
+    const top = cm.heightAtLine(line, 'local') - cm.getScrollInfo().top;
+    b.hidden = top < 0 || top > w.clientHeight - 16; b.style.top = top + 'px';
+  };
+  const want = () => {
+    const l = hoverL >= 0 ? hoverL : cm.getCursor().line;
+    if (l === line && !b.hidden) return place();
+    line = l; b.hidden = true; b.textContent = ''; clearTimeout(t);
+    t = setTimeout(async () => {
+      const [d, g] = await counts(l);
+      if (l !== line || !w.isConnected) return;
+      b.innerHTML = (d ? `<span class="lhd">💾${d}</span>` : '') + (g ? `<span class="lhg">⎇${g}</span>` : '');
+      b.title = `Historial de la línea ${l + 1}: ${d} edicion${d === 1 ? '' : 'es'} en disco · ${g} commit${g === 1 ? '' : 's'} de git`;
+      place();
+    }, 300);
+  };
+  cm.on('cursorActivity', want); cm.on('scroll', place); cm.on('change', () => cache.clear());
+  cm.lhReset = () => { cache.clear(); line = -1; want(); }; // tras cada paso nuevo del historial
+  w.addEventListener('mousemove', e => { if (e.target === b || b.contains(e.target)) return; const l = cm.coordsChar({ left: e.clientX, top: e.clientY }, 'window').line; if (l !== hoverL) { hoverL = l; want(); } });
+  w.addEventListener('mouseleave', () => { hoverL = -1; want(); });
+  b.onmousedown = e => e.preventDefault(); // no mueve el cursor del editor
+  b.onclick = () => lineHistDialog({ path, n: line + 1, texto: cm.getValue(), cm });
+}
+// Modal del historial de una línea: pestañas 💾 (azul) y ⎇ (morado), lista a la izquierda y antes/después a la derecha.
+// st: { path, n, texto, cm, tab, i } — se conserva para que «← Volver» deje la misma pestaña y versión.
+async function lineHistDialog(st) {
+  const d = $('#dlg'), rel = crumbParts(st.path).slice(1).join('/') || st.path.split(/[\\/]/).pop();
+  st.tab ??= LS('desklens.lineahist') || 'disco'; st.i ??= 0;
+  d.className = 'sets lhist'; d.oninput = d.onchange = null; d.onclose = null;
+  const now = st.texto.split('\n')[st.n - 1] ?? '';
+  d.innerHTML = `<header><b>Historial de la línea ${st.n}</b><span class="gc">${esc(rel)}</span><span class="sp"></span>
+      <button class="small" data-ctx>⤢ Ver en su contexto</button><button class="ic" data-x title="Cerrar (Esc)">✕</button></header>
+    <div class="lhnow">Ahora: <code>${esc(now) || '<i>(vacía)</i>'}</code></div>
+    <div class="lhtabs"><button data-t="disco" class="lhd">💾 Ediciones en disco <span>⏳</span></button><button data-t="git" class="lhg">⎇ Commits de git <span>⏳</span></button></div>
+    <div class="lhbody"><nav></nav><section></section></div>`;
+  if (!d.open) d.showModal();
+  d.querySelector('[data-x]').onclick = () => d.close();
+  st.data ??= {};
+  const load = f => st.data[f] ??= api('/api/hist/linea', { ruta: st.path, texto: st.texto, linea: st.n, fuente: f }).catch(e => ({ versiones: [], error: e.message }));
+  const nav = d.querySelector('nav'), det = d.querySelector('section');
+  const tabs = d.querySelectorAll('.lhtabs button');
+  const draw = async () => {
+    tabs.forEach(b => b.classList.toggle('on', b.dataset.t === st.tab));
+    d.querySelector('.lhbody').className = 'lhbody ' + (st.tab === 'disco' ? 'lhd' : 'lhg');
+    nav.innerHTML = '<p class="gc">Cargando…</p>'; det.innerHTML = '';
+    const tab = st.tab, r = await load(tab);
+    if (tab !== st.tab || !d.classList.contains('lhist')) return;
+    const vs = r.versiones;
+    if (!vs.length) {
+      nav.innerHTML = ''; d.querySelector('[data-ctx]').disabled = true;
+      det.innerHTML = `<p class="gc lhempty">${esc(r.error || (tab === 'disco' ? 'Esta línea no se ha editado aquí (o su historial ya se borró).'
+        : r.git === false ? 'El archivo no está en git.' : r.sin_commit ? 'Esta línea aún no está en ningún commit.' : 'Sin commits que toquen esta línea.'))}</p>`;
+      return;
+    }
+    d.querySelector('[data-ctx]').disabled = false;
+    st.i = Math.min(st.i, vs.length - 1);
+    nav.innerHTML = vs.map((v, i) => `<a data-i="${i}" class="${i === st.i ? 'on' : ''}">${tab === 'disco'
+      ? `<b>💾 ${esc(lhWhen(v))}</b><span>${v.id === 'ahora' ? 'sin guardar' : v.antes == null ? 'aquí empieza' : v.guardado ? 'guardado' : 'paso'} · línea ${v.linea}</span>`
+      : `<b>⎇ ${esc(lhWhen(v))} · ${esc(v.autor)}</b><span>«${esc(v.mensaje)}»${v.antes == null ? ' · creada' : ''}</span>`}</a>`).join('');
+    nav.querySelectorAll('a').forEach(a => a.onclick = () => { st.i = +a.dataset.i; draw(); });
+    const v = vs[st.i];
+    await loadMerge().catch(() => {}); // diff_match_patch, para pintar las palabras exactas
+    det.innerHTML = `<p class="lhhead">${tab === 'disco' ? `💾 ${esc(lhWhen(v))} · ${v.id === 'ahora' ? 'sin guardar' : esc(v.desc || 'paso')} · línea ${v.linea}`
+        : `⎇ <code>${v.hash.slice(0, 7)}</code> <button class="small" data-copyh title="Copiar el hash">⧉</button> · ${esc(v.autor)} · ${esc(lhWhen(v))} · línea ${v.linea}<br><b>«${esc(v.mensaje)}»</b>`}</p>
+      <div class="lhdiff">${lhDiff(v.antes, v.texto)}</div>
+      <p class="gc lhfoot">${tab === 'disco' ? `Solo en esta PC · el historial se borra a los ${AJ.historial_dias || 7} días sin editar el archivo (⚙ Ajustes)` : esc(v.rel)}</p>
+      <div class="exp-actions">${tab === 'disco' ? '<button data-back>↩ Volver a esta versión</button>' : '<button data-commit>⇆ Ver el commit entero</button>'}
+        <button data-copy>⧉ Copiar</button><button data-ctx2>⤢ Ver en su contexto</button></div>`;
+    det.querySelector('[data-copy]').onclick = () => copyText(v.texto, 'Línea copiada');
+    det.querySelector('[data-ctx2]').onclick = () => lineHistContext(st, vs);
+    det.querySelector('[data-copyh]')?.addEventListener('click', () => copyText(v.hash, 'Hash copiado'));
+    det.querySelector('[data-commit]')?.addEventListener('click', () => lineHistCommit(st, v));
+    det.querySelector('[data-back]')?.addEventListener('click', () => {
+      const cm = st.cm, i = st.n - 1;
+      if (!cm?.getWrapperElement().isConnected || cm.getLine(i) !== now) return ask('Volver a esta versión', 'El editor cambió desde que abriste el historial: vuelve a abrirlo.', ['Entendido']);
+      cm.replaceRange(v.texto, { line: i, ch: 0 }, { line: i, ch: now.length }); d.close(); cm.focus();
+      flash(`✓ Línea ${st.n} como en ${lhWhen(v)} · sin guardar`);
+    });
+  };
+  tabs.forEach(b => b.onclick = () => { st.tab = b.dataset.t; st.i = 0; LS('desklens.lineahist', st.tab); draw(); });
+  d.querySelector('[data-ctx]').onclick = async () => { const r = await load(st.tab); if (r.versiones.length) lineHistContext(st, r.versiones); };
+  for (const f of ['disco', 'git']) load(f).then(r => { const s = d.querySelector(`.lhtabs [data-t=${f}] span`); if (s) s.textContent = r.versiones.length; });
+  draw();
+}
+const lhWhen = v => typeof v.fecha === 'number' ? `${dayKey(v.fecha)} ${hhmm(v.fecha)}` : v.id === 'ahora' ? 'Ahora' : (() => { const t = Date.parse(v.fecha.replace(' ', 'T')) / 1000; return t ? `${dayKey(t)} ${hhmm(t)}` : v.fecha; })();
+// antes → después de una línea, con las palabras exactas pintadas (diff_match_patch si está; si no, las líneas enteras)
+function lhDiff(a, b) {
+  if (a == null) return `<div class="lhadd">+ ${esc(b)}</div><p class="gc">La línea se creó aquí.</p>`;
+  if (typeof diff_match_patch !== 'function') return `<div class="lhdel">− ${esc(a)}</div><div class="lhadd">+ ${esc(b)}</div>`;
+  const dmp = new diff_match_patch(), ds = dmp.diff_main(a, b); dmp.diff_cleanupSemantic(ds);
+  const side = keep => ds.filter(([op]) => op !== -keep).map(([op, s]) => op ? `<mark>${esc(s)}</mark>` : esc(s)).join('');
+  return `<div class="lhdel">− ${side(-1)}</div><div class="lhadd">+ ${side(1)}</div>`;
+}
+// «Ver en su contexto»: el archivo entero en esa versión, la línea resaltada y lo demás atenuado; ◀ ▶ entre versiones
+async function lineHistContext(st, vs) {
+  const d = $('#dlg'), v = vs[st.i], git = st.tab === 'git';
+  d.className = 'sets lhist lhctx ' + (git ? 'lhg' : 'lhd');
+  d.innerHTML = `<header><button class="small" data-back>← Volver al historial de la línea</button><b>Línea ${v.linea} en «${esc(git ? v.mensaje : lhWhen(v))}»</b>
+      <span class="gc">${git ? `⎇ ${v.hash.slice(0, 7)} · ${esc(v.autor)} · ${esc(lhWhen(v))}` : '💾 ' + esc(lhWhen(v))}</span><span class="sp"></span>
+      <button class="small" data-p ${st.i >= vs.length - 1 ? 'disabled' : ''} title="Versión anterior de la línea">◀ anterior</button>
+      <button class="small" data-n ${st.i <= 0 ? 'disabled' : ''} title="Versión siguiente de la línea">siguiente ▶</button><button class="ic" data-x title="Cerrar (Esc)">✕</button></header>
+    <div class="lhcode"><p class="gc" style="padding:16px">Cargando…</p></div>`;
+  d.querySelector('[data-x]').onclick = () => d.close();
+  d.querySelector('[data-back]').onclick = () => lineHistDialog(st);
+  d.querySelector('[data-p]').onclick = () => { st.i++; lineHistContext(st, vs); };
+  d.querySelector('[data-n]').onclick = () => { st.i--; lineHistContext(st, vs); };
+  let text;
+  try {
+    text = git ? (await api(`/api/git/version?ruta=${encodeURIComponent(st.path)}&hash=${v.hash}&rel=${encodeURIComponent(v.rel)}`)).texto
+      : v.id === 'ahora' ? st.texto : await (await fetch(histUrl(st.path, v.id))).text();
+  } catch (e) { d.querySelector('.lhcode').innerHTML = `<p class="err">${esc(e.message)}</p>`; return; }
+  if (!d.classList.contains('lhctx') || vs[st.i] !== v) return;
+  const html = hlLines(norm(text), kind(st.path).lang), at = v.linea - 1;
+  const box = d.querySelector('.lhcode');
+  box.innerHTML = `<div class="code"><pre class="nums">${html.map((_, i) => `<div class="${i === at ? 'on' : ''}">${i + 1}</div>`).join('')}</pre>`
+    + `<pre><code class="hljs">${html.map((l, i) => `<div class="${i === at ? 'on' : ''}">${l || ' '}</div>`).join('')}</code></pre></div>`;
+  const row = box.querySelector('code .on'); if (row) box.scrollTop = row.offsetTop - box.clientHeight / 2;
+}
+// «⇆ Ver el commit entero»: mensaje, autor y archivos del commit, con ← Volver al historial de la línea
+async function lineHistCommit(st, v) {
+  const d = $('#dlg');
+  d.className = 'sets lhist lhctx lhg';
+  d.innerHTML = `<header><button class="small" data-back>← Volver al historial de la línea</button><b>⎇ ${v.hash.slice(0, 7)} · «${esc(v.mensaje)}»</b>
+      <span class="gc">${esc(v.autor)} · ${esc(lhWhen(v))}</span><span class="sp"></span><button class="ic" data-x title="Cerrar (Esc)">✕</button></header>
+    <div class="lhcode" style="padding:12px 20px"><p class="gc">Cargando…</p></div>`;
+  d.querySelector('[data-x]').onclick = () => d.close();
+  d.querySelector('[data-back]').onclick = () => lineHistDialog(st);
+  let r;
+  try { r = await api(`/api/git/archivos?ruta=${encodeURIComponent(st.path)}&hash=${v.hash}`); }
+  catch (e) { d.querySelector('.lhcode').innerHTML = `<p class="err">${esc(e.message)}</p>`; return; }
+  if (!d.classList.contains('lhctx')) return;
+  d.querySelector('.lhcode').innerHTML = `<p class="gc">${r.archivos.length} archivo${r.archivos.length === 1 ? '' : 's'}</p><table class="gdtab"><thead><tr><th>Estado</th><th>Archivo</th><th class="num">+</th><th class="num">−</th></tr></thead><tbody>`
+    + r.archivos.map(f => `<tr class="${f.rel === v.rel ? 'lhme' : ''}"><td><span class="gst" data-s="${esc(f.estado)}">${esc(f.estado)}</span></td><td class="gn">${esc(f.rel)}</td>`
+      + (f.mas == null ? '<td class="num gc" colspan="2">binario</td>' : `<td class="num"><i>+${f.mas}</i></td><td class="num"><em>−${f.menos}</em></td>`) + '</tr>').join('') + '</tbody></table>';
+}
 // Editor CodeMirror del texto en edición: modo por extensión, buscar de DeskLens, copia de recuperación al
 // escribir y un paso del historial tras cada pausa.
 function editorView(V, ed, name, path) {
@@ -4900,7 +5584,7 @@ function editorView(V, ed, name, path) {
   cm.on('cursorActivity', () => symUpd(cm.getCursor().line));
   cm.on('change', () => { clearTimeout(symT); symT = setTimeout(() => { syms = codeSymbols(cm.getValue().split('\n'), symLang); symUpd(cm.getCursor().line); }, 400); });
   symUpd(0);
-  if (!isUntitled(path)) bpEditor(cm, path);
+  if (!isUntitled(path)) { bpEditor(cm, path); lineHistBadge(cm, path); }
   if (dbgAt?.path.toLowerCase() === path.toLowerCase()) setTimeout(() => dbgPaint({ path: dbgAt.path, line: dbgAt.line }));
   const info = CodeMirror.findModeByFileName(name.toLowerCase().endsWith('.blade.php') ? 'x.php' : name);
   if (info) { cm.setOption('mode', info.mime || info.mimes?.[0]); CodeMirror.autoLoadMode(cm, info.mode); }
@@ -4917,6 +5601,7 @@ function editorView(V, ed, name, path) {
     if (ed.text === ed.histLast) return;
     const desc = textDesc(ed.histLast, ed.text);
     ed.histLast = ed.text; await histStep(path, desc, ed.text);
+    cm.lhReset?.(); // [💾N ⎇N]: hay un paso más
   };
   if (!isUntitled(path)) histUse(path, async id => {
     const t = await (await fetch(histUrl(path, id))).text();
@@ -5385,7 +6070,8 @@ async function save(path, force = false) {
   if (ed.text === ed.histLast) histSaved(path); // 💾 en el historial
   dropBackup(path); // guardado: la copia de recuperación ya no hace falta
   renderTabs();
-  flash('✓ Guardado' + (d.bak ? ' · respaldo: ' + d.bak.split(/[\\/]/).pop() : ''));
+  flash('✓ Guardado' + (d.bak ? ' · respaldo: ' + d.bak.split(/[\\/]/).pop() : '') + (d.resuelto ? ' · conflicto resuelto' : ''));
+  if (d.resuelto && gst?.ruta) gitLoad(); // la vista Git: un conflicto menos
   return true;
 }
 // Botón Guardar (y «Guardar» del ⋮): guarda y vuelve a lectura con la misma primera línea a la vista (en código; un

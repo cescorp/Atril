@@ -379,6 +379,14 @@ with tempfile.TemporaryDirectory() as tmp:
     txt.write_bytes(b"uno\ndos\ntres\n")
     assert desklens.hist_saved(txt, p2)["disco"] == p2  # el siguiente paso parte de aquí sin copiar nada
     assert desklens.hist_step(txt, None, "Texto", b"x")["nodos"][-1]["padre"] == p2
+    # historial de una línea en los pasos: se sigue aunque se inserten líneas encima; «creada» donde aparece
+    lt = proj / "lineas.txt"; lt.write_text("a\nb\nc\n")
+    s1 = desklens.hist_step(lt, None, "Texto", b"a\nB\nc\n")["id"]
+    s2 = desklens.hist_step(lt, s1, "Texto", b"z\na\nB2\nc\n")["id"]
+    vs = desklens.line_history_disk(lt, "z\na\nB2\nc\n", 3)
+    assert [(v["id"] == s2, v["texto"], v["antes"]) for v in vs[:2]] == [(True, "B2", "B"), (False, "B", "b")] and vs[2]["antes"] is None, vs
+    assert [v["linea"] for v in vs] == [3, 2, 2]
+    assert desklens.line_history_disk(lt, "z\na\nB2\nc\n", 1)[0]["antes"] is None  # «z»: creada en el paso 2
     hw = proj / "hist.docx"
     hw.write_bytes(Path(wd).read_bytes())
     w1 = desklens.hist_step(hw, None, "Negrita", json.dumps([{"buscar": "Título del tema", "negrita": True}]).encode())["id"]
@@ -839,6 +847,68 @@ assert.deepStrictEqual(findRefs('Ver 1 Samuel 4:4 y 1 Samuel 8:5, 20; Deuteronom
     assert code == 200 and not ov["preparados"] and not ov["cambios"]
     code, r = act("fusionar", "cesare3")
     assert code == 200 and wait_run(r["id"])["codigo"] == 0 and (rep / ".gitignore").read_text() == "de cesare3\n"
+    # historial de una línea en git: se busca en HEAD aunque en el editor se haya movido; git log -L la sigue
+    (rep / "lin.txt").write_text("l1\nl2\n"); git(rep, "add", "-A"); git(rep, "commit", "-qm", "lin")
+    (rep / "lin.txt").write_text("l1\nL2 nuevo\n"); git(rep, "commit", "-qam", "L2 nuevo")  # otro tamaño: git lo ve en el mismo segundo
+    g = desklens.line_history_git(str(rep / "lin.txt"), "nueva\nl1\nL2 nuevo\n", 3)
+    assert [(v["mensaje"], v["texto"], v["antes"], v["linea"]) for v in g["versiones"]] == [("L2 nuevo", "L2 nuevo", "l2", 2), ("lin", "l2", None, 2)], g
+    assert desklens.line_history_git(str(rep / "lin.txt"), "nueva\nl1\nL2 nuevo\n", 1)["sin_commit"]  # aún sin commit
+    # conflictos: vista previa sin tocar nada, elegir versión, deshacer la elección, mezclar a mano y confirmar
+    (rep / "k.txt").write_text("uno\ndos\n"); (rep / "kb.txt").write_text("b\n"); git(rep, "add", "-A"); git(rep, "commit", "-qm", "k")
+    git(rep, "checkout", "-q", "-b", "kotra"); (rep / "k.txt").write_text("uno\nDOS de otra\n"); git(rep, "rm", "-q", "kb.txt")
+    (rep / "kn.txt").write_text("nuevo\n"); git(rep, "add", "-A"); git(rep, "commit", "-qm", "kotra")
+    git(rep, "checkout", "-q", "main"); (rep / "k.txt").write_text("uno\ndos de main\n"); (rep / "kb.txt").write_text("b main\n"); git(rep, "commit", "-qam", "kmain")
+    antes = out(rep, "rev-parse", "HEAD")
+    chk = lambda rama: json.loads(get(port, f"/api/git/fusion?ruta={urllib.request.quote(str(rep))}&accion=fusionar&rama={rama}")[1])
+    pv = chk("kotra")  # pantalla única: comprobar sin tocar nada
+    assert pv["commits"] == 1 and pv["lista"][0]["mensaje"] == "kotra" and out(rep, "rev-parse", "HEAD") == antes and out(rep, "status", "--porcelain") == "", pv
+    fil = {f["rel"]: f for f in pv["filas"]}
+    assert (fil["k.txt"]["problema"], fil["k.txt"]["tipo"]) == ("conflicto", "contenido") and fil["kb.txt"]["tipo"] == "borrado_suyo"
+    assert [s["rel"] for s in pv["solos"]] == ["kn.txt"] and chk("main")["bloqueo"] == "al_dia"
+    fa = json.loads(get(port, f"/api/git/fusion/archivo?ruta={urllib.request.quote(str(rep))}&rel=k.txt&destino=kotra&arbol={pv['arbol']}")[1])
+    assert (fa["tuya"], fa["llega"]) == ("uno\ndos de main\n", "uno\nDOS de otra\n") and "<<<<<<<" in fa["resultado"]
+    # con un cambio tuyo sin commit en un archivo que también llega: «ambos»; si se tocan sitios distintos, «juntar» es limpio
+    (rep / "kn0.txt").write_text("a\nb\nc\nd\ne\n"); git(rep, "add", "-A"); git(rep, "commit", "-qm", "kn0"); git(rep, "branch", "-f", "kj")
+    git(rep, "checkout", "-q", "kj"); (rep / "kn0.txt").write_text("a\nb\nc\nd\nE de kj\n"); git(rep, "commit", "-qam", "kj"); git(rep, "checkout", "-q", "main")
+    (rep / "kn0.txt").write_text("A mío\nb\nc\nd\ne\n")
+    pj = chk("kj")
+    assert [(f["rel"], f["problema"], f["juntar"]) for f in pj["filas"]] == [("kn0.txt", "ambos", True)], pj
+    code, r = post("/api/git/fusion", {"ruta": str(rep), "accion": "fusionar", "rama": "kj"})
+    assert code == 400 and "Falta decidir" in r["error"]
+    code, r = post("/api/git/fusion", {"ruta": str(rep), "accion": "fusionar", "rama": "kj", "decisiones": {"kn0.txt": "juntar"}})
+    assert code == 200 and r["hecho"] and (rep / "kn0.txt").read_text() == "A mío\nb\nc\nd\nE de kj\n" and out(rep, "status", "--porcelain") == "", r
+    # conflicto + «la que llega» + borrar, en un solo paso
+    code, r = post("/api/git/fusion", {"ruta": str(rep), "accion": "fusionar", "rama": "kotra", "decisiones": {"k.txt": "llega", "kb.txt": "borrar"}})
+    assert code == 200 and r["hecho"] and (rep / "k.txt").read_text() == "uno\nDOS de otra\n" and not (rep / "kb.txt").exists() and (rep / "kn.txt").exists()
+    assert len(out(rep, "log", "-1", "--format=%P").split()) == 2 and out(rep, "status", "--porcelain") == ""
+    git(rep, "reset", "-q", "--hard", antes)
+    # «Editar manualmente» en la ventana: el texto llega con la decisión y se escribe tal cual, sin dejar la fusión abierta
+    fa = json.loads(get(port, f"/api/git/fusion/archivo?ruta={urllib.request.quote(str(rep))}&rel=k.txt&destino=kotra&arbol={chk('kotra')['arbol']}")[1])
+    assert "<<<<<<< tu versión" in fa["mezcla"] and "dos de main" in fa["mezcla"] and "DOS de otra" in fa["mezcla"]
+    code, r = post("/api/git/fusion", {"ruta": str(rep), "accion": "fusionar", "rama": "kotra", "decisiones": {"k.txt": "mano", "kb.txt": "conservar"},
+                                       "textos": {"k.txt": "uno\ndos de main y DOS de otra\n"}})
+    assert code == 200 and r["hecho"] and (rep / "k.txt").read_text() == "uno\ndos de main y DOS de otra\n" and (rep / "kb.txt").exists(), r
+    git(rep, "reset", "-q", "--hard", antes)  # para lo siguiente: la fusión con conflictos hecha a mano
+    code, r = act("fusionar", "kotra")
+    assert wait_run(r["id"])["codigo"] != 0
+    ov = json.loads(get(port, "/api/git/estado?ruta=" + urllib.request.quote(str(rep)))[1])
+    assert ov["fusionando"] and ov["fusion_de"] == "kotra" and {c["rel"] for c in ov["conflictos"]} == {"k.txt", "kb.txt"}
+    k = json.loads(get(port, "/api/git/conflicto?ruta=" + urllib.request.quote(str(rep / "k.txt")))[1])
+    assert (k["mio"], k["suyo"], k["tipo"], k["choques"]) == ("uno\ndos de main\n", "uno\nDOS de otra\n", "contenido", 1), k
+    assert json.loads(get(port, "/api/git/conflicto?ruta=" + urllib.request.quote(str(rep / "kb.txt")))[1])["tipo"] == "borrado_suyo"
+    elegir = lambda f, modo: post("/api/git/accion", {"ruta": str(rep), "accion": "elegir", "archivos": [f], "modo": modo})
+    code, ov = elegir("k.txt", "suyo")
+    assert code == 200 and (rep / "k.txt").read_text() == "uno\nDOS de otra\n" and "k.txt" not in {c["rel"] for c in ov["conflictos"]}
+    code, ov = elegir("k.txt", "deshacer")  # vuelve a estar en conflicto, con las marcas
+    assert "k.txt" in {c["rel"] for c in ov["conflictos"]} and "<<<<<<<" in (rep / "k.txt").read_text()
+    k = json.loads(get(port, "/api/git/conflicto?ruta=" + urllib.request.quote(str(rep / "k.txt")))[1])
+    fk = json.loads(get(port, "/api/abrir?ruta=" + urllib.request.quote(str(rep / "k.txt")))[1])
+    code, r = post("/api/guardar", {"ruta": str(rep / "k.txt"), "texto": "uno\ndos de main y de otra\n", "codificacion": fk["codificacion"], "eol": fk["eol"], "mtime": fk["mtime"]})
+    assert code == 200 and r["resuelto"], r  # mezclado a mano: sin marcas, queda resuelto
+    code, ov = elegir("kb.txt", "suyo")  # la otra lo borró
+    assert not (rep / "kb.txt").exists() and not ov["conflictos"]
+    post("/api/git/accion", {"ruta": str(rep), "accion": "commit", "mensaje": "Fusión de kotra en main"})
+    assert len(out(rep, "log", "-1", "--format=%P").split()) == 2 and (rep / "kn.txt").exists()  # commit de fusión (2 padres)
     # «Unir autores»: personas con sus firmas en config.json; una firma, una sola persona; las triviales no se guardan
     code, r = post("/api/personas", {"personas": [{"nombre": " César ", "firmas": ["CesarE", "cesare", "CesarE"]},
                                                    {"nombre": "Otro", "firmas": ["cesare", "x"]}, {"nombre": "solo", "firmas": ["solo"]}]})

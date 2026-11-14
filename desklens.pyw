@@ -2038,6 +2038,84 @@ def hist_diff(path, nid):
     return out[:200]
 
 
+def line_map(new, old, i):
+    """Dónde estaba la línea i (0-based) de `new` en `old` (listas de líneas), por un diff de líneas.
+    None si la línea no existía (se añadió). En un bloque reescrito se toma la misma posición dentro del bloque."""
+    for tag, a1, a2, b1, b2 in difflib.SequenceMatcher(None, old, new, autojunk=False).get_opcodes():
+        if b1 <= i < b2:
+            if tag == "equal":
+                return a1 + i - b1
+            if tag == "replace":
+                return a1 + min(i - b1, a2 - a1 - 1)
+            return None  # insert: no estaba
+    return None
+
+
+def line_history_disk(path, texto, linea):
+    """Versiones de una línea en el historial de cambios (💾 Ediciones en disco). Recorre del paso actual hacia atrás
+    (la rama que lleva al editor) siguiéndola con line_map; cada vez que su texto cambia hay una versión.
+    texto: lo que tiene el editor ahora; linea: 1-based. Cada versión: paso, fecha, guardado, línea en ese paso,
+    texto y el de antes (None = la línea se creó en ese paso).
+    ponytail: como mucho 300 pasos (cada uno se descomprime y se compara entero); más atrás no se mira."""
+    if hist_kind(path) != "texto":
+        raise ValueError("El historial por línea es para archivos de texto")
+    meta = hist_meta(path)
+    by = {n["id"]: n for n in meta["nodos"]}
+    states, nid = [{"id": "ahora", "fecha": "", "lines": texto.replace("\r\n", "\n").split("\n")}], meta.get("actual")
+    while nid in by and len(states) <= 300:
+        n = by[nid]
+        if (hist_dir(path) / f"{nid}.dat").exists():
+            states.append({"id": nid, "fecha": n["fecha"], "guardado": bool(n.get("guardado")), "desc": n.get("desc", ""),
+                           "lines": hist_data(path, nid).decode("utf-8", "replace").split("\n")})
+        nid = n.get("padre")
+    out, i = [], linea - 1
+    if not 0 <= i < len(states[0]["lines"]):
+        raise ValueError("Esa línea no existe")
+    for k, s in enumerate(states):
+        older = states[k + 1] if k + 1 < len(states) else None
+        j = line_map(s["lines"], older["lines"], i) if older else None
+        here, before = s["lines"][i], (older["lines"][j] if j is not None else None)
+        if older is None or before != here:
+            if older is not None or out:  # el estado más viejo solo cuenta si la línea cambió después
+                out.append({"id": s["id"], "fecha": s["fecha"], "guardado": s.get("guardado", False), "desc": s.get("desc", ""),
+                            "linea": i + 1, "texto": here, "antes": before})
+        if j is None:
+            break
+        i = j
+    if out and out[0]["id"] == "ahora" and len(states) > 1 and states[1]["lines"] == states[0]["lines"]:
+        out.pop(0)  # el editor es igual que el último paso: «Ahora» no es una versión aparte
+    return out
+
+
+def line_history_git(path, texto, linea):
+    """Commits que tocaron una línea (⎇ Commits de git), con git log -L. La línea del editor se busca primero en el
+    archivo del último commit (puede haberse movido con cambios sin commit); si no está allí, no tiene commits aún.
+    Cada versión: hash, fecha, autor, mensaje, ruta en ese commit (sigue renombres), línea, texto y el de antes."""
+    p = Path(path).resolve()
+    repo = git_root(p.parent)
+    if not repo:
+        return {"git": False, "versiones": []}
+    rel = str(p.relative_to(repo)).replace("\\", "/")
+    head = git_run(repo, "-c", "core.quotePath=false", "show", f"HEAD:{rel}")
+    j = line_map(texto.replace("\r\n", "\n").split("\n"), head.replace("\r\n", "\n").split("\n"), linea - 1) if head else None
+    if j is None:
+        return {"git": True, "versiones": [], "sin_commit": True}
+    out = git_run(repo, "-c", "core.quotePath=false", "log", "-n", "200", "--no-color", f"-L{j + 1},{j + 1}:{rel}",
+                  "--format=\x01%H\x1f%at\x1f%an\x1f%s")  # \x01: git_run hace strip() y \x1e cuenta como espacio
+    vers = []
+    for chunk in out.split("\x01")[1:]:
+        head_line, _, patch = chunk.partition("\n")
+        h, at, an, s = (head_line.split("\x1f") + ["", "", "", ""])[:4]
+        f = re.search(r"^\+\+\+ (?:b/)?(.+)$", patch, re.M)
+        hunk = re.search(r"^@@ -\d+(?:,\d+)? \+(\d+)", patch, re.M)
+        body = patch[hunk.end():].split("\n")[1:] if hunk else []
+        antes = [ln[1:] for ln in body if ln.startswith("-")]
+        ahora = [ln[1:] for ln in body if ln[:1] in ("+", " ")]
+        vers.append({"hash": h, "fecha": int(at or 0), "autor": an, "mensaje": s, "rel": f.group(1) if f else rel,
+                     "linea": int(hunk.group(1)) if hunk else None, "texto": "\n".join(ahora), "antes": "\n".join(antes) if antes else None})
+    return {"git": True, "versiones": vers}
+
+
 def hist_cleanup():
     """Borra el historial de los archivos sin actividad desde hace N días y, si todo pasa del tope, los más viejos.
     Corre en el hilo del índice (al arrancar y en cada repaso), no en cada paso: recorre todo el historial."""
@@ -2829,6 +2907,7 @@ def git_overview(path):
             # cambios guardados aparte (stash): [{id: stash@{N}, mensaje, fecha}], el más reciente primero
             "stashes": [dict(zip(("id", "mensaje", "fecha"), ln.split("\x1f"))) for ln in q["stash"].splitlines() if ln],
             "fusionando": bool(q["merge"] or q["revert"]),  # merge o revert a medias
+            "fusion_de": git_merge_name(repo) if q["merge"] else "",
             "ramas_info": [git_track(ln) for ln in q["track"].splitlines() if ln],
             "servicio": git_service(q["urls"]),
             "en_otra_carpeta": git_branches_elsewhere(repo, q["worktrees"]),
@@ -3203,6 +3282,324 @@ def git_before_merge(repo, ov, target, modo, files, mensaje):
     return False
 
 
+CONFLICT_WHAT = {"contents": "las dos ramas cambiaron las mismas líneas", "modify/delete": "una rama lo cambió y la otra lo borró",
+                 "add/add": "las dos ramas lo crearon, distinto", "rename/delete": "una rama lo renombró y la otra lo borró",
+                 "rename/rename": "cada rama lo renombró distinto", "file/directory": "en una rama es archivo y en la otra carpeta"}
+
+
+def _merge_tree(repo, target):
+    """Simula fusionar `target` en HEAD sin tocar nada (git merge-tree --write-tree, Git 2.38+). Devuelve el árbol
+    resultante y {ruta: tipo} de los conflictos: contenido · borrado_mio / borrado_suyo (quién lo borró) · otro."""
+    r = subprocess.run(["git", "-C", str(repo), "-c", "core.quotePath=false", "merge-tree", "--write-tree", "-z", "--name-only", "HEAD", target],
+                       capture_output=True, timeout=60, creationflags=NO_WINDOW)
+    parts = r.stdout.decode("utf-8", "replace").split("\0")
+    if r.returncode not in (0, 1) or not re.fullmatch(r"[0-9a-f]{40,64}", parts[0]):
+        err = r.stderr.decode("utf-8", "replace").strip()
+        raise ValueError("No se pudo simular la fusión" + (" (hace falta Git 2.38 o más nuevo)" if "usage" in err or "write-tree" in err else f": {err[-300:]}"))
+    tree, i, conflicts = parts[0], 1, {}
+    while i < len(parts) and parts[i]:  # rutas con conflicto hasta el campo vacío
+        conflicts[parts[i]] = "otro"
+        i += 1
+    i += 1
+    while i < len(parts) and parts[i].isdigit():  # mensajes: N rutas, tipo, texto
+        n = int(parts[i])
+        paths, typ, msg = parts[i + 1:i + 1 + n], (parts[i + 1 + n:i + 2 + n] or [""])[0], (parts[i + 2 + n:i + 3 + n] or [""])[0]
+        m = re.match(r"CONFLICT \(([^)]+)\)", typ)
+        kind = None if not m else "contenido" if m.group(1) in ("contents", "add/add") else \
+            ("borrado_mio" if "deleted in HEAD" in msg else "borrado_suyo") if m.group(1) == "modify/delete" else "otro"
+        for p in paths:
+            if kind and p in conflicts:
+                conflicts[p] = kind
+        i += n + 3
+    return tree, conflicts
+
+
+def _numstat(repo, a, b):
+    """{ruta: (+, −)} entre dos commits o árboles; binarios: (None, None)."""
+    out = {}
+    for ln in git_run(repo, "-c", "core.quotePath=false", "diff", "--numstat", "--no-renames", a, b).splitlines():
+        m, d, rel = ln.split("\t", 2)
+        out[rel] = (None, None) if m == "-" else (int(m), int(d))
+    return out
+
+
+def _blob(repo, spec):
+    """Contenido de «commit:ruta» (o None si ahí no existe)."""
+    r = subprocess.run(["git", "-C", str(repo), "show", spec], capture_output=True, timeout=20, creationflags=NO_WINDOW)
+    return None if r.returncode else r.stdout
+
+
+def _merge_file(ours, base, theirs):
+    """Une tres versiones con git merge-file (como haría git con tus cambios sin commit encima del resultado).
+    Devuelve (texto unido, limpio?). Con marcas <<<<<<< si chocan. Texto en bytes, con saltos LF: en Windows el
+    archivo de trabajo suele tener CRLF y el de git LF, y sin igualarlos todas las líneas parecerían distintas."""
+    with tempfile.TemporaryDirectory() as d:
+        paths = []
+        for name, data in (("tuya", ours), ("base", base), ("llega", theirs)):
+            p = Path(d) / name
+            p.write_bytes((data or b"").replace(b"\r\n", b"\n"))
+            paths.append(str(p))
+        r = subprocess.run(["git", "merge-file", "-p", "-L", "tu versión", "-L", "base", "-L", "la que llega", *paths],
+                           capture_output=True, timeout=20, creationflags=NO_WINDOW)
+        return r.stdout, r.returncode == 0
+
+
+def _merge_target(repo, ov, accion, rama):
+    """La rama a fusionar según la acción: «fusionar» (otra rama), «pull» (la remota que sigue la actual) o
+    «pull_desde» (remoto/rama). Para pull trae antes lo último del remoto (fetch); si falla, ValueError."""
+    if accion == "fusionar":
+        return git_branch_name(repo, rama)
+    if accion == "pull":
+        if not ov["remota"]:
+            raise ValueError(f"«{ov['rama']}» no está enlazada a una rama remota: no hay de dónde traer")
+        target = ov["remota"]
+    elif accion == "pull_desde":
+        remote, _, other = str(rama).partition("/")
+        if remote not in ov["remotos"] or not other:
+            raise ValueError("Elige una rama remota (por ejemplo origin/main)")
+        target = f"{remote}/{git_branch_name(repo, other)}"
+    else:
+        raise ValueError("Acción de fusión desconocida")
+    remote, _, br = target.partition("/")
+    r = subprocess.run(["git", "-C", str(repo), "fetch", remote, br], capture_output=True, timeout=90,
+                       creationflags=NO_WINDOW, env={**os.environ, **GIT_ENV})
+    if r.returncode:
+        raise GitMergeStop("sin_conexion", f"No se pudo traer «{target}»: " + r.stderr.decode("utf-8", "replace").strip()[-300:])
+    return target
+
+
+class GitMergeStop(ValueError):
+    """Algo impide fusionar antes de mirar archivos (fusión a medias, sin conexión, sin historia en común)."""
+
+    def __init__(self, codigo, texto):
+        self.codigo = codigo
+        super().__init__(texto)
+
+
+def git_merge_check(path, accion, rama):
+    """Pantalla única de fusionar: todas las comprobaciones de una vez, sin tocar nada. Devuelve qué llega (commits),
+    los archivos que se unen solos y los problemas por archivo, cada uno con su tipo:
+      conflicto (las dos ramas cambiaron lo mismo, o una lo borró: tipo contenido/borrado_mio/borrado_suyo),
+      ambos (tú lo tienes cambiado sin commit y también llega cambiado; «juntar» dice si se unen solos),
+      tuyo_nuevo (tienes un archivo nuevo sin seguimiento con el mismo nombre que uno que llega),
+      bloqueado (otro programa lo tiene abierto: Windows no deja escribirlo).
+    o un `bloqueo` general (a_medias, sin_conexion, sin_historia) si no se puede ni empezar."""
+    repo = repo_of(path)
+    ov = git_overview(repo)
+    out = {"accion": accion, "rama": ov["rama"], "filas": [], "solos": [], "lista": [], "commits": 0}
+    try:
+        if ov["fusionando"]:
+            raise GitMergeStop("a_medias", "Hay una fusión anterior sin terminar.")
+        target = _merge_target(repo, ov, accion, rama)
+        out["destino"] = target
+        base = git_run(repo, "merge-base", "HEAD", target)
+        if not base:
+            raise GitMergeStop("sin_historia", f"«{target}» y «{ov['rama']}» no tienen ningún commit en común.")
+    except GitMergeStop as e:
+        return {**out, "destino": rama, "bloqueo": e.codigo, "motivo": str(e)}
+    out["commits"] = int(git_run(repo, "rev-list", "--count", f"HEAD..{target}") or 0)
+    out["lista"] = [dict(zip(("fecha", "autor", "mensaje"), (int(a or 0), b, c))) for a, b, c in
+                    (ln.split("\x1f", 2) for ln in git_run(repo, "log", "-n", "50", "--format=%at\x1f%an\x1f%s", f"HEAD..{target}").splitlines() if ln.count("\x1f") == 2)]
+    if not out["commits"]:
+        return {**out, "bloqueo": "al_dia", "motivo": f"Ya tienes todo lo de «{target}»."}
+    tree, conflicts = _merge_tree(repo, target)
+    out["arbol"], out["destino_hash"] = tree, git_run(repo, "rev-parse", target)
+    q = ("-c", "core.quotePath=false")
+    llega = {rel: s[:1] for s, _, rel in (ln.partition("\t") for ln in git_run(repo, *q, "diff", "--name-status", "--no-renames", base, target).splitlines())}
+    res = {rel: s[:1] for s, _, rel in (ln.partition("\t") for ln in git_run(repo, *q, "diff", "--name-status", "--no-renames", "HEAD", tree).splitlines())}
+    num_mio, num_tuyo = _numstat(repo, "HEAD", tree), {}  # lo que cambia al fusionar · tus cambios sin commit
+    local = {}
+    for it in ov["preparados"] + ov["cambios"] + ov["conflictos"]:
+        local.setdefault(it["rel"], it["estado"])
+    if local:
+        r = subprocess.run(["git", "-C", str(repo), *q, "diff", "--numstat", "--no-renames", "HEAD"], capture_output=True, timeout=30, creationflags=NO_WINDOW)
+        for ln in r.stdout.decode("utf-8", "replace").splitlines():
+            m, d, rel = ln.split("\t", 2)
+            num_tuyo[rel] = (None, None) if m == "-" else (int(m), int(d))
+    for rel in sorted(set(llega) | set(conflicts)):
+        p = repo / rel
+        fila = {"rel": rel, "ruta": str(p), "llega": llega.get(rel, "M"), "mas": num_mio.get(rel, (None,))[0], "menos": num_mio.get(rel, (None, None))[1]}
+        if rel in local:
+            st = p.stat() if p.is_file() else None
+            fila["tuyo"] = {"estado": local[rel], "mas": num_tuyo.get(rel, (None,))[0], "menos": num_tuyo.get(rel, (None, None))[1],
+                            "mtime": st and int(st.st_mtime)}
+        if WINDOWS and p.is_file():
+            try:
+                with open(p, "ab"):  # sin escribir: solo comprueba que Windows deja abrirlo para escritura
+                    pass
+            except PermissionError:
+                out["filas"].append({**fila, "problema": "bloqueado"})
+                continue
+        if rel in conflicts:
+            binario = fila["mas"] is None and conflicts[rel] == "contenido" and rel in num_mio
+            out["filas"].append({**fila, "problema": "conflicto", "tipo": conflicts[rel], "binario": binario})
+        elif rel in local and local[rel] == "U":
+            out["filas"].append({**fila, "problema": "tuyo_nuevo"})
+        elif rel in local:
+            limpio = False
+            if local[rel] != "D" and p.is_file() and res.get(rel) != "D":
+                _, limpio = _merge_file(p.read_bytes(), _blob(repo, f"HEAD:{rel}"), _blob(repo, f"{tree}:{rel}"))
+            out["filas"].append({**fila, "problema": "ambos", "juntar": limpio})
+        elif rel in res:
+            out["solos"].append({**fila, "estado": res[rel]})
+    return out
+
+
+def git_merge_file(path, rel, destino, arbol):
+    """Para la vista previa de un archivo: el último commit (base), tu versión (con lo que no tiene commit), la que
+    llega, el resultado si git lo une solo (arbol) y tus cambios juntados encima de ese resultado (merge-file)."""
+    repo = repo_of(path)
+    if rel.startswith(("-", ":")) or not re.fullmatch(r"[0-9a-f]{40,64}", arbol or "0"):
+        raise ValueError("archivo no válido")
+    target = git_branch_name(repo, destino)
+    p = (repo / rel).resolve()
+    if not p.is_relative_to(repo):
+        raise ValueError("archivo no válido")
+    dec = lambda b: None if b is None else b.decode("utf-8", "replace").replace("\r\n", "\n")
+    base, llega, res = _blob(repo, f"HEAD:{rel}"), _blob(repo, f"{target}:{rel}"), _blob(repo, f"{arbol}:{rel}")
+    tuya = p.read_bytes() if p.is_file() else None
+    junt, limpio = _merge_file(tuya, base, res) if tuya is not None and res is not None else (None, False)
+    # «Editar manualmente» parte de tus cambios y los que llegan juntos (base: el ancestro común de las dos ramas),
+    # con <<<<<<< ======= >>>>>>> donde chocan
+    anc = _blob(repo, f"{git_run(repo, 'merge-base', 'HEAD', target)}:{rel}")
+    mezcla = _merge_file(tuya, anc, llega)[0] if tuya is not None and llega is not None else None
+    return {"base": dec(base), "tuya": dec(tuya), "llega": dec(llega), "resultado": dec(res), "juntado": dec(junt), "limpio": limpio,
+            "mezcla": dec(mezcla)}
+
+
+def git_merge_apply(path, accion, rama, decisiones, textos=None):
+    """Fusiona aplicando lo elegido en la pantalla única ({ruta: opción}); «mano» con su texto en `textos` (editado
+    en la ventana) se escribe tal cual y queda resuelto. Orden, para no perder nada:
+      1. «llega» (o borrar) en un archivo con cambios tuyos sin commit: se descartan (git_discard; los nuevos, a la papelera).
+      2. Lo tuyo que quieres conservar (mia, juntar, mano, conservar): commit solo de esos archivos.
+      3. git merge --no-commit; en cada archivo elegido queda la versión de HEAD (mía) o de MERGE_HEAD (la que llega),
+         o se borra si en ese lado no existe; «juntar» y «mano» quedan como los deja git.
+      4. Sin conflictos pendientes: commit de la fusión. Con «mano» pendientes: se devuelven para abrirlos en el editor.
+    Si el merge falla sin conflictos (archivo bloqueado…), se cancela y se explica; el commit del paso 2 queda."""
+    repo = repo_of(path)
+    chk = git_merge_check(path, accion, rama)
+    if chk.get("bloqueo"):
+        raise ValueError(chk["motivo"])
+    target, rama_actual = chk["destino"], chk["rama"]
+    filas = {f["rel"]: f for f in chk["filas"]}
+    if any(f["problema"] == "bloqueado" for f in filas.values()):
+        raise ValueError("Hay archivos abiertos en otro programa: ciérralos y vuelve a comprobar")
+    falta = [rel for rel in filas if not decisiones.get(rel)]
+    if falta:
+        raise ValueError("Falta decidir: " + ", ".join(falta[:5]))
+    tirar, guardar = [], []
+    for rel, f in filas.items():
+        d = decisiones[rel]
+        if "tuyo" in f:
+            (tirar if d in ("llega", "borrar") else guardar).append(rel)
+    if tirar:
+        git_discard(repo, tirar, preparado=True)
+    if guardar:
+        git_do(repo, "add", "-A", "--", *guardar)
+        git_do(repo, "commit", "-m", f"Tus cambios en {len(guardar)} archivo{'s' if len(guardar) != 1 else ''} antes de fusionar «{target}»", "--", *guardar)
+    r = subprocess.run(["git", "-C", str(repo), "merge", "--no-commit", "--no-edit", target], capture_output=True, timeout=120,
+                       creationflags=NO_WINDOW, env={**os.environ, **GIT_ENV})
+    merging = bool(git_run(repo, "rev-parse", "-q", "--verify", "MERGE_HEAD"))
+    if r.returncode and not git_overview(repo)["conflictos"]:
+        if merging:
+            git_run(repo, "merge", "--abort")
+        raise ValueError("No se pudo fusionar: " + (r.stderr or r.stdout).decode("utf-8", "replace").strip()[-400:]
+                         + ("\n\nTus cambios ya quedaron guardados en un commit." if guardar else ""))
+    if not merging:  # avance directo (fast-forward): no hay nada que elegir
+        return {"hecho": True, "mano": [], "destino": target}
+    textos = textos or {}
+    for rel, d in decisiones.items():
+        if rel in filas and d == "mano" and isinstance(textos.get(rel), str):  # editado en la ventana: tal cual
+            p = repo / rel
+            crlf = p.is_file() and b"\r\n" in p.read_bytes()[:65536]
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_bytes(textos[rel].replace("\r\n", "\n").replace("\n", "\r\n" if crlf else "\n").encode("utf-8"))
+            git_do(repo, "add", "--", rel)
+            continue
+        if rel not in filas or d in ("juntar", "mano"):
+            continue
+        src = "HEAD" if d in ("mia", "conservar") else "MERGE_HEAD"
+        if _blob(repo, f"{src}:{rel}") is None:
+            git_do(repo, "rm", "-q", "-f", "--ignore-unmatch", "--", rel)
+        else:
+            git_do(repo, "checkout", src, "--", rel)
+            git_do(repo, "add", "--", rel)
+    pend = [c["rel"] for c in git_overview(repo)["conflictos"]]
+    if not pend:
+        git_do(repo, "commit", "--no-edit", "-m", f"Fusión de «{target}» en «{rama_actual}»")
+    git_cache.pop(repo, None)
+    return {"hecho": not pend, "mano": [str(repo / x) for x in pend], "destino": target}
+
+
+def git_merge_name(repo):
+    """Qué se está fusionando, sacado de MERGE_MSG («Merge branch 'cesare'» → cesare); «» si no se sabe."""
+    p = git_run(repo, "rev-parse", "--git-path", "MERGE_MSG")
+    try:
+        first = (repo / p).read_text(encoding="utf-8", errors="replace").splitlines()[0] if p else ""
+    except (OSError, IndexError):
+        return ""
+    m = re.match(r"Merge (?:remote-tracking )?branch(?:es)? '([^']+)'", first)
+    return m.group(1) if m else first[:60]
+
+
+def git_conflict(path):
+    """Un archivo en conflicto durante una fusión: mi versión (:2), la otra (:3), el archivo de trabajo con las marcas
+    de git y el tipo (cuál de las dos lo borró). None en una versión = no existe en ese lado."""
+    p = Path(path).resolve()
+    repo = repo_of(p)
+    rel = str(p.relative_to(repo)).replace("\\", "/")
+
+    def stage(n):
+        r = subprocess.run(["git", "-C", str(repo), "show", f":{n}:{rel}"], capture_output=True, timeout=20, creationflags=NO_WINDOW)
+        return None if r.returncode else r.stdout.decode("utf-8", "replace").replace("\r\n", "\n")
+    mio, suyo = stage(2), stage(3)
+    trabajo = read_text(p)[0].replace("\r\n", "\n") if p.is_file() else None
+    tipo = "borrado_suyo" if suyo is None and mio is not None else "borrado_mio" if mio is None and suyo is not None else "contenido"
+    return {"rel": rel, "mio": mio, "suyo": suyo, "trabajo": trabajo, "tipo": tipo, "rama": git_run(repo, "rev-parse", "--abbrev-ref", "HEAD"),
+            "de": git_merge_name(repo), "choques": (trabajo or "").count("\n<<<<<<< ") + (trabajo or "").startswith("<<<<<<< ")}
+
+
+def git_choose(repo, files, modo):
+    """Resuelve archivos en conflicto entero: «mio» o «suyo» (si esa versión es «borrado», se borra), «conservar»
+    (el archivo como está) o «borrar». Queda preparado (git add / git rm). «deshacer» vuelve a dejarlo en conflicto
+    (git checkout -m, que usa lo que git guardó al resolverlo)."""
+    for f in files:
+        if modo == "deshacer":
+            git_do(repo, "checkout", "-m", "--", f)
+            continue
+        if modo in ("mio", "suyo"):
+            side = "2" if modo == "mio" else "3"
+            if subprocess.run(["git", "-C", str(repo), "cat-file", "-e", f":{side}:{f}"], capture_output=True, creationflags=NO_WINDOW).returncode:
+                modo_f = "borrar"  # en ese lado el archivo no existe
+            else:
+                git_do(repo, "checkout", "--ours" if modo == "mio" else "--theirs", "--", f)
+                modo_f = "conservar"
+        else:
+            modo_f = modo
+        if modo_f == "borrar":
+            git_do(repo, "rm", "-q", "--ignore-unmatch", "--", f)
+        elif modo_f == "conservar":
+            git_do(repo, "add", "--", f)
+        else:
+            raise ValueError("Elección no válida")
+
+
+def git_mark_merged(path, texto):
+    """«✎ Mezclar a mano»: al guardar un archivo en conflicto sin marcas de git (<<<<<<< ======= >>>>>>>), se da por
+    resuelto (git add). True si lo marcó. Solo mira el archivo guardado; cualquier otro guardado no hace nada."""
+    p = Path(path).resolve()
+    repo = git_root(p.parent)
+    if not repo or re.search(r"^(<{7}|={7}|>{7})( |$)", texto, re.M):
+        return False
+    rel = str(p.relative_to(repo)).replace("\\", "/")
+    xy = git_run(repo, "-c", "core.quotePath=false", "status", "--porcelain=v1", "--", rel)[:2]
+    if xy not in GIT_CONFLICT:
+        return False
+    git_do(repo, "add", "--", rel)
+    git_cache.pop(repo, None)
+    return True
+
+
 def git_switch(repo, name, modo=""):
     """Cambia a la rama `name`. Si git se niega por cambios sin commit, GitLocalChanges con los archivos.
     modo «llevar»: guarda los cambios (stash), cambia y los vuelve a poner en la rama nueva (como «Migrate changes»
@@ -3300,6 +3697,8 @@ def git_action(path, accion, archivos=(), mensaje="", rama="", todo=False, modo=
             git_do(repo, "remote", "set-url", "origin", url)
         else:
             git_do(repo, "remote", "add", "origin", url)
+    elif accion == "elegir":  # conflicto de fusión resuelto entero: modo mio / suyo / conservar / borrar / deshacer
+        git_choose(repo, files, modo)
     elif accion == "cancelar_fusion":  # deja todo como antes de la fusión (o del revert) a medias
         if git_run(repo, "rev-parse", "-q", "--verify", "MERGE_HEAD"):
             git_do(repo, "merge", "--abort")
@@ -3694,6 +4093,15 @@ class Handler(BaseHTTPRequestHandler):
                     return self.send_json(200, git_files(ruta, q.get("hash", "")))
                 except (ValueError, OSError, subprocess.TimeoutExpired) as e:
                     return self.send_json(400, {"error": str(e)})
+            if url.path in ("/api/git/fusion", "/api/git/fusion/archivo", "/api/git/conflicto"):  # pantalla única de fusionar
+                try:
+                    if url.path == "/api/git/fusion":
+                        return self.send_json(200, git_merge_check(ruta, q.get("accion", "fusionar"), q.get("rama", "")))
+                    if url.path == "/api/git/fusion/archivo":
+                        return self.send_json(200, git_merge_file(ruta, q.get("rel", ""), q.get("destino", ""), q.get("arbol", "")))
+                    return self.send_json(200, git_conflict(ruta))
+                except (ValueError, OSError, subprocess.TimeoutExpired) as e:
+                    return self.send_json(400, {"error": str(e)})
             if url.path == "/api/git/version":
                 try:
                     return self.send_json(200, {"texto": git_version(ruta, q.get("hash", ""), q.get("rel", ""))})
@@ -3759,6 +4167,19 @@ class Handler(BaseHTTPRequestHandler):
                 cfg["ultima"] = data["ultima"]
                 save_config(cfg)
             return self.send_json(200, estado())
+        if url == "/api/git/fusion":  # pantalla única: fusionar aplicando lo elegido en cada archivo
+            if self.denied(data.get("ruta", "")):
+                return
+            dec = data.get("decisiones") or {}
+            if not isinstance(dec, dict) or not all(v in ("mia", "llega", "juntar", "mano", "conservar", "borrar") for v in dec.values()):
+                return self.send_json(400, {"error": "decisiones no válidas"})
+            tx = data.get("textos") or {}
+            if not isinstance(tx, dict) or not all(isinstance(v, str) for v in tx.values()):
+                return self.send_json(400, {"error": "textos no válidos"})
+            try:
+                return self.send_json(200, git_merge_apply(data["ruta"], str(data.get("accion", "fusionar")), str(data.get("rama", "")), dec, tx))
+            except (ValueError, OSError, subprocess.TimeoutExpired) as e:
+                return self.send_json(400, {"error": str(e)})
         if url == "/api/git/accion":
             if self.denied(data.get("ruta", "")):
                 return
@@ -3785,8 +4206,11 @@ class Handler(BaseHTTPRequestHandler):
         if url == "/api/guardar":
             if self.denied(data.get("ruta", "")):
                 return
-            return self.send_json(*save_text(data["ruta"], data.get("texto", ""), data.get("codificacion"),
-                                             data.get("eol"), data.get("mtime"), bool(data.get("forzar"))))
+            code, body = save_text(data["ruta"], data.get("texto", ""), data.get("codificacion"),
+                                   data.get("eol"), data.get("mtime"), bool(data.get("forzar")))
+            if code == 200 and git_mark_merged(data["ruta"], data.get("texto", "")):
+                body = {**body, "resuelto": True}
+            return self.send_json(code, body)
         if url in ("/api/plantilla", "/api/archivar"):
             if not is_project(data.get("ruta", "")):
                 return self.send_json(403, {"error": "no es un proyecto añadido"})
@@ -3864,6 +4288,11 @@ class Handler(BaseHTTPRequestHandler):
             if self.denied(ruta):
                 return
             try:
+                if url == "/api/hist/linea":  # historial de una línea: fuente «disco» (pasos) o «git» (commits)
+                    texto, linea = str(data.get("texto", "")), int(data.get("linea") or 0)
+                    if data.get("fuente") == "git":
+                        return self.send_json(200, line_history_git(ruta, texto, linea))
+                    return self.send_json(200, {"versiones": line_history_disk(ruta, texto, linea)})
                 if url == "/api/hist/paso":  # texto: llega tal cual; lo demás en base64
                     d = data.get("datos")
                     d = d.encode("utf-8") if hist_kind(ruta) == "texto" else base64.b64decode(d or "")

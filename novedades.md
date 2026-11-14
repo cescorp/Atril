@@ -1,6 +1,39 @@
 # Novedades de DeskLens
 Cada cambio es una versión nueva, la más reciente arriba. El número de la primera es el que sale en ⓘ (arriba en la cinta).
 
+## v1.121 · 2026-11-13 · Comparar en dos columnas al elegir versión
+- Cada pestaña enseña dos columnas que se mueven juntas: a la izquierda lo que tienes ahora y a la derecha cómo quedará. En rojo lo que se quita y en verde lo que se añade.
+- «Dejar mi cambio» también enseña los dos archivos, con el aviso «✓ Tu archivo no cambia».
+
+## v1.120 · 2026-11-13 · Elegir versión en pestañas
+- «👁 Ver y elegir» es ahora una ventana más pequeña con una pestaña por opción (Unificar cambios, Dejar mi cambio, Dejar cambio que llega, Editar manualmente): la que ves es la que eliges.
+- Cada pestaña compara con lo que tienes ahora: en rojo lo que se quitaría de tu archivo y en verde lo que se añadiría («✓ Tu archivo no cambia» si nada cambia). Barra a la derecha con marcas de los cambios.
+- «Editar manualmente» siempre disponible en los archivos de texto. Azul marino para lo elegido, más sobrio.
+
+## v1.119 · 2026-11-13 · Elegir con un clic y editar manualmente al fusionar
+- En «👁 Ver las dos», cada columna se resalta al pasar el ratón y se elige con un clic. Los cambios van en negrita, el resto más tenue, y cada columna se abre centrada en su primer cambio.
+- Nombres más claros: «Dejar mi cambio», «Dejar cambio que llega», «Dejar los dos cambios» y «Editar manualmente».
+- «Editar manualmente» se hace ahí mismo: empieza con los dos cambios juntos, «Guardar y volver a la lista» y se escribe al fusionar. Cada archivo de la lista muestra lo elegido («✓ Dejar mi cambio», «✎ Editado manualmente»).
+
+## v1.118 · 2026-11-13 · Fusionar y traer cambios en una sola pantalla
+- ⤵ Fusionar, Pull y «Pull desde» abren una sola pantalla que lo comprueba todo antes de tocar nada: los commits que llegan, los conflictos, tus cambios sin commit en archivos que también llegan, archivos nuevos tuyos con el mismo nombre y archivos abiertos en otro programa.
+- Cada archivo con algo que elegir dice qué pasa y qué hará cada opción («Juntar las dos», «Quedarme con la mía», «Quedarme con la que llega», «Mezclar a mano», «Borrarlo»…). Las vistas previas se abren en otra ventana encima.
+- «Fusionar» lo hace todo de una vez; solo «Mezclar a mano» abre el editor para terminar.
+
+## v1.117 · 2026-11-13 · Vista previa de la fusión más clara
+- Arriba, la respuesta en grande: «✅ Se puede fusionar sin problemas», «⚠️ Hay N archivos que tendrás que elegir» o «✅ Ya tienes todo».
+- Se ven los commits que llegan (fecha, autor y mensaje) y cada archivo con lo que le pasará, en letra normal y con «👁 Ver cambios».
+
+## v1.116 · 2026-11-13 · Fusionar con vista previa y conflictos explicados
+- Antes de fusionar, una vista previa dice qué pasará con cada archivo (se une solo, llega nuevo, se borra o tendrás que elegir), sin tocar nada.
+- Durante una fusión, la vista Git dice qué se fusiona y si hay conflictos, con «⚔ Ver y elegir», «✓ Confirmar la fusión» o «✕ Cancelar la fusión».
+- Cada conflicto se resuelve con dos botones que dicen el resultado («Quedarme con MI versión», «Borrar el archivo»…); «👁 Ver diferencias» enseña las dos versiones y cómo quedará. Al final, un resumen antes de hacer el commit.
+
+## v1.115 · 2026-11-13 · Historial de cada línea
+- Al editar, a la derecha de la línea sale `[💾N ⎇N]`: cuántas veces cambió en disco y en commits de git. Al pulsarlo, el historial de esa línea en dos pestañas (💾 Ediciones en disco en azul, ⎇ Commits de git en morado) con el antes y después pintado.
+- «⤢ Ver en su contexto»: el archivo entero en esa versión, con la línea resaltada y lo demás atenuado, ◀ ▶ entre versiones y ← Volver.
+- «↩ Volver a esta versión» cambia solo esa línea en el editor; «⇆ Ver el commit entero» muestra sus archivos.
+
 ## v1.114 · 2026-11-13 · Línea sombreada, Guardar vuelve a lectura y Ctrl+A en casi todo
 - Al pasar el ratón se sombrea la fila con su número, al leer y al editar; al editar, la línea del cursor queda marcada. En Markdown, tablas y cuadernos se sombrea el párrafo, la fila o la celda.
 - El botón Guardar guarda y vuelve a lectura en la misma línea; Ctrl+S guarda sin salir de la edición.
