@@ -50,6 +50,7 @@ const isDark = () => (document.documentElement.dataset.theme || (matchMedia('(pr
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/keymap/sublime.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/scroll/annotatescrollbar.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/search/match-highlighter.min.js"></script>
 <script>
   // Atajos de VS Code con los comandos que trae el keymap de Sublime (sin internet, solo quedan los de siempre)
   if (window.CodeMirror?.commands.swapLineUp) {
@@ -822,8 +823,15 @@ dialog#dlg2[open]{display:flex}.mgv>header{display:flex;align-items:center;gap:1
 .mgcode.sbs .sr.hd{position:sticky;top:0;z-index:1;background:var(--side);border-bottom:1px solid var(--line)}
 .mgcode.sbs .sr.hd .c{opacity:1;font:600 11px Inter,sans-serif;color:var(--muted);padding:6px 10px;letter-spacing:.04em}
 .mgnote{margin:0;padding:8px 16px;font-weight:600;color:#2e8b57;background:color-mix(in srgb,#2e8b57 8%,transparent);border-top:1px solid var(--line)}
-.mgbar{position:relative;width:12px;flex:none;background:var(--side);border-left:1px solid var(--line);cursor:pointer}
-.mgbar i{position:absolute;left:2px;right:2px;height:4px;border-radius:2px}.mgbar i.del{background:#d33}.mgbar i.add{background:#2e8b57}
+.mgbar{position:relative;width:22px;flex:none;background:var(--side);border-left:1px solid var(--line);cursor:pointer}
+.mgbar i{position:absolute;left:3px;right:3px;height:7px;margin-top:-3px;border-radius:2px}.mgbar i.del{background:#e03131}.mgbar i.add{background:#2f9e44}
+/* «Editar manualmente»: líneas distintas de lo que tienes ahora en verde; donde se quitaron, raya roja encima */
+.mgedit{display:flex}.mgedit .CodeMirror{flex:1;min-width:0}
+.mgedit .mgl-add{background:color-mix(in srgb,#2e8b57 16%,transparent)}.mgedit .mgl-del{box-shadow:inset 0 2px 0 #d33}
+/* coincidencias de lo seleccionado (editores: addon match-highlighter; lectura y comparaciones: CSS Custom Highlight) */
+.cm-matchhighlight{background:color-mix(in srgb,#f5b301 35%,transparent);border-radius:2px}
+::highlight(dlsel){background-color:color-mix(in srgb,#f5b301 35%,transparent)}
+.CodeMirror-selection-highlight-scrollbar{background:#f5b301}
 .mgmsg{display:flex;align-items:center;gap:10px;margin-top:14px;font-size:13px}.mgmsg input{flex:1;font:inherit;padding:5px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
 /* historial de una línea: 💾 disco en azul, ⎇ git en morado (el color de git en DeskLens) */
 :root{--lhd:#2f7fd8}
@@ -2814,7 +2822,7 @@ async function mergeTwoView(f, from, c, dec, txt, back, editNow = false) {
     // siempre las dos columnas: lo que tienes ahora | así quedará (también si no cambia o se borra: se ve el archivo)
     const note = res == null && tab !== 'mano' ? (now == null ? '✓ Sigue borrado: tu archivo no cambia.' : '🗑 Con esta opción el archivo se borra.')
       : same ? '✓ Tu archivo no cambia: queda exactamente como lo tienes.' : '';
-    const body = editing ? '<div class="mgedit"></div>'
+    const body = editing ? '<div class="mgedit"><div class="mgbar"></div></div>'
       : `${note ? `<p class="mgnote">${note}</p>` : ''}<div class="mgscroll"><div class="mgcode sbs${same ? ' same' : ''}">
           <div class="sr hd"><div class="c">LO QUE TIENES AHORA${now == null ? ' · (no existe)' : ''}</div><div class="c">ASÍ QUEDARÁ CON «${label}»${res == null ? ' · (no existe)' : ''}</div></div>
           ${sideBySideRows(norm(now ?? ''), norm(res ?? ''))}</div><div class="mgbar"></div></div>`;
@@ -2840,7 +2848,9 @@ async function mergeTwoView(f, from, c, dec, txt, back, editNow = false) {
     });
     cm = null;
     if (editing) {
-      cm = CodeMirror(d.querySelector('.mgedit'), { value: start(), lineNumbers: true, lineWrapping: true, theme: isDark() ? 'material-darker' : 'default', styleActiveLine: true });
+      const box = d.querySelector('.mgedit');
+      cm = CodeMirror(el => box.prepend(el), { value: start(), lineNumbers: true, lineWrapping: true, theme: isDark() ? 'material-darker' : 'default', styleActiveLine: true });
+      mgEditMarks(cm, norm(now ?? ''), box.querySelector('.mgbar'));
       const info = CodeMirror.findModeByFileName(f.rel.split('/').pop());
       if (info) { cm.setOption('mode', info.mime || info.mimes?.[0]); CodeMirror.autoLoadMode(cm, info.mode); }
       const m = cm.getValue().split('\n').findIndex(l => l.startsWith('<<<<<<<'));
@@ -2860,7 +2870,7 @@ function mgCenter(root) {
 // Barra de marcas a la derecha: una raya roja o verde por cada bloque de cambios, en su altura proporcional;
 // clic en la barra lleva a ese punto (centrado)
 function mgMarks(root) {
-  for (const bar of root.querySelectorAll('.mgbar')) {
+  for (const bar of root.querySelectorAll('.mgscroll>.mgbar')) {
     const box = bar.previousElementSibling, H = box.scrollHeight || 1;
     let html = '', last = null;
     for (const r of box.querySelectorAll('.ld.del, .ld.add, .sr.mgchg')) {
@@ -2871,6 +2881,36 @@ function mgMarks(root) {
     bar.innerHTML = html;
     bar.onclick = e => { const y = (e.clientY - bar.getBoundingClientRect().top) / bar.clientHeight; box.scrollTop = y * H - box.clientHeight / 2; };
   }
+}
+// «Editar manualmente»: colorea las líneas que difieren de `base` (lo que tienes ahora) y pone sus rayas en la
+// barra (clic → ese punto). Se recalcula al escribir, con una espera corta.
+function mgEditMarks(cm, base, bar) {
+  let marked = [], timer;
+  const run = () => {
+    cm.operation(() => {
+      for (const [h, c] of marked) cm.removeLineClass(h, 'background', c);
+      marked = [];
+      const dmp = new diff_match_patch(), { chars1, chars2, lineArray } = dmp.diff_linesToChars_(base, norm(cm.getValue()));
+      const ds = dmp.diff_main(chars1, chars2, false); dmp.diff_charsToLines_(ds, lineArray);
+      let n = 0;
+      const mark = (line, c) => { const h = cm.getLineHandle(Math.min(line, cm.lastLine())); if (h) { cm.addLineClass(h, 'background', c); marked.push([h, c]); } };
+      for (const [op, t] of ds) {
+        const k = t.replace(/\n$/, '').split('\n').length;
+        if (op < 0) mark(n, 'mgl-del');
+        else { if (op > 0) for (let i = 0; i < k; i++) mark(n + i, 'mgl-add'); n += k; }
+      }
+    });
+    const total = cm.lineCount() || 1; let html = '', last = null;
+    for (const [h, c] of marked) {
+      const top = cm.getLineNumber(h) / total * 100, kind = c === 'mgl-del' ? 'del' : 'add';
+      if (last && last.kind === kind && top - last.top < 0.6) continue;
+      last = { top, kind }; html += `<i class="${kind}" style="top:${top.toFixed(2)}%"></i>`;
+    }
+    bar.innerHTML = html;
+  };
+  bar.onclick = e => { const line = Math.floor((e.clientY - bar.getBoundingClientRect().top) / bar.clientHeight * cm.lineCount()); cm.scrollIntoView({ line, ch: 0 }, cm.getScrollInfo().clientHeight / 2); cm.setCursor(line, 0); cm.focus(); };
+  cm.on('changes', () => { clearTimeout(timer); timer = setTimeout(run, 250); });
+  run();
 }
 // 👁 Ver cambios de un archivo que se une solo: así quedará, frente al último commit
 async function mergeSoloView(f, from, c) {
@@ -5880,6 +5920,34 @@ addEventListener('keydown', e => {
   pick(V && (['.code code.hljs', '.docx-wrapper', '.page', '.md'].map(s => V.querySelector(s)).find(Boolean)
     || V.querySelector('.textLayer')?.closest('[data-n]')?.parentElement || V.querySelector('table')));
 });
+// Seleccionar texto sombrea todas sus apariciones (como VS Code): de 2 a 200 caracteres y en una sola línea, tal cual
+// (distingue mayúsculas). En los editores lo hace el addon de CodeMirror (con rayas en la barra de scroll); en
+// lectura y comparaciones, CSS Custom Highlight sobre el bloque donde está la selección, sin tocar el HTML.
+// Sin sombreado: HTML/SVG con formato (iframe aislado) y PDF (capas de texto por página).
+CodeMirror.defaults.highlightSelectionMatches = { minChars: 2, showToken: false, delay: 150, annotateScrollbar: true };
+let selTimer;
+document.addEventListener('selectionchange', () => { clearTimeout(selTimer); selTimer = setTimeout(selMatches, 150); });
+function selMatches() {
+  if (!window.Highlight || !CSS.highlights) return;
+  CSS.highlights.delete('dlsel');
+  const s = getSelection(), q = s.rangeCount ? s.toString() : '';
+  if (q.length < 2 || q.length > 200 || q.includes('\n') || !q.trim()) return;
+  const a = s.anchorNode?.nodeType === 1 ? s.anchorNode : s.anchorNode?.parentElement;
+  if (!a || a.closest('.CodeMirror, input, textarea, [contenteditable=""], [contenteditable=true], .textLayer')) return;
+  const root = a.closest('code.hljs, .mgcode, .docx-wrapper, .page, .md, #view, #out, #convLog');
+  if (!root) return;
+  // texto seguido del bloque (los números de línea <i> de las comparaciones no cuentan) y dónde empieza cada nodo
+  const nodes = [], starts = []; let text = '';
+  const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode: n => n.parentElement.closest('i, script, style') ? 2 : 1 });
+  for (let n; (n = w.nextNode());) { nodes.push(n); starts.push(text.length); text += n.data; }
+  const at = p => { let lo = 0, hi = nodes.length - 1; while (lo < hi) { const m = (lo + hi + 1) >> 1; starts[m] <= p ? lo = m : hi = m - 1; } return [nodes[lo], p - starts[lo]]; };
+  const ranges = [];
+  for (let i = text.indexOf(q); i >= 0 && ranges.length < 2000; i = text.indexOf(q, i + q.length)) {
+    const r = new Range(); r.setStart(...at(i)); r.setEnd(...at(i + q.length - 1)); r.setEnd(r.endContainer, r.endOffset + 1);
+    ranges.push(r);
+  }
+  if (ranges.length > 1) CSS.highlights.set('dlsel', new Highlight(...ranges));
+}
 CodeMirror.commands.save = () => cur && (edits.has(cur) ? save(cur) : wedit?.path === cur ? wordSave() : iedit?.path === cur ? imageSave() : pedit?.path === cur && pdfSave());
 addEventListener('keydown', e => {
   // si el foco está en el editor, CodeMirror ya lo gestionó (defaultPrevented): evita guardar dos veces

@@ -1,6 +1,11 @@
 # Novedades de DeskLens
 Cada cambio es una versión nueva, la más reciente arriba. El número de la primera es el que sale en ⓘ (arriba en la cinta).
 
+## v1.122 · 2026-11-13 · Sombrear lo que seleccionas y ver los cambios al editar a mano
+- Al seleccionar una palabra o trozo de una línea, todas sus apariciones se sombrean en amarillo: en el editor, en la lectura y en las comparaciones al fusionar (en el editor también se marcan en la barra de scroll).
+- «Editar manualmente» colorea en verde las líneas distintas de lo que tienes ahora y pone una raya roja donde se quitó algo; la barra de la derecha lo resume y lleva a cada cambio.
+- La barra de marcas de cambios es más ancha y se ve mejor.
+
 ## v1.121 · 2026-11-13 · Comparar en dos columnas al elegir versión
 - Cada pestaña enseña dos columnas que se mueven juntas: a la izquierda lo que tienes ahora y a la derecha cómo quedará. En rojo lo que se quita y en verde lo que se añade.
 - «Dejar mi cambio» también enseña los dos archivos, con el aviso «✓ Tu archivo no cambia».
