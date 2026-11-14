@@ -1,6 +1,10 @@
 # Novedades de DeskLens
 Cada cambio es una versión nueva, la más reciente arriba. El número de la primera es el que sale en ⓘ (arriba en la cinta).
 
+## v1.127 · 2026-11-14 · Fusionar: la opción elegida se ve en verde
+- La pestaña de la opción elegida se marca en verde fuerte (fondo, borde y título).
+- Con una opción ya elegida, el botón de arriba dice «✓ Guardar y volver», en verde y más grande; «Guardar y volver a la lista» de «Editar manualmente» también va en verde.
+
 ## v1.126 · 2026-11-14 · Fusionar: los archivos por decidir en una tabla
 - En vez de una tarjeta grande por archivo, una tabla: archivo, ubicación, qué pasa y una lista para elegir cómo queda. Un clic en el título de una columna la ordena; si la ubicación es larga se ve su final.
 - «Ver y elegir» ahora se llama «Ver detalles» (elegir ya se puede desde la tabla). Los commits que llegan van plegados.

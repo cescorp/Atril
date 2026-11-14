@@ -821,8 +821,14 @@ dialog#dlg2[open]{display:flex}.mgv>header{display:flex;align-items:center;gap:1
 .mgtabs button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;flex:1 1 0;min-width:0;padding:8px 12px;text-align:left;border:1px solid var(--line);border-bottom:0;border-radius:8px 8px 0 0;background:var(--bg);margin-bottom:-1px;cursor:pointer}
 .mgtabs button b{font-size:13px;font-weight:600}.mgtabs button small{font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .mgtabs button:hover{border-color:var(--navyhov)}
-.mgtabs button.on{background:var(--paper);border-color:var(--line);border-top:3px solid var(--navy);padding-top:6px}.mgtabs button.on b{color:var(--navy)}
-.mgtabs button.chosen b{color:var(--navy)}
+/* la pestaña que ves (y eliges) en verde fuerte: fondo, borde y raya gruesa arriba */
+.mgtabs button.on{background:color-mix(in srgb,#2f9e44 16%,var(--paper));border-color:#2f9e44;border-top:4px solid #2f9e44;padding-top:5px}
+.mgtabs button b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.mgtabs button.on b{color:#2f9e44;font-weight:700}.mgtabs button.on small{color:var(--ink)}
+.mgtabs button.chosen b{color:#2f9e44}
+/* «✓ Guardar y volver» cuando ya hay una opción elegida: verde y más alto que un botón pequeño */
+.mgv button.mgsave{background:#2f9e44;border-color:#2f9e44;color:#fff;font-weight:700;font-size:13.5px;padding:8px 18px}
+.mgv button.mgsave:hover{background:#2b8a3e;border-color:#2b8a3e}
 .mgv .mglegend{padding:8px 16px;line-height:26px}.mgv .mglegend button{float:right;margin-left:10px}
 .mgscroll{flex:1;display:flex;min-height:0;border-top:1px solid var(--line)}.mgscroll .mgcode{flex:1;border-top:0}
 /* comparación en dos columnas alineadas (una sola caja con scroll: se mueven juntas) */
@@ -2843,6 +2849,10 @@ async function mergeTwoView(f, from, c, dec, txt, back, editNow = false) {
     const chosen = dec[f.rel], editing = tab === 'mano' && (txt[f.rel] == null || d.dataset.edit === '1');
     const res = result(tab), same = res != null && now != null && norm(res) === norm(now);
     const label = esc(opts.find(o => o[0] === tab)[1]);
+    // con una opción ya elegida, volver es guardar la elección (en «Editar manualmente» guarda su propio botón)
+    const back = d.querySelector('[data-back]'), saved = !editing && chosen && (chosen !== 'mano' || txt[f.rel] != null);
+    back.textContent = saved ? '✓ Guardar y volver' : '← Volver a la lista';
+    back.classList.toggle('mgsave', !!saved);
     // siempre las dos columnas: lo que tienes ahora | así quedará (también si no cambia o se borra: se ve el archivo)
     const note = res == null && tab !== 'mano' ? (now == null ? '✓ Sigue borrado: tu archivo no cambia.' : '🗑 Con esta opción el archivo se borra.')
       : same ? '✓ Tu archivo no cambia: queda exactamente como lo tienes.' : '';
@@ -2852,7 +2862,7 @@ async function mergeTwoView(f, from, c, dec, txt, back, editNow = false) {
           ${sideBySideRows(norm(now ?? ''), norm(res ?? ''))}</div><div class="mgbar"></div></div>`;
     d.querySelector('.mgvbody').innerHTML = `<nav class="mgtabs">${opts.map(([id, label, sub]) => `<button data-t="${id}" class="${tab === id ? 'on' : ''}${chosen === id && (id !== 'mano' || txt[f.rel] != null) ? ' chosen' : ''}">
         <b>${ICON[id] || ''} ${esc(label)}${chosen === id && (id !== 'mano' || txt[f.rel] != null) ? ' ✓' : ''}</b><small>${esc(sub)}</small></button>`).join('')}</nav>
-      <p class="mglegend">${editing ? '<button class="small primary" data-save>✓ Guardar y volver a la lista</button>' + (/^<{7} /m.test(start())
+      <p class="mglegend">${editing ? '<button class="small mgsave" data-save>✓ Guardar y volver a la lista</button>' + (/^<{7} /m.test(start())
           ? 'Escribe cómo debe quedar el archivo. Donde chocan los dos cambios hay unas líneas «&lt;&lt;&lt;&lt;&lt;&lt;&lt;», «=======» y «&gt;&gt;&gt;&gt;&gt;&gt;&gt;» que solo los separan: deja lo que quieras de cada uno y bórralas.'
           : 'Empieza con los dos cambios ya juntos: retoca lo que quieras.')
         : tab === 'mano' ? `Así queda con lo que escribiste. <button class="small" data-reedit>✎ Volver a editar</button>`
