@@ -1,6 +1,11 @@
 # Novedades de DeskLens
 Cada cambio es una versión nueva, la más reciente arriba. El número de la primera es el que sale en ⓘ (arriba en la cinta).
 
+## v1.114 · 2026-11-13 · Línea sombreada, Guardar vuelve a lectura y Ctrl+A en casi todo
+- Al pasar el ratón se sombrea la fila con su número, al leer y al editar; al editar, la línea del cursor queda marcada. En Markdown, tablas y cuadernos se sombrea el párrafo, la fila o la celda.
+- El botón Guardar guarda y vuelve a lectura en la misma línea; Ctrl+S guarda sin salir de la edición.
+- Ctrl+A también en la consola (su salida) y en el panel de IA (la conversación), nunca toda la ventana.
+
 ## v1.113 · 2026-11-13 · Ctrl+A selecciona solo el documento
 - En lectura, Ctrl+A selecciona solo el texto del archivo abierto (sin árbol, pestañas ni números de línea); con la vista dividida, solo el lado activo.
 - En cuadros de texto, el editor y la consola sigue como siempre.

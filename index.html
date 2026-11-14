@@ -37,6 +37,7 @@ const isDark = () => (document.documentElement.dataset.theme || (matchMedia('(pr
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldgutter.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldgutter.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/selection/active-line.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/brace-fold.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/xml-fold.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/indent-fold.min.js"></script>
@@ -741,6 +742,14 @@ dialog#dlg.fcmp[open]{display:flex}
 .code .nl{position:relative;padding-left:14px}.code .nl .fd{position:absolute;left:0;width:12px;font-style:normal;text-align:center;color:var(--faint)}
 .code .nl.can{cursor:pointer}.code .nl.can:hover,.code .nl.can:hover .fd{color:var(--accent)}.code .nl .fd::before{content:"▾"}.code .nl.off .fd::before{content:"▸";color:var(--accent)}
 .code .hid{display:none}
+/* fila bajo el ratón (lectura): número + línea hasta el borde; :where para no tapar la línea de depuración ni la marca de «Ir a» */
+.code pre:last-child{flex:1}:where(.code .cl.hov,.code .nl.hov){background:var(--hover)}.code .nl.hov{color:var(--accent)}
+:where(.page) :is(p,h1,h2,h3,h4,h5,h6,blockquote,pre,tr,.cell):hover,:where(.page) li:hover:not(:has(li:hover)){background:var(--hover);border-radius:4px}
+table.grid tr:hover td{background:var(--hover)}
+/* edición: fila bajo el ratón y la del cursor (addon active-line), con su número */
+.CodeMirror-code>div:hover,.CodeMirror-code>div:hover .CodeMirror-gutter-elt{background:var(--hover)}
+.CodeMirror-code>div:hover .CodeMirror-linenumber,.CodeMirror-activeline-gutter .CodeMirror-linenumber{color:var(--accent)}
+.CodeMirror-activeline-background,.CodeMirror-activeline-gutter{background:color-mix(in srgb,var(--accent) 9%,transparent)}
 .code .fmk{display:inline-block;margin-left:6px;padding:0 6px;border-radius:4px;background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent);cursor:pointer;font-size:.85em;line-height:1.3}
 .CodeMirror-foldgutter{width:14px}.CodeMirror-foldgutter-open,.CodeMirror-foldgutter-folded{color:var(--faint);cursor:pointer}
 .CodeMirror-foldgutter-open:after{content:"▾"}.CodeMirror-foldgutter-folded:after{content:"▸";color:var(--accent)}
@@ -4719,11 +4728,11 @@ async function render() {
   const editable = f.texto !== null && !f.truncado, isDoc = MD.has(k.ext) || HTML.has(k.ext);
   const menu = [];
   if (ed) {
-    B.append(Object.assign(button('Guardar', () => save(path)), { className: 'primary small', title: 'Ctrl+S' }));
+    B.append(Object.assign(button('Guardar', () => saveAndRead(path)), { className: 'primary small', title: 'Guardar y volver a lectura (Ctrl+S guarda sin salir)' }));
     if (!isUntitled(path)) histButtons(B, path);
     B.append(iconBtn('book', 'Volver a lectura', () => leaveEdit(path)));
     if (isDoc) menu.push([preview ? 'Editar código' : 'Vista previa', () => { preview = !preview; render(); }]);
-    menu.push(['Guardar', () => save(path)], ['Descartar cambios', () => discard(path)], ['Salir de edición', () => leaveEdit(path)]);
+    menu.push(['Guardar', () => saveAndRead(path)], ['Descartar cambios', () => discard(path)], ['Salir de edición', () => leaveEdit(path)]);
   }
   if (f.ejecutar) {
     const why = f.ejecutar.error;
@@ -4870,7 +4879,7 @@ function livePreview(ed, V, fn) {
 function editorView(V, ed, name, path) {
   V.className = 'flush';
   const cm = CodeMirror(V, { value: ed.text, lineNumbers: true, matchBrackets: true, indentUnit: AJ.editor_tab || 4, tabSize: AJ.editor_tab || 4, lineWrapping: wrapOn(),
-    theme: isDark() ? 'material-darker' : 'default', foldGutter: true, gutters: ['cm-bp', 'CodeMirror-linenumbers', 'CodeMirror-foldgutter'],
+    theme: isDark() ? 'material-darker' : 'default', foldGutter: true, styleActiveLine: { nonEmpty: false }, gutters: ['cm-bp', 'CodeMirror-linenumbers', 'CodeMirror-foldgutter'],
     foldOptions: { rangeFinder: foldFinder, widget: '⋯', minFoldSize: 1 },
     extraKeys: { 'Shift-Ctrl-[': 'fold', 'Shift-Ctrl-]': 'unfold' } });
   // el otro lado edita el mismo archivo: este usa un documento enlazado al suyo (lo escrito sale en los dos, un solo
@@ -5164,24 +5173,27 @@ function findReplace(all) {
     else if (e.key === 'Escape' && !$('#find').hidden && !e.target.closest?.('input, textarea')) { e.stopImmediatePropagation(); findClose(); }
   });
 }
-// Ctrl+A en lectura: solo el contenido del documento del lado activo (sin árbol, pestañas, migas ni números de
-// línea). En cuadros de texto, editores y la consola manda el navegador/CodeMirror. Vistas sin texto (imagen, vídeo,
-// ficha): no selecciona nada. PDF: solo el texto de las páginas ya dibujadas.
+// Ctrl+A nunca selecciona toda la ventana: en la consola, su salida; en el panel de IA, la conversación; en el resto
+// (lectura, árbol, pestañas…), el documento del lado activo sin números de línea. En cuadros de texto, editores
+// (CodeMirror, Word) y modales manda el navegador/CodeMirror. Sin texto (imagen, vídeo, ficha): no selecciona nada.
+// Límites: PDF, solo el texto de las páginas ya dibujadas; HTML con formato va aislado (iframe sin same-origin):
+// se selecciona con Ctrl+A tras hacer clic dentro.
+let lastDown = null; // un clic en la consola o el chat (sin foco propio) deja el foco en body: vale dónde se pulsó
+addEventListener('pointerdown', e => lastDown = e.target, true);
 addEventListener('keydown', e => {
   if (!e.ctrlKey || e.altKey || e.shiftKey || e.key.toLowerCase() !== 'a' || e.defaultPrevented || modalOpen()) return;
-  const t = e.target;
-  if (t.closest?.('input, textarea, select, [contenteditable=""], [contenteditable=true], .CodeMirror, #panel, #ia, #find, aside')) return;
-  const V = $('#view');
-  if (!V) return;
+  const t = e.target === document.body && lastDown?.isConnected ? lastDown : e.target;
+  if (t.closest?.('input, textarea, select, [contenteditable=""], [contenteditable=true], .CodeMirror')) return;
   e.preventDefault();
-  const cm = V.querySelector('.CodeMirror')?.CodeMirror; // editor visible sin foco: todo su texto
+  const pick = el => { getSelection().removeAllRanges(); if (!el) return; const r = document.createRange(); r.selectNodeContents(el); getSelection().addRange(r); };
+  if (t.closest?.('#panel')) return pick(document.getElementById('out'));
+  if (t.closest?.('#ia')) return pick(document.getElementById('convLog'));
+  const V = $('#view');
+  const cm = V?.querySelector('.CodeMirror')?.CodeMirror; // editor visible sin foco: todo su texto
   if (cm) { cm.focus(); return cm.execCommand('selectAll'); }
-  // por prioridad (no en orden del documento): código, Word, Markdown/texto, páginas del PDF, tabla
-  const el = ['.code code.hljs', '.docx-wrapper', '.page', '.md'].map(s => V.querySelector(s)).find(Boolean)
-    || V.querySelector('.textLayer')?.closest('[data-n]')?.parentElement || V.querySelector('table');
-  if (!el) return getSelection().removeAllRanges();
-  const r = document.createRange(); r.selectNodeContents(el);
-  getSelection().removeAllRanges(); getSelection().addRange(r);
+  // por prioridad (no en orden del documento): código, Word, Markdown/texto/cuaderno, páginas del PDF, tabla
+  pick(V && (['.code code.hljs', '.docx-wrapper', '.page', '.md'].map(s => V.querySelector(s)).find(Boolean)
+    || V.querySelector('.textLayer')?.closest('[data-n]')?.parentElement || V.querySelector('table')));
 });
 CodeMirror.commands.save = () => cur && (edits.has(cur) ? save(cur) : wedit?.path === cur ? wordSave() : iedit?.path === cur ? imageSave() : pedit?.path === cur && pdfSave());
 addEventListener('keydown', e => {
@@ -5364,7 +5376,7 @@ async function save(path, force = false) {
   if (r.status === 409) {
     const c = await ask('Conflicto', `"${ed.f.nombre}" cambió fuera de DeskLens a las ${new Date(d.fecha * 1000).toLocaleTimeString()}. ` +
       '¿Qué versión quieres conservar?', ['Recargar su versión', 'Sobrescribir', 'Cancelar']);
-    if (c === 'Sobrescribir') return save(path, true);
+    if (c === 'Sobrescribir') return save(path, true); // su resultado (true si se guardó) es el de este
     if (c === 'Recargar su versión') startEdit(path, await api('/api/abrir?ruta=' + encodeURIComponent(path)));
     return;
   }
@@ -5374,6 +5386,17 @@ async function save(path, force = false) {
   dropBackup(path); // guardado: la copia de recuperación ya no hace falta
   renderTabs();
   flash('✓ Guardado' + (d.bak ? ' · respaldo: ' + d.bak.split(/[\\/]/).pop() : ''));
+  return true;
+}
+// Botón Guardar (y «Guardar» del ⋮): guarda y vuelve a lectura con la misma primera línea a la vista (en código; un
+// documento con formato no tiene líneas). Si no se guardó, sigue en edición. Ctrl+S guarda sin salir.
+async function saveAndRead(path) {
+  const top = editorCM ? editorCM.lineAtHeight(editorCM.getScrollInfo().top, 'local') : -1;
+  if (isUntitled(path)) return save(path); // al ponerle nombre pasa a ser otro archivo: se queda en edición
+  if (await save(path) !== true) return;
+  await leaveEdit(path);
+  const row = cur === path && top > 0 && $('#view .code .cl[data-i="' + top + '"]');
+  if (row) $('#view').scrollTop = row.closest('.code').offsetTop + row.offsetTop;
 }
 // ---------- el archivo abierto cambió en el disco (otro programa, la IA, git…): se recarga solo o se pregunta ----------
 // ⚙ «Preguntar antes de recargar…» (predeterminado: no). Con cambios sin guardar aquí, siempre se pregunta.
@@ -5607,6 +5630,11 @@ function codeView(V, text, lang, path) {
   d.innerHTML = `<pre class="nums">${raw.map((_, i) => `<div class="nl${ranges.has(i) ? ' can' : ''}" data-i="${i}">${ranges.has(i) ? '<i class="fd"></i>' : ''}${i + 1}</div>`).join('')}</pre>`
     + `<pre><code class="hljs">${html.map((l, i) => `<div class="cl" data-i="${i}">${l || ' '}</div>`).join('')}</code></pre>`;
   const nl = d.querySelectorAll('.nl'), cl = d.querySelectorAll('.cl'), folded = new Set();
+  // fila bajo el ratón: número y línea van en columnas distintas, así que se marcan los dos (.hov)
+  let hov = -1;
+  const hover = i => { if (i === hov) return; [nl[hov], cl[hov]].forEach(x => x?.classList.remove('hov')); hov = i; [nl[i], cl[i]].forEach(x => x?.classList.add('hov')); };
+  d.onmouseover = e => { const r = e.target.closest?.('[data-i]'); if (r) hover(+r.dataset.i); };
+  d.onmouseleave = () => hover(-1);
   const apply = () => {
     d.querySelectorAll('.hid').forEach(x => x.classList.remove('hid')); d.querySelectorAll('.fmk').forEach(x => x.remove()); d.querySelectorAll('.nl.off').forEach(x => x.classList.remove('off'));
     for (const s of [...folded].sort((a, b) => a - b)) {
